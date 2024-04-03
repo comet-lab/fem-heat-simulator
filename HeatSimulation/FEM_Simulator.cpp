@@ -139,19 +139,19 @@ void FEM_Simulator::calculateJs(float deltaX[2], int dim, Eigen::Matrix2<float> 
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
 	int direction = dim / abs(dim);
 	dim = abs(dim);
-	J(0, 1) = 0;
-	J(1, 0) = 0;
+	Js(0, 1) = 0;
+	Js(1, 0) = 0;
 	if (dim == 1) {
-		J(0, 0) = deltaX[1] / 2.0;
-		J(1, 1) = deltaX[2] / 2.0;
+		Js(0, 0) = deltaX[1] / 2.0;
+		Js(1, 1) = deltaX[2] / 2.0;
 	}
 	else if (dim == 2) {
-		J(0, 0) = deltaX[0] / 2.0;
-		J(1, 1) = deltaX[2] / 2.0;
+		Js(0, 0) = deltaX[0] / 2.0;
+		Js(1, 1) = deltaX[2] / 2.0;
 	}
 	else if (dim == 3) {
-		J(0, 0) = deltaX[0] / 2.0;
-		J(1, 1) = deltaX[1] / 2.0;
+		Js(0, 0) = deltaX[0] / 2.0;
+		Js(1, 1) = deltaX[1] / 2.0;
 	}
 
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
