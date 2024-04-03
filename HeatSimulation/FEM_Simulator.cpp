@@ -266,7 +266,7 @@ void FEM_Simulator::ind2sub(int index, int size[3], int sub[3])
 	return;
 }
 
-float FEM_Simulator::integrate(std::function<float(float[3], int, int)> fun, int points, int dim, int Ai, int Bi)
+float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int), int points, int dim, int Ai, int Bi)
 {
 	std::vector<float> zeros;
 	std::vector<float> weights;
@@ -296,19 +296,19 @@ float FEM_Simulator::integrate(std::function<float(float[3], int, int)> fun, int
 			if (dim == 0) {
 				for (int k = 0; k < points; k++) {
 					float xi[3] = { zeros[i], zeros[j], zeros[k] };
-					output += fun(xi, Ai, Bi) * weights[i] * weights[j] * weights[k];
+					output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j] * weights[k];
 				}
 			} if (abs(dim) == 1) { // we are in the y-z plane
 				float xi[3] = { dim / abs(dim), zeros[i], zeros[j] };
-				output += fun(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 2) { // we are in the x-z plane
 				float xi[3] = { zeros[i], dim / abs(dim), zeros[j] };
-				output += fun(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 3) { // we are in the x-y plane
 				float xi[3] = { zeros[i], zeros[j], dim / abs(dim) };
-				output += fun(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
 			}
 		}
 	}

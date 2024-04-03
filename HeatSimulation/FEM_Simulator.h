@@ -73,7 +73,7 @@ private:
 	static float calculateNA_eta(float xi[3], int Ai);
 	static float calculateNA_zeta(float xi[3], int Ai);
 	static void ind2sub(int index, int size[3], int sub[3]);
-	float integrate(std::function<float(float[3], int Ai, int Bi)> fun, int points, int dim, int Ai, int Bi);
+	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi);
 	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	void getGlobalPosition(int globalNode, float position[3]);
 	float calculateKAB(float xi[3]);
