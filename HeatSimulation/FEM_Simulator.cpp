@@ -101,7 +101,7 @@ float FEM_Simulator::calculateNA(float xi[3], int Ai)
 	return output;
 }
 
-void FEM_Simulator::calculateJ(float xi[3], float deltaX[3], Eigen::Matrix3<float> J)
+void FEM_Simulator::calculateJ(float deltaX[3], Eigen::Matrix3<float> J)
 {
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
@@ -131,12 +131,33 @@ void FEM_Simulator::calculateJ(float xi[3], float deltaX[3], Eigen::Matrix3<floa
 
 }
 
-void FEM_Simulator::calculateJs(float xi[2], float pos[8][3], int dim, Eigen::Matrix2<float> Js)
+void FEM_Simulator::calculateJs(float deltaX[2], int dim, Eigen::Matrix2<float> Js)
 {
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
 	// We assume the values of xi correspond to the values of the remaining two axis in ascending order.
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
+	int direction = dim / abs(dim);
+	dim = abs(dim);
+	J(0, 1) = 0;
+	J(1, 0) = 0;
+	if (dim == 1) {
+		J(0, 0) = deltaX[1] / 2.0;
+		J(1, 1) = deltaX[2] / 2.0;
+	}
+	else if (dim == 2) {
+		J(0, 0) = deltaX[0] / 2.0;
+		J(1, 1) = deltaX[2] / 2.0;
+	}
+	else if (dim == 3) {
+		J(0, 0) = deltaX[0] / 2.0;
+		J(1, 1) = deltaX[1] / 2.0;
+	}
+
+	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
+	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
+	will only contain values along the diagonal and their values will be equal to (deltaX/2, deltaY/2, and deltaZ/2).
+
 	int direction = dim / abs(dim);
 	dim = abs(dim);
 	float xiExt[3] = { 0.0,0.0,0.0 };
@@ -197,7 +218,7 @@ void FEM_Simulator::calculateJs(float xi[2], float pos[8][3], int dim, Eigen::Ma
 				}
 			}
 		}
-	}
+	} */
 }
 
 void FEM_Simulator::calculateNA_dot(float xi[3], int Ai, Eigen::Vector3<float> NA_dot)

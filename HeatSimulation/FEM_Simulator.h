@@ -66,8 +66,8 @@ private:
 	bool checkBoundaryNode(int globalNode);
 	void initializeNodeMap();
 	float calculateNA(float xi[3], int Ai);
-	static void calculateJ(float xi[3], float deltaX[3], Eigen::Matrix3<float> J);
-	static void calculateJs(float xi[2], float  pos[8][3], int dim, Eigen::Matrix2<float> Js);
+	static void calculateJ(float deltaX[3], Eigen::Matrix3<float> J);
+	static void calculateJs(float  deltaX[3], int dim, Eigen::Matrix2<float> Js);
 	static void calculateNA_dot(float xi[3], int Ai, Eigen::Vector3<float> NA_dot);
 	static float calculateNA_xi(float xi[3], int Ai);
 	static float calculateNA_eta(float xi[3], int Ai);
