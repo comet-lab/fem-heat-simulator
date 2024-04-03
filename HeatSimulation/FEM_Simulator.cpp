@@ -79,10 +79,12 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			for (int Bi = 0; Bi < 8; Bi++) {
 				K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi); // TODO: K
 				M.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi); // TODO: M
+				
+				int BiSub[3];
+				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
+				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi); // TODO: Fint
 			}
 
-			F(elementGlobalNodes[Ai]) += NFR[nodeSub[0]][nodeSub[01]][nodeSub[2]]; // TODO: Fint
-	
 			if (fluxFlag) {
 				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
 			}
@@ -389,6 +391,20 @@ float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
 
 	MABfunc = (NAa * NAb); // matrix math
 	MABfunc = MABfunc * J.determinant() * this->VHC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
+	return MABfunc;
+}
+
+float FEM_Simulator::createFintFunction(float xi[3], int Ai, int Bi)
+{
+	float MABfunc = 0;
+	float NAa;
+	float NAb;
+	Eigen::Matrix3<float> J = this->J;
+
+	NAa = this->calculateNA(xi, Ai);
+	NAb = this->calculateNA(xi, Bi);
+	MABfunc = this->MUA * (NAa * NAb) * J.determinant();
+	// Output of this still needs to get multiplied by the NFR at node Bi
 	return MABfunc;
 }
 

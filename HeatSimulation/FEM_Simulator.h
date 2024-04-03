@@ -79,9 +79,9 @@ private:
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi);
 	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	void getGlobalPosition(int globalNode, float position[3]);
-	float calculateKAB(float xi[3]);
 	float createKABFunction(float xi[3], int Ai, int Bi);
 	float createMABFunction(float xi[3], int Ai, int Bi);
+	float createFintFunction(float xi[3], int Ai, int Bi);
 
 };
 
