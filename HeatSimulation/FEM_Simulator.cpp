@@ -15,16 +15,26 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->TC = TC;
 	this->VHC = VHC;
 	this->MUA = MUA;
+	// If we change assumption of uniform voxel size in cuboid this won't work anymore.
+	this->calculateJ(this->J);
+	this->calculateJs(1, this->Js1);
+	this->calculateJs(2, this->Js2);
+	this->calculateJs(3, this->Js3);
+	
+	this->initializeBoundaryNodes();
 }
 
 void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 {
+	this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 
 	Eigen::SparseMatrix<float> K(nNodes, nNodes);
+	K.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
 	Eigen::SparseMatrix<float> M(nNodes, nNodes);
-	std::vector<float> F(nNodes); // Containts Fint, Fj, and Fd
+	Eigen::VectorXf F(nNodes); // Containts Fint, Fj, and Fd
+	int indexCounter = 0;
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
 
@@ -64,27 +74,22 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				} // iterate through faces
 			} // if node is a face
 
-			// Now we will build the K, M and F matrices
-			if (!dirichletFlag) { // if the node is not a dirichlet boundary
-				// Calculate Fj, Fint, K, M
+			// Now we will build the K, M and F matrice
 
-				for (int Bi = 0; Bi < 8; Bi++) {
-					K[elementGlobalNodes[Ai]][elementGlobalNodes[Bi]] += this->integrate(&calculateKAB); // TODO: K
-					M[elementGlobalNodes[Ai]][elementGlobalNodes[Bi]] += 0; // TODO: M
-				}
-
-				F[elementGlobalNodes[Ai]] += NFR[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // TODO: Fint
-				if (fluxFlag) {
-					F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
-				}
-				if (convectionFlag) {
-					F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
-				}
-
+			for (int Bi = 0; Bi < 8; Bi++) {
+				K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi); // TODO: K
+				M.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi); // TODO: M
 			}
-			else { // If Node is a dirichlet boundary
-				// Calculate Fd
+
+			F(elementGlobalNodes[Ai]) += NFR[nodeSub[0]][nodeSub[01]][nodeSub[2]]; // TODO: Fint
+	
+			if (fluxFlag) {
+				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
 			}
+			if (convectionFlag) {
+				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
+			}
+
 		}
 	}
 	// Remove unecessary members of Fint and Fj
@@ -303,7 +308,7 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 
 	for (int i = 0; i < points; i++) {
 		for (int j = 0; j < points; j++) {
-			if (dim == 0) {
+			if (dim == 0) { // integrate across all 3 axis
 				for (int k = 0; k < points; k++) {
 					float xi[3] = { zeros[i], zeros[j], zeros[k] };
 					output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j] * weights[k];
@@ -322,6 +327,7 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 			}
 		}
 	}
+	return output;
 }
 
 void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
@@ -356,23 +362,15 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 	position[2] = sub[2] * deltaZ;
 }
 
-float FEM_Simulator::calculateKAB(float xi[3])
-{
-
-	float KAB = integrate(&createKABFunction, 2, 0);
-	return KAB;
-}
-
 float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 {
 	float KABfunc = 0;
 	Eigen::Vector3<float> NAdotA;
 	Eigen::Vector3<float> NAdotB;
-	Eigen::Matrix3<float> J;
+	Eigen::Matrix3<float> J = this->J;
 
 	this->calculateNA_dot(xi, Ai, NAdotA);
 	this->calculateNA_dot(xi, Bi, NAdotB);
-	this->calculateJ(this->currElement.globalNodePositions, J);
 
 	KABfunc = (NAdotA.transpose() * J.inverse() * J.inverse().transpose() * NAdotB); // matrix math
 	KABfunc = KABfunc * J.determinant() * this->TC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
@@ -384,11 +382,10 @@ float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
 	float MABfunc = 0;
 	float NAa;
 	float NAb;
-	Eigen::Matrix3<float> J;
+	Eigen::Matrix3<float> J = this->J;
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
-	this->calculateJ(xi, this->currElement.globalNodePositions, J);
 
 	MABfunc = (NAa * NAb); // matrix math
 	MABfunc = MABfunc * J.determinant() * this->VHC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
@@ -407,11 +404,25 @@ void FEM_Simulator::setBoundaryConditions(int BC[6])
 void FEM_Simulator::initializeBoundaryNodes()
 {
 	// we only need to scan nodes on the surface. Since we are assuming a cuboid this is easy to predetermine
-	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-	int face = 0;
-	for (int n = 0; n < (this->nodeSize[0] * this->nodeSize[1]); n++) { // Nodes on the bottom surface
+	this->numDirichletNodes = 0;
+	if (this->boundaryType[0] == HEATSINK) { // Top Face
+		numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
+	}	
+	if (this->boundaryType[1] == HEATSINK) { // bottom face
+		numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
 	}
-	for (int n = (this->nodeSize[0] * this->nodeSize[1]); n) {}
+	if (this->boundaryType[2] == HEATSINK) { // front face
+		numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2]-2);
+	}
+	if (this->boundaryType[4] == HEATSINK) { // back face
+		numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2] - 2);
+	}
+	if (this->boundaryType[3] == HEATSINK) { // right face
+		numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
+	}
+	if (this->boundaryType[5] == HEATSINK) { // left face
+		numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
+	}
 }
 
 int FEM_Simulator::determineNodeFace(int globalNode)

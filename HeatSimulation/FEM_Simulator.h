@@ -26,6 +26,7 @@ public:
 	float MUA = 0; // Absorption Coefficient [cm^-1]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
 	std::vector<std::vector<std::vector<float>>> Temp; // Our values for temperature at the nodes of the elements
+	std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tSpan[2] = { 0, 0 };
@@ -43,12 +44,14 @@ public:
 
 private:
 
-
-	
+	// because of our assumptions, these don't need to be recalculated every time and be class variables.
+	Eigen::Matrix3<float> J;
+	Eigen::Matrix2<float> Js1;
+	Eigen::Matrix2<float> Js2;
+	Eigen::Matrix2<float> Js3;
 	int nodeSize[3] = { 1,1,1 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> nodeMapping; // Maps d values in the full d vector to the reduced d vector. It helps in creating the matrices already in reduced form
-	//int currAi = 0;
-	//int currBi = 0;
+	int numDirichletNodes; 
 	element currElement;
 
 	std::vector<int> dirichletBoundaryNodes;
