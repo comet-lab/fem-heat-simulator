@@ -414,7 +414,6 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 {
 	float FjFunc = 0;
 	float NAa;
-	float NAb;
 	Eigen::Matrix2f Js; 
 	if (dim == 1) {
 		Js = this->Js1;
@@ -427,7 +426,6 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 	}
 
 	NAa = this->calculateNA(xi, Ai);
-	NAb = this->calculateNA(xi, Bi);
 	FjFunc = (NAa * this->Jn) * Js.determinant();
 	return FjFunc;
 }
