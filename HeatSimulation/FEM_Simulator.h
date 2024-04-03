@@ -16,6 +16,7 @@ public:
 	// One node can belong to multiple faces so we use binary to set the face value
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face
 	enum tissueFace { INTERNAL = 0, TOP = 1, BOTTOM = 2, FRONT = 4, RIGHT = 8, BACK = 16, LEFT = 32 };
+	const int dimMap[6] = { 3, -3, -2, 1, 2, -1 };
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
@@ -82,6 +83,7 @@ private:
 	float createKABFunction(float xi[3], int Ai, int Bi);
 	float createMABFunction(float xi[3], int Ai, int Bi);
 	float createFintFunction(float xi[3], int Ai, int Bi);
+	float createFjFunction(float xi[3], int Ai, int Bi);
 
 };
 

@@ -65,9 +65,11 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 							dirichletFlag == true;
 						}
 						else if (this->boundaryType[f] == FLUX) { // flux boundary
+							F(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFjFunction,2,this->dimMap[f], Ai, this->dimMap[f]);
 							fluxFlag = true;
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
+							F(elementGlobalNodes[Ai]) += 0;
 							convectionFlag = true;
 						}
 					} // if Node is face f
@@ -86,7 +88,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			}
 
 			if (fluxFlag) {
-				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
+				F(elementGlobalNodes[Ai]) += 0; // TODO: Fj
 			}
 			if (convectionFlag) {
 				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
@@ -396,16 +398,38 @@ float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
 
 float FEM_Simulator::createFintFunction(float xi[3], int Ai, int Bi)
 {
-	float MABfunc = 0;
+	float FintFunc = 0;
 	float NAa;
 	float NAb;
 	Eigen::Matrix3<float> J = this->J;
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
-	MABfunc = this->MUA * (NAa * NAb) * J.determinant();
+	FintFunc = this->MUA * (NAa * NAb) * J.determinant();
 	// Output of this still needs to get multiplied by the NFR at node Bi
-	return MABfunc;
+	return FintFunc;
+}
+
+float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
+{
+	float FjFunc = 0;
+	float NAa;
+	float NAb;
+	Eigen::Matrix2f Js; 
+	if (dim == 1) {
+		Js = this->Js1;
+	}
+	else if (dim == 2) {
+		Js = this->Js2;
+	}
+	else if (dim == 3) {
+		Js = this->Js3;
+	}
+
+	NAa = this->calculateNA(xi, Ai);
+	NAb = this->calculateNA(xi, Bi);
+	FjFunc = (NAa * this->Jn) * Js.determinant();
+	return FjFunc;
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
