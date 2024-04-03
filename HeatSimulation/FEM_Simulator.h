@@ -11,7 +11,7 @@ public:
 		int elementNumber;         // Member (int variable)
 		float globalNodePositions[8][3];   // Member (string variable)
 	};       // Structure variable
-	static const int A[8][3] = { {-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1} };
+	static const int A[8][3];
 
 	// One node can belong to multiple faces so we use binary to set the face value
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face

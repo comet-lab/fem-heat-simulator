@@ -1,5 +1,7 @@
 #include "FEM_Simulator.h"
 
+const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}};
+
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, int tissueSize[3], float TC, float VHC, float MUA)
 {
 	this->Temp = Temp;
@@ -67,7 +69,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				// Calculate Fj, Fint, K, M
 
 				for (int Bi = 0; Bi < 8; Bi++) {
-					K[elementGlobalNodes[Ai]][elementGlobalNodes[Bi]] += this->integrate(&calculateKAB; // TODO: K
+					K[elementGlobalNodes[Ai]][elementGlobalNodes[Bi]] += this->integrate(&calculateKAB); // TODO: K
 					M[elementGlobalNodes[Ai]][elementGlobalNodes[Bi]] += 0; // TODO: M
 				}
 
@@ -360,7 +362,7 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 
 	this->calculateNA_dot(xi, Ai, NAdotA);
 	this->calculateNA_dot(xi, Bi, NAdotB);
-	this->calculateJ(xi, this->currElement.globalNodePositions, J);
+	this->calculateJ(this->currElement.globalNodePositions, J);
 
 	KABfunc = (NAdotA.transpose() * J.inverse() * J.inverse().transpose() * NAdotB); // matrix math
 	KABfunc = KABfunc * J.determinant() * this->TC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
