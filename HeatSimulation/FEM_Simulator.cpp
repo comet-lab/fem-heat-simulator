@@ -103,7 +103,7 @@ float FEM_Simulator::calculateNA(float xi[3], int Ai)
 	return output;
 }
 
-void FEM_Simulator::calculateJ(float deltaX[3], Eigen::Matrix3<float> J)
+void FEM_Simulator::calculateJ(Eigen::Matrix3<float> J)
 {
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
@@ -121,39 +121,49 @@ void FEM_Simulator::calculateJ(float deltaX[3], Eigen::Matrix3<float> J)
 			}
 		}
 	}*/
-	J(0, 0) = deltaX[0] / 2.0;
+
+	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	float deltaX = this->gridSize[0] / this->tissueSize[0];
+	float deltaY = this->gridSize[1] / this->tissueSize[1];
+	float deltaZ = this->gridSize[2] / this->tissueSize[2];
+	J(0, 0) = deltaX / 2.0;
 	J(0, 1) = 0;
 	J(0, 2) = 0;
 	J(1, 0) = 0;
-	J(1, 1) = deltaX[0]/2.0;
+	J(1, 1) = deltaY/2.0;
 	J(1, 2) = 0;
 	J(2, 0) = 0;
 	J(2, 1) = 0;
-	J(2, 2) = deltaX[2] / 2.0;
+	J(2, 2) = deltaZ / 2.0;
 
 }
 
-void FEM_Simulator::calculateJs(float deltaX[2], int dim, Eigen::Matrix2<float> Js)
+void FEM_Simulator::calculateJs(int dim, Eigen::Matrix2<float> Js)
 {
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
 	// We assume the values of xi correspond to the values of the remaining two axis in ascending order.
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
+
+	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	float deltaX = this->gridSize[0] / this->tissueSize[0];
+	float deltaY = this->gridSize[1] / this->tissueSize[1];
+	float deltaZ = this->gridSize[2] / this->tissueSize[2];
 	int direction = dim / abs(dim);
 	dim = abs(dim);
 	Js(0, 1) = 0;
 	Js(1, 0) = 0;
 	if (dim == 1) {
-		Js(0, 0) = deltaX[1] / 2.0;
-		Js(1, 1) = deltaX[2] / 2.0;
+		Js(0, 0) = deltaY / 2.0;
+		Js(1, 1) = deltaZ / 2.0;
 	}
 	else if (dim == 2) {
-		Js(0, 0) = deltaX[0] / 2.0;
-		Js(1, 1) = deltaX[2] / 2.0;
+		Js(0, 0) = deltaX / 2.0;
+		Js(1, 1) = deltaZ / 2.0;
 	}
 	else if (dim == 3) {
-		Js(0, 0) = deltaX[0] / 2.0;
-		Js(1, 1) = deltaX[1] / 2.0;
+		Js(0, 0) = deltaX / 2.0;
+		Js(1, 1) = deltaY / 2.0;
 	}
 
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that

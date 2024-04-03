@@ -20,7 +20,7 @@ public:
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
 	int gridSize[3] = { 0,0,0 }; // Number of voxels in x, y, and z [voxels]
-	int tissueSize[3] = { 0,0,0 };  // Length of the tissue in x, y, and z [cm]
+	float tissueSize[3] = { 0,0,0 };  // Length of the tissue in x, y, and z [cm]
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
@@ -66,8 +66,8 @@ private:
 	bool checkBoundaryNode(int globalNode);
 	void initializeNodeMap();
 	float calculateNA(float xi[3], int Ai);
-	static void calculateJ(float deltaX[3], Eigen::Matrix3<float> J);
-	static void calculateJs(float  deltaX[3], int dim, Eigen::Matrix2<float> Js);
+	void calculateJ(Eigen::Matrix3<float> J);
+	void calculateJs(int dim, Eigen::Matrix2<float> Js);
 	static void calculateNA_dot(float xi[3], int Ai, Eigen::Vector3<float> NA_dot);
 	static float calculateNA_xi(float xi[3], int Ai);
 	static float calculateNA_eta(float xi[3], int Ai);
