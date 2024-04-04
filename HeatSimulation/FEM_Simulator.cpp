@@ -69,7 +69,13 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 							fluxFlag = true;
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							F(elementGlobalNodes[Ai]) += 0;
+							F(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFvFunction,2,this->dimMap[f], Ai, this->dimMap[f]);
+							for (int Bi : BSurfMap[f]) {
+								int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
+								// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
+								K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+							}
+
 							convectionFlag = true;
 						}
 					} // if Node is face f
@@ -79,21 +85,13 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			// Now we will build the K, M and F matrice
 
 			for (int Bi = 0; Bi < 8; Bi++) {
-				K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi); // TODO: K
-				M.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi); // TODO: M
+				K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi);
+				M.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
 				
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi); // TODO: Fint
+				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
 			}
-
-			if (fluxFlag) {
-				F(elementGlobalNodes[Ai]) += 0; // TODO: Fj
-			}
-			if (convectionFlag) {
-				F[elementGlobalNodes[Ai]] += 0; // TODO: Fj
-			}
-
 		}
 	}
 	// Remove unecessary members of Fint and Fj
@@ -285,7 +283,7 @@ void FEM_Simulator::ind2sub(int index, int size[3], int sub[3])
 	return;
 }
 
-float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int), int points, int dim, int Ai, int Bi)
+float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int), int points, int dim, int param1, int param2)
 {
 	std::vector<float> zeros;
 	std::vector<float> weights;
@@ -315,19 +313,19 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 			if (dim == 0) { // integrate across all 3 axis
 				for (int k = 0; k < points; k++) {
 					float xi[3] = { zeros[i], zeros[j], zeros[k] };
-					output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j] * weights[k];
+					output += (this->*func)(xi, param1, param2) * weights[i] * weights[j] * weights[k];
 				}
 			} if (abs(dim) == 1) { // we are in the y-z plane
 				float xi[3] = { dim / abs(dim), zeros[i], zeros[j] };
-				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 2) { // we are in the x-z plane
 				float xi[3] = { zeros[i], dim / abs(dim), zeros[j] };
-				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 3) { // we are in the x-y plane
 				float xi[3] = { zeros[i], zeros[j], dim / abs(dim) };
-				output += (this->*func)(xi, Ai, Bi) * weights[i] * weights[j];
+				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 		}
 	}
@@ -428,6 +426,52 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 	NAa = this->calculateNA(xi, Ai);
 	FjFunc = (NAa * this->Jn) * Js.determinant();
 	return FjFunc;
+}
+
+float FEM_Simulator::createFvFunction(float xi[3], int Ai, int dim)
+{
+	float FvFunc = 0;
+	float NAa;
+	Eigen::Matrix2f Js;
+	if (dim == 1) {
+		Js = this->Js1;
+	}
+	else if (dim == 2) {
+		Js = this->Js2;
+	}
+	else if (dim == 3) {
+		Js = this->Js3;
+	}
+
+	NAa = this->calculateNA(xi, Ai);
+	FvFunc = (NAa * this->HTC) * this->ambientTemp * Js.determinant();
+	return FvFunc;
+}
+
+float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
+{
+	float FvuFunc = 0;
+	int Ai = AiBi % 8; // AiBi is passed in in base 8. the ones digit is Ai, the 8s digit is Bi.
+	int Bi = AiBi / 8;
+	float NAa;
+	float NAb;
+	int dir = dim / abs(dim);
+	Eigen::Matrix2f Js;
+	if (dim == 1) { // y-z plane
+		Js = this->Js1;
+	}
+	else if (dim == 2) { // x-z plane
+		Js = this->Js2;
+	}
+	else if (dim == 3) { // x-y plane
+		Js = this->Js3;
+	}
+	NAa = this->calculateNA(xi, Ai);
+	NAb = this->calculateNA(xi, Bi);
+
+	FvuFunc += (NAa * NAb * this->HTC) * Js.determinant();
+	
+	return FvuFunc;
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
