@@ -2,6 +2,7 @@
 //
 
 #include <iostream>
+#include "FEM_Simulator.h"
 
 int main()
 {

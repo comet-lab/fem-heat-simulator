@@ -1,8 +1,11 @@
 #pragma once
 #include <vector> 
+#include <algorithm>
 #include <functional>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
+#include <Eigen/IterativeLinearSolvers>
 
 class FEM_Simulator
 {
@@ -38,13 +41,15 @@ public:
 
 	FEM_Simulator() = default;
 
-	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, int tissueSize[3], float TC, float VHC, float MUA);
+	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA);
 
 	void setBoundaryConditions(int BC[6]);
 
 	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
 
-private:
+
+	/**********************************************************************************************************************/
+	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// because of our assumptions, these don't need to be recalculated every time and be class variables.
 	Eigen::Matrix3<float> J;
@@ -56,15 +61,7 @@ private:
 	int numDirichletNodes; 
 	element currElement;
 
-	std::vector<int> dirichletBoundaryNodes;
-	std::vector<int> fluxBoundaryNodes;
-	std::vector<int> convectionBoundaryNodes;
-	std::vector<int> bottomFaceNodes;
-	std::vector<int> frontFaceNodes;
-	std::vector<int> topFaceNodes;
-	std::vector<int> rightFaceNodes;
-	std::vector<int> backFaceNodes;
-	std::vector<int> leftFaceNodes;
+	std::vector<int> dirichletNodes;
 
 	void initializeBoundaryNodes();
 	int determineNodeFace(int globalNode);
@@ -77,7 +74,6 @@ private:
 	static float calculateNA_xi(float xi[3], int Ai);
 	static float calculateNA_eta(float xi[3], int Ai);
 	static float calculateNA_zeta(float xi[3], int Ai);
-	static void ind2sub(int index, int size[3], int sub[3]);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi);
 	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	void getGlobalPosition(int globalNode, float position[3]);
@@ -88,6 +84,9 @@ private:
 	float createFvFunction(float xi[3], int Ai, int dim);
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
+	static void ind2sub(int index, int size[3], int sub[3]);
+	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes);
+	
 };
 
 

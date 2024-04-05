@@ -2,7 +2,7 @@
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}};
 
-FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, int tissueSize[3], float TC, float VHC, float MUA)
+FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA)
 {
 	this->Temp = Temp;
 	this->gridSize[0] = Temp.size() - 1; // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
@@ -30,11 +30,12 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 
-	Eigen::SparseMatrix<float> K(nNodes, nNodes);
-	K.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
-	Eigen::SparseMatrix<float> M(nNodes, nNodes);
+	Eigen::SparseMatrix<float> Kbar(nNodes, nNodes);
+	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
+	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
 	Eigen::VectorXf F(nNodes); // Containts Fint, Fj, and Fd
-	int indexCounter = 0;
+	std::vector<int> dirichletNodes;
+	std::vector<int> nonDirichletNodes;
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
 
@@ -62,10 +63,12 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				for (int f = 0; f < 6; f++) {
 					if ((nodeFace >> f) & 1) { // Node lies on a boundary
 						if (this->boundaryType[f] == HEATSINK) { // dirichlet boundary
+							dirichletNodes.push_back(elementGlobalNodes[Ai]);
 							dirichletFlag == true;
 						}
 						else if (this->boundaryType[f] == FLUX) { // flux boundary
 							F(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFjFunction,2,this->dimMap[f], Ai, this->dimMap[f]);
+							nonDirichletNodes.push_back(elementGlobalNodes[Ai]);
 							fluxFlag = true;
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
@@ -73,9 +76,9 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 							for (int Bi : BSurfMap[f]) {
 								int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 								// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-								K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+								Kbar.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
 							}
-
+							nonDirichletNodes.push_back(elementGlobalNodes[Ai]);
 							convectionFlag = true;
 						}
 					} // if Node is face f
@@ -83,10 +86,9 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			} // if node is a face
 
 			// Now we will build the K, M and F matrice
-
 			for (int Bi = 0; Bi < 8; Bi++) {
-				K.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi);
-				M.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+				Kbar.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi);
+				Mbar.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
 				
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
@@ -94,13 +96,95 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			}
 		}
 	}
-	// Remove unecessary members of Fint and Fj
-	// Remove unecessary members of Mbar and Kbar
+
+	// Remove the rows corresponding to Dirichlet Nodes
+	F = F(nonDirichletNodes);
+	// Remove unecessary members of Kbar
+	Eigen::SparseMatrix<float> K(nNodes - dirichletNodes.size(), nNodes - dirichletNodes.size()); // K is the reduced Kbar matrix
+	K.reserve(Eigen::VectorXi::Constant(nNodes - dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
+	Eigen::SparseMatrix<float> tempF(nNodes - dirichletNodes.size(),dirichletNodes.size()); // This will store the output of the dirichletBoundaryValues
+	this->reduceSparseMatrix(Kbar, dirichletNodes, K, tempF, nNodes);
+
+	// Remove unecessary memebers of Mbar
+	Eigen::SparseMatrix<float> M(nNodes - dirichletNodes.size(), nNodes - dirichletNodes.size()); // M is the reduced Mbar matrix
+	M.reserve(Eigen::VectorXi::Constant(nNodes - dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	Eigen::SparseMatrix<float> dummy(nNodes - dirichletNodes.size(), dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
+	this->reduceSparseMatrix(Mbar, dirichletNodes, M, dummy, nNodes);
+
 	// Create Fdirichlet based on dirichlet boundaries
+	for (int col = 0; col < tempF.outerSize(); ++col) // iterate through columns 
+		for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
+		{	// col refers to the index in the dirichletNodes array
+			int nodeSub[3];
+			ind2sub(dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
+			float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
+			
+			F(it.row()) -= it.value() * dirichletValue; // Subtract it from F
+		}
 
 	// Solve Euler Family 
+	// Initialize d vector
+	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
+	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
+	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
+	int counter = 0;
+	for (int n = 0; n < nNodes; n++) {
+		if (std::find(dirichletNodes.begin(), dirichletNodes.end(), n) == dirichletNodes.end()) { //not in the list 
+			int nodeSub[3];
+			ind2sub(n, this->nodeSize, nodeSub);
+			dVec(counter) = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]];
+			vVec(counter) = 0;
+		}
+	}
+	// Perform TimeStepping
+	
+	for (float t = deltaT; t < this->tSpan[1]; t += this->deltaT) {
+		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
+		Eigen::ConjugateGradient<Eigen::SparseMatrix<float> > solver;
+		solver.compute(M + this->alpha * deltaT * K);
+		Eigen::VectorXf vVec2 = solver.solve(F - K * dTilde);
+		dVec = dVec + this->deltaT * (this->alpha * vVec2 + (1 - this->alpha) * vVec);
+
+		vVec = vVec2;
+	}
+
+	// Adjust our Temp with new d vector
+	for (int n = 0; n < nNodes; n++) {
+		if (std::find(dirichletNodes.begin(), dirichletNodes.end(), n) == dirichletNodes.end()) { //not in the list 
+			int nodeSub[3];
+			ind2sub(n, this->nodeSize, nodeSub);
+			this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]] = dVec(counter);
+		}
+	}
 }
 
+void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes) {
+	// Assuming the newMat is already the appropriate size, and has had its elements reserved. 
+	int rowCounter = 0;
+	for (int row = 0; row < nNodes; row++) {
+		int validColCounter = 0;
+		int invalidColCounter = 0;
+		if (std::find(rowsToRemove.begin(), rowsToRemove.end(), row) == rowsToRemove.end()) {// if row is NOT in our rows to remove, iterate over the columns
+			for (int col = 0; col < nNodes; col++) {
+				if (std::find(rowsToRemove.begin(), rowsToRemove.end(), col) == rowsToRemove.end()) { // the col is a valid entry
+					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
+						// We add the value from old matrix to new matrix
+						newMat.insert(rowCounter, validColCounter) = oldMat.coeff(row, col);
+					} 
+					// else is just do nothing
+					validColCounter++; // have to increment column counter so we maintain correct position in new matrix. 
+				} // end if col is valid
+				else { // the col is not a valid entry, but the row is so fill the support matrix
+					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
+						suppMat.insert(rowCounter, invalidColCounter) = oldMat.coeff(row, col);
+					}
+					invalidColCounter++;
+				}
+			} // end for each column
+			rowCounter++; // increment row counter in our new matrix
+		} // end if row is not in our rows to remove
+	} // end for each row
+} //reduceSparseMatrix
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
@@ -532,4 +616,3 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 	}
 	return output;
 }
-
