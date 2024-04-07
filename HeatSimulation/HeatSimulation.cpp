@@ -6,6 +6,15 @@
 
 int main()
 {
+    std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+                                                                   { {0,0,0}, {0,0,0}, {0,0,0} },
+                                                                   { {0,0,0}, {0,0,0}, {0,0,0} } };
+    float tissueSize[3] = { 1,1,1 };
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+    float xi[3] = { -1,-1,-1 };
+    float output = simulator->calculateNA(xi, 0);
+    std::cout << output << std::endl;
+
     std::cout << "Hello World!\n";
 }
 

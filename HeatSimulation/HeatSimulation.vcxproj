@@ -104,12 +104,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\nickp\Downloads\eigen-3.4.0\eigen-3.4.0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\nickp\OneDrive - Worcester Polytechnic Institute %28wpi.edu%29\PhD\Code Repositories\CppLibraries\eigen-3.4.0</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\nickp\Downloads\eigen-3.4.0\eigen-3.4.0</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\nickp\OneDrive - Worcester Polytechnic Institute %28wpi.edu%29\PhD\Code Repositories\CppLibraries\eigen-3.4.0;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

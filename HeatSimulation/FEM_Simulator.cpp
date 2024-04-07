@@ -16,10 +16,10 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->VHC = VHC;
 	this->MUA = MUA;
 	// If we change assumption of uniform voxel size in cuboid this won't work anymore.
-	this->calculateJ(this->J);
-	this->calculateJs(1, this->Js1);
-	this->calculateJs(2, this->Js2);
-	this->calculateJs(3, this->Js3);
+	this->J = this->calculateJ();
+	this->Js1 = this->calculateJs(1);
+	this->Js2 = this->calculateJs(2);
+	this->Js3 = this->calculateJs(3);
 	
 	this->initializeBoundaryNodes();
 }
@@ -194,7 +194,7 @@ float FEM_Simulator::calculateNA(float xi[3], int Ai)
 	return output;
 }
 
-void FEM_Simulator::calculateJ(Eigen::Matrix3<float> J)
+Eigen::Matrix3<float> FEM_Simulator::calculateJ()
 {
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
@@ -213,10 +213,11 @@ void FEM_Simulator::calculateJ(Eigen::Matrix3<float> J)
 		}
 	}*/
 
+	Eigen::Matrix3<float> J;
 	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
-	float deltaX = this->gridSize[0] / this->tissueSize[0];
-	float deltaY = this->gridSize[1] / this->tissueSize[1];
-	float deltaZ = this->gridSize[2] / this->tissueSize[2];
+	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
+	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
+	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
 	J(0, 0) = deltaX / 2.0;
 	J(0, 1) = 0;
 	J(0, 2) = 0;
@@ -226,10 +227,11 @@ void FEM_Simulator::calculateJ(Eigen::Matrix3<float> J)
 	J(2, 0) = 0;
 	J(2, 1) = 0;
 	J(2, 2) = deltaZ / 2.0;
+	return J;
 
 }
 
-void FEM_Simulator::calculateJs(int dim, Eigen::Matrix2<float> Js)
+Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim)
 {
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
@@ -237,11 +239,12 @@ void FEM_Simulator::calculateJs(int dim, Eigen::Matrix2<float> Js)
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
 
 	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
-	float deltaX = this->gridSize[0] / this->tissueSize[0];
-	float deltaY = this->gridSize[1] / this->tissueSize[1];
-	float deltaZ = this->gridSize[2] / this->tissueSize[2];
+	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
+	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
+	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
 	int direction = dim / abs(dim);
 	dim = abs(dim);
+	Eigen::Matrix2f Js;
 	Js(0, 1) = 0;
 	Js(1, 0) = 0;
 	if (dim == 1) {
@@ -257,6 +260,7 @@ void FEM_Simulator::calculateJs(int dim, Eigen::Matrix2<float> Js)
 		Js(1, 1) = deltaY / 2.0;
 	}
 
+	return Js;
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
 	will only contain values along the diagonal and their values will be equal to (deltaX/2, deltaY/2, and deltaZ/2).
