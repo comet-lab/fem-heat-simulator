@@ -8,7 +8,7 @@
 #include<memory>
 #include<iostream>
 #include "FEM_Simulator.h"
-//#include "FEM_Simulator.cpp"
+#include "FEM_Simulator.cpp"
 
  //using namespace matlab::mex;
  //using namespace matlab::data;

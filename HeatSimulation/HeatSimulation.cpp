@@ -11,6 +11,9 @@ int main()
                                                                    { {50,50,50}, {50,50,50}, {50,50,50} } };
     float tissueSize[3] = { 1,1,1 };
     FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1);
+    simulator->deltaT = 0.01f;
+    simulator->tSpan[1] = 1;
+    simulator->setHTC(1);
     std::vector<std::vector<std::vector<float>>> NFR = { { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} } };

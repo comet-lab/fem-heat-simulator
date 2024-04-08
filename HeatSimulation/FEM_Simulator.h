@@ -72,7 +72,7 @@ public:
 	std::vector<int> dirichletNodes;
 
 	void initializeBoundaryNodes();
-	int determineNodeFace(int globalNode);
+	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
 	Eigen::Matrix3<float> calculateJ(); // function has test cases
 	Eigen::Matrix2<float> calculateJs(int dim); // function has test cases
