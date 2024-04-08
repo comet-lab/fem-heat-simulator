@@ -1,4 +1,5 @@
 #include "FEM_Simulator.h"
+#include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}};
 
@@ -30,8 +31,8 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Eigen::SparseMatrix<float> Kbar(nNodes, nNodes);
 	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
 	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
-	Eigen::VectorXf F(nNodes); // Containts Fint, Fj, and Fd
-	F.setZero();
+	Eigen::VectorXf Fbar(nNodes); // Containts Fint, Fj, and Fd
+	Fbar.setZero();
 
 
 	for (int e = 0; e < numElems; e++) {
@@ -62,34 +63,34 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				for (int f = 0; f < 6; f++) {
 					if ((nodeFace >> f) & 1) { // Node lies on a boundary
 						if (this->boundaryType[f] == FLUX) { // flux boundary
-							F(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
+							Fbar(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							F(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
+							Fbar(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
 							for (int Bi : BSurfMap[f]) {
 								int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 								// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
 								Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
 							}
-						}						
+						}
 					} // if Node is face f
 				} // iterate through faces
 			} // if node is a face
 
 			// Now we will build the K, M and F matrice
 			for (int Bi = 0; Bi < 8; Bi++) {
-				Kbar.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction,2,0,Ai,Bi);
-				Mbar.coeffRef(elementGlobalNodes[Ai],elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
-				
+				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-				F(elementGlobalNodes[Ai]) += (NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
+				Fbar(elementGlobalNodes[Ai]) += (NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 			}
 		}
 	}
 
 	// Remove the rows corresponding to Dirichlet Nodes
-	F = F(this->validNodes);
+	Eigen::VectorXf F = Fbar(this->validNodes);
 	// Remove unecessary members of Kbar
 	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size()); // K is the reduced Kbar matrix
 	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
