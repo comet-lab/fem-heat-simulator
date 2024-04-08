@@ -254,5 +254,129 @@ namespace FEMSimulatorTests
 			Assert::AreEqual(2, sub[1]);
 			Assert::AreEqual(5, sub[2]);
 		}
+
+		TEST_METHOD(TestGetGlobalNodes1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			int e = 0;
+			int elementGlobalNodes[8]; //global nodes for element e
+			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
+			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
+			Assert::AreEqual(0,elementGlobalNodes[0]);
+			Assert::AreEqual(1, elementGlobalNodes[1]);
+			Assert::AreEqual(4, elementGlobalNodes[2]);
+			Assert::AreEqual(3, elementGlobalNodes[3]);
+			Assert::AreEqual(9, elementGlobalNodes[4]);
+			Assert::AreEqual(10, elementGlobalNodes[5]);
+			Assert::AreEqual(13, elementGlobalNodes[6]);
+			Assert::AreEqual(12, elementGlobalNodes[7]);
+
+		}
+
+		TEST_METHOD(TestGetGlobalNodes2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			int e = 5;
+			int elementGlobalNodes[8]; //global nodes for element e
+			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
+			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
+			Assert::AreEqual(10, elementGlobalNodes[0]);
+			Assert::AreEqual(11, elementGlobalNodes[1]);
+			Assert::AreEqual(14, elementGlobalNodes[2]);
+			Assert::AreEqual(13, elementGlobalNodes[3]);
+			Assert::AreEqual(19, elementGlobalNodes[4]);
+			Assert::AreEqual(20, elementGlobalNodes[5]);
+			Assert::AreEqual(23, elementGlobalNodes[6]);
+			Assert::AreEqual(22, elementGlobalNodes[7]);
+
+		}
+
+		TEST_METHOD(TestGetGlobalNodes3)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			int e = 7;
+			int elementGlobalNodes[8]; //global nodes for element e
+			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
+			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
+			Assert::AreEqual(13, elementGlobalNodes[0]);
+			Assert::AreEqual(14, elementGlobalNodes[1]);
+			Assert::AreEqual(17, elementGlobalNodes[2]);
+			Assert::AreEqual(16, elementGlobalNodes[3]);
+			Assert::AreEqual(22, elementGlobalNodes[4]);
+			Assert::AreEqual(23, elementGlobalNodes[5]);
+			Assert::AreEqual(26, elementGlobalNodes[6]);
+			Assert::AreEqual(25, elementGlobalNodes[7]);
+
+		}
+
+		TEST_METHOD(TestCreateKABFunction1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f; 
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = FEM_Simulator::A[Ai][0];
+			xi[1] = FEM_Simulator::A[Ai][1];
+			xi[2] = FEM_Simulator::A[Ai][2];
+			float output1 = simulator->createKABFunction(xi, Ai, Bi);
+			Eigen::MatrixXf Ke(8, 8);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				for (int Bi = 0; Bi < 8; Bi++) {
+					Ke(Ai, Bi) = simulator->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+				}
+			}
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			Assert::IsTrue((abs(3 * TC / 16.0f) - output1) < 0.0001);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				Assert::IsTrue(((1 / 6.0f * TC) - Ke(Ai, Ai)) < 0.0001);
+			}
+			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
+		}
+
+		TEST_METHOD(TestCreateKABFunction1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = FEM_Simulator::A[Ai][0];
+			xi[1] = FEM_Simulator::A[Ai][1];
+			xi[2] = FEM_Simulator::A[Ai][2];
+			float output1 = simulator->createKABFunction(xi, Ai, Bi);
+			Eigen::MatrixXf Ke(8, 8);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				for (int Bi = 0; Bi < 8; Bi++) {
+					Ke(Ai, Bi) = simulator->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+				}
+			}
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			Assert::IsTrue((abs(3 * TC / 16.0f) - output1) < 0.0001);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				Assert::IsTrue(((1 / 6.0f * TC) - Ke(Ai, Ai)) < 0.0001);
+			}
+			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
+		}
 	};
 }

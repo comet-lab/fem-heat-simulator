@@ -72,10 +72,10 @@ public:
 	static float calculateNA_xi(float xi[3], int Ai); // function has test cases
 	static float calculateNA_eta(float xi[3], int Ai); // function has test cases
 	static float calculateNA_zeta(float xi[3], int Ai); // function has test cases
-	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi);
-	void getGlobalNodesFromElem(int elem, int nodes[8]);
-	void getGlobalPosition(int globalNode, float position[3]);
-	float createKABFunction(float xi[3], int Ai, int Bi);
+	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
+	void getGlobalNodesFromElem(int elem, int nodes[8]); // function has test cases
+	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
+	float createKABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createMABFunction(float xi[3], int Ai, int Bi);
 	float createFintFunction(float xi[3], int Ai, int Bi);
 	float createFjFunction(float xi[3], int Ai, int dim);

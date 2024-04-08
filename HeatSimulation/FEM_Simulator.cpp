@@ -94,7 +94,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 			}
 		}
 	}
@@ -381,22 +381,22 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 	float output = 0;
 	// TODO: Replace with automatic determination of zeros and weights
 	if (points == 1) {
-		zeros.push_back(0.0);
-		weights.push_back(2.0);
+		zeros.push_back(0.0f);
+		weights.push_back(2.0f);
 	}
 	else if (points == 2) {
-		zeros.push_back(-sqrt(1 / 3.0));
-		zeros.push_back(sqrt(1 / 3.0));
-		weights.push_back(1.0);
-		weights.push_back(1.0);
+		zeros.push_back(-sqrt(1 / 3.0f));
+		zeros.push_back(sqrt(1 / 3.0f));
+		weights.push_back(1.0f);
+		weights.push_back(1.0f);
 	}
 	else if (points == 3) {
-		zeros.push_back(-sqrt(3 / 5.0));
-		zeros.push_back(0.0);
-		zeros.push_back(sqrt(3 / 5.0));
-		weights.push_back(5 / 9.0);
-		weights.push_back(8 / 9.0);
-		weights.push_back(5 / 9.0);
+		zeros.push_back(-sqrt(3 / 5.0f));
+		zeros.push_back(0.0f);
+		zeros.push_back(sqrt(3 / 5.0f));
+		weights.push_back(5 / 9.0f);
+		weights.push_back(8 / 9.0f);
+		weights.push_back(5 / 9.0f);
 	}
 
 	for (int i = 0; i < points; i++) {
@@ -428,7 +428,18 @@ void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
 	int sub[3];
 	this->ind2sub(elem, this->gridSize, sub);
 	// This order is defined by the pattern of A in the .h file. 
-	// TODO: Make the A ordering explicit
+	
+	int xShift = 0;
+	int yShift = 0;
+	int zShift = 0;
+	for (int Ai = 0; Ai < 8; Ai++ ){
+		// This makes the order of the nodes based on A, so if we change A the node order should change
+		xShift = (FEM_Simulator::A[Ai][0] + 1) / 2;
+		yShift = (FEM_Simulator::A[Ai][1] + 1) / 2;
+		zShift = (FEM_Simulator::A[Ai][2] + 1) / 2;
+		nodes[Ai] = (sub[2] + zShift) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + yShift) * this->nodeSize[0] + (sub[0] + xShift);
+	}
+	/*
 	nodes[0] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0];
 	nodes[1] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0] + 1;
 	nodes[2] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0] + 1;
@@ -438,7 +449,7 @@ void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
 	nodes[6] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0] + 1;
 	nodes[7] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0];
 	return;
-
+	*/
 }
 
 void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
