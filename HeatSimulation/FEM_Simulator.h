@@ -34,7 +34,7 @@ public:
 	//std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
-	float tSpan[2] = { 0, 0 };
+	float tSpan[2] = { 0, 1 };
 	float Jn = 0; // heat escaping the Neumann Boundary
 	float HTC = 0; // convective heat transfer coefficient [W/cm^2]
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary

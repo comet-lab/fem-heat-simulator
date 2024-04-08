@@ -116,7 +116,7 @@ public:
 
         int boundaryType[6] = { 0,0,0,0,0,0 };
         for (int i = 0; i < 6; i++) {
-            boundaryType[i] = inputs[7][i];
+            boundaryType[i] = inputs[6][i];
         }
         simulator->setBoundaryConditions(boundaryType);
         
@@ -151,9 +151,11 @@ public:
         if ((inputs[2].getDimensions()[0] != 3) || (inputs[2].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
         }
+        /* This Check Doesnt work
         if (inputs[4][0] > inputs[3][0]) {
             displayError("deltaT must be less than the final time");
         }
+        */
         if ((inputs[5].getDimensions()[0] != 4) || (inputs[5].getDimensions()[1] != 1)) {
             displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
         }
