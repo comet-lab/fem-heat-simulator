@@ -100,10 +100,15 @@ public:
         tissueSize[1] = inputs[2][1];
         tissueSize[2] = inputs[2][2];
         simulator->setTissueSize(tissueSize);
-        float TC = inputs[3][0];
-        float VHC = inputs[4][0];
+
+        float tFinal = inputs[3][0];
+        float deltaT = inputs[4][0];
+        simulator->tSpan[1] = tFinal;
+        simulator->deltaT = deltaT;
         float MUA = inputs[5][0];
-        float HTC = inputs[6][0];
+        float TC = inputs[5][1];
+        float VHC = inputs[5][2];
+        float HTC = inputs[5][3];
         simulator->setTC(TC);
         simulator->setVHC(VHC);
         simulator->setMUA(MUA);
@@ -114,6 +119,12 @@ public:
             boundaryType[i] = inputs[7][i];
         }
         simulator->setBoundaryConditions(boundaryType);
+        
+        float Jn = inputs[7][0];
+        simulator->Jn = Jn;
+
+        float ambientTemp = inputs[8][0];
+        simulator->setAmbientTemp(ambientTemp);
 
         std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
         simulator->solveFEA(NFR);
@@ -125,8 +136,8 @@ public:
     * Inputs: T0, NFR, tissueSize TC, VHC, MUA, HTC, boundaryConditions
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        if (inputs.size() != 8) {
-            displayError("Seven inputs required: T0, NFR, tissueSize TC, VHC, MUA, HTC, BC");
+        if (inputs.size() != 9) {
+            displayError("Nine inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp");
         }
         if (outputs.size() > 1) {
             displayError("Too many outputs specified.");
@@ -140,10 +151,16 @@ public:
         if ((inputs[2].getDimensions()[0] != 3) || (inputs[2].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
         }
-        if ((inputs[7].getDimensions()[0] != 6) || (inputs[7].getDimensions()[1] != 1)) {
+        if (inputs[4][0] > inputs[3][0]) {
+            displayError("deltaT must be less than the final time");
+        }
+        if ((inputs[5].getDimensions()[0] != 4) || (inputs[5].getDimensions()[1] != 1)) {
+            displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
+        }
+        if ((inputs[6].getDimensions()[0] != 6) || (inputs[7].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
         }
-        if ((inputs[7].getType() != matlab::data::ArrayType::INT32)) {
+        if ((inputs[6].getType() != matlab::data::ArrayType::INT32)) {
             displayError("Boundary Conditions must be an int");
         }
     }
