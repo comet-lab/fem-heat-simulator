@@ -24,14 +24,14 @@ public:
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
-	int gridSize[3] = { 0,0,0 }; // Number of voxels in x, y, and z [voxels]
-	float tissueSize[3] = { 0,0,0 };  // Length of the tissue in x, y, and z [cm]
+	int gridSize[3] = { 1,1,1 }; // Number of voxels in x, y, and z [voxels]
+	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
 	std::vector<std::vector<std::vector<float>>> Temp; // Our values for temperature at the nodes of the elements
-	std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
+	//std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tSpan[2] = { 0, 0 };
@@ -40,12 +40,20 @@ public:
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 
 	FEM_Simulator() = default;
-
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA);
-
+	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
+	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
+	void setTissueSize(float tissueSize[3]);
+	void setTC(float TC);
+	void setVHC(float VHC);
+	void setMUA(float MUA);
+	void setHTC(float HTC);
+	void setAmbientTemp(float ambientTemp);
+	void setGridSize(int gridSize[3]);
+	void setNodeSize(int nodeSize[3]);
+	void setJ();
 	void setBoundaryConditions(int BC[6]);
 
-	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
 
 
 	/**********************************************************************************************************************/
@@ -56,7 +64,7 @@ public:
 	Eigen::Matrix2<float> Js1;
 	Eigen::Matrix2<float> Js2;
 	Eigen::Matrix2<float> Js3;
-	int nodeSize[3] = { 1,1,1 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
+	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> nodeMapping; // Maps d values in the full d vector to the reduced d vector. It helps in creating the matrices already in reduced form
 	int numDirichletNodes; 
 	element currElement;
@@ -85,6 +93,7 @@ public:
 	static void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes);
 	
+
 };
 
 

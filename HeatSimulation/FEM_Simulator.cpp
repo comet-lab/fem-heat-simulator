@@ -16,17 +16,14 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->VHC = VHC;
 	this->MUA = MUA;
 	// If we change assumption of uniform voxel size in cuboid this won't work anymore.
-	this->J = this->calculateJ();
-	this->Js1 = this->calculateJs(1);
-	this->Js2 = this->calculateJs(2);
-	this->Js3 = this->calculateJs(3);
+	this->setJ();
 	
 	this->initializeBoundaryNodes();
 }
 
 void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 {
-	this->NFR = NFR;
+	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 
@@ -94,7 +91,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-				F(elementGlobalNodes[Ai]) += (this->NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
+				F(elementGlobalNodes[Ai]) += (NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 			}
 		}
 	}
@@ -478,8 +475,11 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	NAdotA = this->calculateNA_dot(xi, Ai);
 	NAdotB = this->calculateNA_dot(xi, Bi);
 
-	KABfunc = (NAdotA.transpose() * J.inverse() * J.inverse().transpose() * NAdotB); // matrix math
-	KABfunc = KABfunc * J.determinant() * this->TC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
+	Eigen::Matrix3f Jinv = J.inverse();
+	Eigen::Matrix3f Jinv2 = Jinv * Jinv.transpose();
+
+	KABfunc = (NAdotA.transpose() * this->J.inverse() * this->J.inverse().transpose() * NAdotB); // matrix math
+	KABfunc = float(J.determinant() * this->TC * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
 	return KABfunc;
 }
 
@@ -578,15 +578,6 @@ float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
 	return FvuFunc;
 }
 
-void FEM_Simulator::setBoundaryConditions(int BC[6])
-{
-	for (int i = 0; i < 6; i++) {
-		this->boundaryType[i] = static_cast<boundaryCond>(i);
-	}
-	this->initializeBoundaryNodes();
-}
-
-
 void FEM_Simulator::initializeBoundaryNodes()
 {
 	// we only need to scan nodes on the surface. Since we are assuming a cuboid this is easy to predetermine
@@ -635,4 +626,71 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 		output += LEFT;
 	}
 	return output;
+}
+
+void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp) {
+	this->Temp = Temp;
+	int gridSize[3]; 
+	gridSize[0] = Temp.size() - 1; // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
+	gridSize[1] = Temp[1].size() - 1;
+	gridSize[2] = Temp[1][1].size() - 1;
+	this->setGridSize(gridSize);
+}
+
+void FEM_Simulator::setTissueSize(float tissueSize[3]) {
+	for (int i = 0; i < 3; i++) {
+		this->tissueSize[i] = tissueSize[i];
+	}
+	this->setJ();
+}
+
+void FEM_Simulator::setTC(float TC) {
+	this->TC = TC;
+}
+
+void FEM_Simulator::setVHC(float VHC) {
+	this->VHC = VHC;
+}
+
+void FEM_Simulator::setMUA(float MUA) {
+	this->MUA = MUA;
+}
+
+void FEM_Simulator::setHTC(float HTC) {
+	this->HTC = HTC;
+}
+
+void FEM_Simulator::setAmbientTemp(float ambientTemp) {
+	this->ambientTemp = ambientTemp;
+}
+
+void FEM_Simulator::setGridSize(int gridSize[3]) {
+	for (int i = 0; i < 3; i++) {
+		gridSize[i] = gridSize[0];
+		this->nodeSize[i] = gridSize[i] + 1;
+	}
+	this->setJ();
+}
+
+void FEM_Simulator::setNodeSize(int nodeSize[3]) {
+	for (int i = 0; i < 3; i++) {
+		gridSize[i] = nodeSize[0] - 1;
+		this->nodeSize[i] = nodeSize[0];
+	}
+	setJ();
+}
+
+void FEM_Simulator::setJ() {
+	this->J = this->calculateJ();
+	this->Js1 = this->calculateJs(1);
+	this->Js2 = this->calculateJs(2);
+	this->Js3 = this->calculateJs(3);
+}
+
+void FEM_Simulator::setBoundaryConditions(int BC[6])
+{
+	for (int i = 0; i < 6; i++) {
+		this->boundaryType[i] = static_cast<boundaryCond>(i);
+	}
+	this->initializeBoundaryNodes();
 }
