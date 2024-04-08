@@ -21,9 +21,6 @@
     <ClCompile Include="FEM_Simulator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MEX_Heat_Simulation.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FEM_Simulator.h">

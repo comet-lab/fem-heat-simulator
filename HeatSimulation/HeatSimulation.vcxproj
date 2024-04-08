@@ -131,7 +131,6 @@
   <ItemGroup>
     <ClCompile Include="FEM_Simulator.cpp" />
     <ClCompile Include="HeatSimulation.cpp" />
-    <ClCompile Include="MEX_Heat_Simulation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FEM_Simulator.h" />

@@ -36,7 +36,7 @@ public:
 	float deltaT = 0.01; // time step [s]
 	float tSpan[2] = { 0, 1 };
 	float Jn = 0; // heat escaping the Neumann Boundary
-	float HTC = 0; // convective heat transfer coefficient [W/cm^2]
+	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 
 	FEM_Simulator() = default;
@@ -65,7 +65,7 @@ public:
 	Eigen::Matrix2<float> Js2;
 	Eigen::Matrix2<float> Js3;
 	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
-	std::vector<int> nodeMapping; // Maps d values in the full d vector to the reduced d vector. It helps in creating the matrices already in reduced form
+	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	int numDirichletNodes; 
 	element currElement;
 

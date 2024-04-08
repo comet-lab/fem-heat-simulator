@@ -6,16 +6,28 @@
 
 int main()
 {
-    std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+    std::vector<std::vector<std::vector<float>>> Temp = { { {50,50,50}, {50,50,50}, {50,50,50} },
+                                                                   { {50,50,50}, {50,0,50}, {50,50,50} },
+                                                                   { {50,50,50}, {50,50,50}, {50,50,50} } };
+    float tissueSize[3] = { 1,1,1 };
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1);
+    std::vector<std::vector<std::vector<float>>> NFR = { { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} } };
-    float tissueSize[3] = { 1,1,1 };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
-    float xi[3] = { -1,-1,-1 };
-    float output = simulator->calculateNA(xi, 0);
-    std::cout << output << std::endl;
 
-    std::cout << "Hello World!\n";
+    simulator->solveFEA(NFR);
+    /*
+    for (int k = 0; k < 3; k++) {
+        for (int j = 0; j < 3; j++) {
+            for (int i = 0; i < 3; i++) {
+                std::cout << simulator->Temp[i][j][k] << ", ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+     std::cout << std::endl;
+     */
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
