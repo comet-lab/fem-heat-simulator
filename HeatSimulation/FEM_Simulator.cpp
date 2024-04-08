@@ -31,8 +31,8 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
 	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
 	Eigen::VectorXf F(nNodes); // Containts Fint, Fj, and Fd
-	std::vector<int> dirichletNodes;
-	std::vector<int> nonDirichletNodes;
+
+
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
 
@@ -93,13 +93,13 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size()); // K is the reduced Kbar matrix
 	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
 	Eigen::SparseMatrix<float> tempF(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // This will store the output of the dirichletBoundaryValues
-	this->reduceSparseMatrix(Kbar, this->dirichletNodes, K, tempF, nNodes);
+	this->reduceSparseMatrix(Kbar, this->dirichletNodes, &K, &tempF, nNodes);
 
 	// Remove unecessary memebers of Mbar
 	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size()); // M is the reduced Mbar matrix
 	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
 	Eigen::SparseMatrix<float> dummy(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
-	this->reduceSparseMatrix(Mbar, this->dirichletNodes, M, dummy, nNodes);
+	this->reduceSparseMatrix(Mbar, this->dirichletNodes, &M, &dummy, nNodes);
 
 	// Create Fdirichlet based on dirichlet boundaries
 	for (int col = 0; col < tempF.outerSize(); ++col) // iterate through columns 
@@ -148,7 +148,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	}
 }
 
-void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes) {
+void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> *newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes) {
 	// Assuming the newMat is already the appropriate size, and has had its elements reserved. 
 	int rowCounter = 0;
 	for (int row = 0; row < nNodes; row++) {
@@ -159,14 +159,14 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 				if (std::find(rowsToRemove.begin(), rowsToRemove.end(), col) == rowsToRemove.end()) { // the col is a valid entry
 					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
 						// We add the value from old matrix to new matrix
-						newMat.insert(rowCounter, validColCounter) = oldMat.coeff(row, col);
+						newMat->insert(rowCounter, validColCounter) = oldMat.coeff(row, col);
 					} 
 					// else is just do nothing
 					validColCounter++; // have to increment column counter so we maintain correct position in new matrix. 
 				} // end if col is valid
 				else { // the col is not a valid entry, but the row is so fill the support matrix
 					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
-						suppMat.insert(rowCounter, invalidColCounter) = oldMat.coeff(row, col);
+						suppMat->insert(rowCounter, invalidColCounter) = oldMat.coeff(row, col);
 					}
 					invalidColCounter++;
 				}

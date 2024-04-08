@@ -91,7 +91,7 @@ public:
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
 	static void ind2sub(int index, int size[3], int sub[3]); // function has test cases
-	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes);
+	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float>* newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes);
 	
 
 };

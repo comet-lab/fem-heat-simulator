@@ -16,7 +16,7 @@ int main()
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} } };
 
     simulator->solveFEA(NFR);
-    /*
+    
     for (int k = 0; k < 3; k++) {
         for (int j = 0; j < 3; j++) {
             for (int i = 0; i < 3; i++) {
@@ -26,8 +26,8 @@ int main()
         }
         std::cout << std::endl;
     }
-     std::cout << std::endl;
-     */
+    std::cout << std::endl;
+    
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
