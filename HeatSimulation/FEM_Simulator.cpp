@@ -31,6 +31,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
 	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
 	Eigen::VectorXf F(nNodes); // Containts Fint, Fj, and Fd
+	F.setZero();
 
 
 	for (int e = 0; e < numElems; e++) {
