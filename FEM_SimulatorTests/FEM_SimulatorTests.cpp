@@ -19,13 +19,16 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
 			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
-			float xi[3];
+			float xi1[3], xi2[3];
 			for (int Ai = 0; Ai < 8; Ai++) {
-				xi[0] = FEM_Simulator::A[Ai][0];
-				xi[1] = FEM_Simulator::A[Ai][1];
-				xi[2] = FEM_Simulator::A[Ai][2];
-				float output1 = simulator->calculateNA(xi, Ai);
-				float output2 = simulator->calculateNA(xi, (Ai+1)%8);
+				xi1[0] = FEM_Simulator::A[Ai][0];
+				xi1[1] = FEM_Simulator::A[Ai][1];
+				xi1[2] = FEM_Simulator::A[Ai][2];
+				xi2[0] = FEM_Simulator::A[(Ai + 1) % 8][0];
+				xi2[1] = FEM_Simulator::A[(Ai + 1) % 8][1];
+				xi2[2] = FEM_Simulator::A[(Ai + 1) % 8][2];
+				float output1 = simulator->calculateNA(xi1, Ai);
+				float output2 = simulator->calculateNA(xi2, Ai);
 
 				Assert::AreEqual(1.0f, output1);
 				Assert::AreEqual(0.0f, output2);				
@@ -127,7 +130,129 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
 			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			float xi[3];
+			for (int Ai = 0; Ai < 1; Ai++) {
+				xi[0] = FEM_Simulator::A[Ai][0];
+				xi[1] = FEM_Simulator::A[Ai][1];
+				xi[2] = FEM_Simulator::A[Ai][2];
+				float output1 = simulator->calculateNA_xi(xi, Ai); // test at Ai
+				xi[0] = -xi[0];
+				float output2 = simulator->calculateNA_xi(xi, Ai); // test but flip x
+				xi[0] = -xi[0]; // flip x back
+				xi[1] = -xi[1];
+				float output3 = simulator->calculateNA_xi(xi, Ai); // test but flip y
+				xi[1] = -xi[1]; // flip y back
+				xi[2] = -xi[2]; 
+				float output4 = simulator->calculateNA_xi(xi, Ai); // test but flip z
 
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output2);
+				Assert::AreEqual(0.0f, output3);
+				Assert::AreEqual(0.0f, output4);
+			}
+		}
+
+		TEST_METHOD(TestCalculateNA_Eta1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			float xi[3];
+			for (int Ai = 0; Ai < 1; Ai++) {
+				xi[0] = FEM_Simulator::A[Ai][0];
+				xi[1] = FEM_Simulator::A[Ai][1];
+				xi[2] = FEM_Simulator::A[Ai][2];
+				float output1 = simulator->calculateNA_eta(xi, Ai); // test at Ai
+				xi[0] = -xi[0];
+				float output2 = simulator->calculateNA_eta(xi, Ai); // test but flip x
+				xi[0] = -xi[0]; // flip x back
+				xi[1] = -xi[1];
+				float output3 = simulator->calculateNA_eta(xi, Ai); // test but flip y
+				xi[1] = -xi[1]; // flip y back
+				xi[2] = -xi[2];
+				float output4 = simulator->calculateNA_eta(xi, Ai); // test but flip z
+
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
+				Assert::AreEqual(0.0f, output2);
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output3);
+				Assert::AreEqual(0.0f, output4);
+			}
+		}
+
+
+		TEST_METHOD(TestCalculateNA_Zeta1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			float xi[3];
+			for (int Ai = 0; Ai < 1; Ai++) {
+				xi[0] = FEM_Simulator::A[Ai][0];
+				xi[1] = FEM_Simulator::A[Ai][1];
+				xi[2] = FEM_Simulator::A[Ai][2];
+				float output1 = simulator->calculateNA_zeta(xi, Ai); // test at Ai
+				xi[0] = -xi[0];
+				float output2 = simulator->calculateNA_zeta(xi, Ai); // test but flip x
+				xi[0] = -xi[0]; // flip x back
+				xi[1] = -xi[1];
+				float output3 = simulator->calculateNA_zeta(xi, Ai); // test but flip y
+				xi[1] = -xi[1]; // flip y back
+				xi[2] = -xi[2];
+				float output4 = simulator->calculateNA_zeta(xi, Ai); // test but flip z
+
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
+				Assert::AreEqual(0.0f, output2);
+				Assert::AreEqual(0.0f, output3);
+				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output4);
+			}
+		}
+
+		TEST_METHOD(TestInd2Sub1)
+		{
+			int sub[3];
+			int index = 0;
+			int size[3] = { 10,10,10 };
+			FEM_Simulator::ind2sub(index, size, sub);
+			Assert::AreEqual(0, sub[0]);
+			Assert::AreEqual(0, sub[1]);
+			Assert::AreEqual(0, sub[2]);
+		}
+
+		TEST_METHOD(TestInd2Sub2)
+		{
+			int sub[3];
+			int index = 10;
+			int size[3] = { 10,10,10 };
+			FEM_Simulator::ind2sub(index, size, sub);
+			Assert::AreEqual(0, sub[0]);
+			Assert::AreEqual(1, sub[1]);
+			Assert::AreEqual(0, sub[2]);
+		}
+
+		TEST_METHOD(TestInd2Sub3)
+		{
+			int sub[3];
+			int index = 100;
+			int size[3] = { 10,10,10 };
+			FEM_Simulator::ind2sub(index, size, sub);
+			Assert::AreEqual(0, sub[0]);
+			Assert::AreEqual(0, sub[1]);
+			Assert::AreEqual(1, sub[2]);
+		}
+
+		TEST_METHOD(TestInd2Sub4)
+		{
+			int sub[3];
+			int index = 521;
+			int size[3] = { 10,10,10 };
+			FEM_Simulator::ind2sub(index, size, sub);
+			Assert::AreEqual(1, sub[0]);
+			Assert::AreEqual(2, sub[1]);
+			Assert::AreEqual(5, sub[2]);
 		}
 	};
 }

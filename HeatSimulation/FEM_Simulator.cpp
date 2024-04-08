@@ -44,9 +44,11 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 		int elementGlobalNodes[8]; //global nodes for element e
 		this->getGlobalNodesFromElem(e, elementGlobalNodes);
 
+		/* We are assuming a uniform cuboid so we don't need this
 		for (int Ai = 0; Ai < 8; Ai++) {// x,y,z coordinates for each of the global nodes
 			this->getGlobalPosition(elementGlobalNodes[Ai], this->currElement.globalNodePositions[Ai]);
 		}
+		*/
 
 		int nodeFace;
 		for (int Ai = 0; Ai < 8; Ai++) {
@@ -328,12 +330,13 @@ Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim)
 	} */
 }
 
-void FEM_Simulator::calculateNA_dot(float xi[3], int Ai, Eigen::Vector3<float> NA_dot)
+Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 {
+	Eigen::Vector3<float> NA_dot;
 	NA_dot(0) = FEM_Simulator::calculateNA_xi(xi, Ai);
 	NA_dot(1) = FEM_Simulator::calculateNA_eta(xi, Ai);
 	NA_dot(2) = FEM_Simulator::calculateNA_zeta(xi, Ai);
-	return;
+	return NA_dot;
 }
 
 float FEM_Simulator::calculateNA_xi(float xi[3], int Ai)
@@ -440,6 +443,8 @@ void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
 
 void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 {
+	// This function is only needed if we are using a non-uniform cuboid. Since we are assuming a uniform cuboid
+	// this function has not been tested. 
 	position[0] = 0; position[1] = 0; position[2] = 0;
 
 	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
@@ -459,8 +464,8 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	Eigen::Vector3<float> NAdotB;
 	Eigen::Matrix3<float> J = this->J;
 
-	this->calculateNA_dot(xi, Ai, NAdotA);
-	this->calculateNA_dot(xi, Bi, NAdotB);
+	NAdotA = this->calculateNA_dot(xi, Ai);
+	NAdotB = this->calculateNA_dot(xi, Bi);
 
 	KABfunc = (NAdotA.transpose() * J.inverse() * J.inverse().transpose() * NAdotB); // matrix math
 	KABfunc = KABfunc * J.determinant() * this->TC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
@@ -576,22 +581,22 @@ void FEM_Simulator::initializeBoundaryNodes()
 	// we only need to scan nodes on the surface. Since we are assuming a cuboid this is easy to predetermine
 	this->numDirichletNodes = 0;
 	if (this->boundaryType[0] == HEATSINK) { // Top Face
-		numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
+		this->numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
 	}	
 	if (this->boundaryType[1] == HEATSINK) { // bottom face
-		numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
+		this->numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
 	}
 	if (this->boundaryType[2] == HEATSINK) { // front face
-		numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2]-2);
+		this->numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2]-2);
 	}
 	if (this->boundaryType[4] == HEATSINK) { // back face
-		numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2] - 2);
+		this->numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2] - 2);
 	}
 	if (this->boundaryType[3] == HEATSINK) { // right face
-		numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
+		this->numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
 	}
 	if (this->boundaryType[5] == HEATSINK) { // left face
-		numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
+		this->numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
 	}
 }
 

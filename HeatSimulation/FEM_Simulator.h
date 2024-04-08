@@ -65,15 +65,13 @@ public:
 
 	void initializeBoundaryNodes();
 	int determineNodeFace(int globalNode);
-	bool checkBoundaryNode(int globalNode);
-	void initializeNodeMap();
-	float calculateNA(float xi[3], int Ai);
-	Eigen::Matrix3<float> calculateJ();
-	Eigen::Matrix2<float> calculateJs(int dim);
-	static void calculateNA_dot(float xi[3], int Ai, Eigen::Vector3<float> NA_dot);
-	static float calculateNA_xi(float xi[3], int Ai);
-	static float calculateNA_eta(float xi[3], int Ai);
-	static float calculateNA_zeta(float xi[3], int Ai);
+	float calculateNA(float xi[3], int Ai); // function has test cases
+	Eigen::Matrix3<float> calculateJ(); // function has test cases
+	Eigen::Matrix2<float> calculateJs(int dim); // function has test cases
+	static Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
+	static float calculateNA_xi(float xi[3], int Ai); // function has test cases
+	static float calculateNA_eta(float xi[3], int Ai); // function has test cases
+	static float calculateNA_zeta(float xi[3], int Ai); // function has test cases
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi);
 	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	void getGlobalPosition(int globalNode, float position[3]);
@@ -84,7 +82,7 @@ public:
 	float createFvFunction(float xi[3], int Ai, int dim);
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
-	static void ind2sub(int index, int size[3], int sub[3]);
+	static void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> newMat, Eigen::SparseMatrix<float> suppMat, int nNodes);
 	
 };
