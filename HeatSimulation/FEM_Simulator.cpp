@@ -130,7 +130,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	}
 	// Perform TimeStepping
 	
-	for (float t = deltaT; t < this->tSpan[1]; t += this->deltaT) {
+	for (float t = deltaT; t < this->tFinal; t += this->deltaT) {
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::ConjugateGradient<Eigen::SparseMatrix<float> > solver;
 		solver.compute(M + this->alpha * deltaT * K);
