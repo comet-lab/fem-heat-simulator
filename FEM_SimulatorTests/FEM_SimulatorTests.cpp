@@ -18,7 +18,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			float xi1[3], xi2[3];
 			for (int Ai = 0; Ai < 8; Ai++) {
 				xi1[0] = FEM_Simulator::A[Ai][0];
@@ -41,7 +41,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int faces[27];
 			for (int i = 0; i < 27; i++) {
 				faces[i] = simulator->determineNodeFace(i);
@@ -65,7 +65,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
 			Assert::AreEqual(tissueSize[0] / 4, simulator->J(0, 0));
 			Assert::AreEqual(0.0f, simulator->J(0, 1));
@@ -85,7 +85,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
 			Assert::AreEqual(tissueSize[1] / 4, simulator->Js1(0, 0));
 			Assert::AreEqual(0.0f, simulator->Js1(0, 1));
@@ -100,7 +100,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
 			Assert::AreEqual(tissueSize[0] / 4, simulator->Js2(0, 0));
 			Assert::AreEqual(0.0f, simulator->Js2(0, 1));
@@ -115,7 +115,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
 			Assert::AreEqual(tissueSize[0] / 4, simulator->Js3(0, 0));
 			Assert::AreEqual(0.0f, simulator->Js3(0, 1));
@@ -129,7 +129,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			float xi[3];
 			for (int Ai = 0; Ai < 1; Ai++) {
 				xi[0] = FEM_Simulator::A[Ai][0];
@@ -158,7 +158,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			float xi[3];
 			for (int Ai = 0; Ai < 1; Ai++) {
 				xi[0] = FEM_Simulator::A[Ai][0];
@@ -188,7 +188,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			float xi[3];
 			for (int Ai = 0; Ai < 1; Ai++) {
 				xi[0] = FEM_Simulator::A[Ai][0];
@@ -261,7 +261,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int e = 0;
 			int elementGlobalNodes[8]; //global nodes for element e
 			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
@@ -283,7 +283,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int e = 5;
 			int elementGlobalNodes[8]; //global nodes for element e
 			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
@@ -305,7 +305,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int e = 7;
 			int elementGlobalNodes[8]; //global nodes for element e
 			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
@@ -328,7 +328,7 @@ namespace FEMSimulatorTests
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
 			float TC = 1.0f; 
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f);
 			int Ai = 0;
 			int Bi = 0;
 			float xi[3];
@@ -349,5 +349,36 @@ namespace FEMSimulatorTests
 			}
 			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
 		}
+
+		TEST_METHOD(TestCreateMABFunction1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			float VHC = 1.0f;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, VHC, 1.0f, 1.0f);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = FEM_Simulator::A[Ai][0];
+			xi[1] = FEM_Simulator::A[Ai][1];
+			xi[2] = FEM_Simulator::A[Ai][2];
+			float output1 = simulator->createMABFunction(xi, Ai, Bi);
+			Eigen::MatrixXf Me(8, 8);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				for (int Bi = 0; Bi < 8; Bi++) {
+					Me(Ai, Bi) = simulator->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+				}
+			}
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			Assert::IsTrue((abs(1 / 64.0f) - output1) < 0.0001);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				Assert::IsTrue(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
+			}
+			Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
+		}
+
 	};
 }

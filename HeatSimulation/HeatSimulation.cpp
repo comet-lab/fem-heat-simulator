@@ -6,26 +6,37 @@
 
 int main()
 {
-    std::vector<std::vector<std::vector<float>>> Temp = { { {50,50,50}, {50,50,50}, {50,50,50} },
-                                                                   { {50,50,50}, {50,0,50}, {50,50,50} },
-                                                                   { {50,50,50}, {50,50,50}, {50,50,50} } };
+    std::cout << "Starting Program" << std::endl;
+    int nodeSize[3] = { 4,4,4 };
+    std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+    std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+    for (int i = 0; i < nodeSize[0]; i++) {
+        for (int j = 0; j < nodeSize[1]; j++) {
+            for (int k = 0; k < nodeSize[2]; k++) {
+                Temp[i][j][k] = 0.0f;
+                NFR[i][j][k] = 0.0f;
+            }
+        }
+    }
+
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+
+    std::cout << "Object Created " << std::endl;
+
     simulator->deltaT = 0.01f;
     simulator->tFinal = 0.2f;
     int BC[6] = { 0,0,0,0,0,0 };
     simulator->setBoundaryConditions(BC);
     simulator->Jn = 0;
     simulator->setAmbientTemp(0);
-    std::vector<std::vector<std::vector<float>>> NFR = { { {0,0,0}, {0,0,0}, {0,0,0} },
-                                                                   { {0,0,0}, {0,0,0}, {0,0,0} },
-                                                                   { {0,0,0}, {0,0,0}, {0,0,0} } };
-
+    
+    std::cout << "Running FEA" << std::endl;
     simulator->solveFEA(NFR);
     
-    for (int k = 0; k < 3; k++) {
-        for (int j = 0; j < 3; j++) {
-            for (int i = 0; i < 3; i++) {
+    for (int k = 0; k < nodeSize[2]; k++) {
+        for (int j = 0; j < nodeSize[1]; j++) {
+            for (int i = 0; i < nodeSize[0]; i++) {
                 std::cout << simulator->Temp[i][j][k] << ", ";
             }
             std::cout << std::endl;

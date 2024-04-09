@@ -21,7 +21,10 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	this->initializeBoundaryNodes();
 	Eigen::SparseMatrix<float> Kbar(nNodes, nNodes);
 	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
+	//Kbar.setZero();
 	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
+	Mbar.reserve(Eigen::VectorXi::Constant(nNodes, 27));
+	Mbar.setZero();
 	Eigen::VectorXf Fbar(nNodes); // Containts Fint, Fj, and Fd
 	Fbar.setZero();
 
@@ -70,8 +73,10 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 			// Now we will build the K, M and F matrice
 			for (int Bi = 0; Bi < 8; Bi++) {
-				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
-				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+				float Ktemp = this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Ktemp;
+				float Mtemp = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Mtemp;
 
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
@@ -79,6 +84,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			}
 		}
 	}
+
 
 	// Remove the rows corresponding to Dirichlet Nodes
 	Eigen::VectorXf F = Fbar(this->validNodes);
@@ -94,16 +100,39 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Eigen::SparseMatrix<float> dummy(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
 	this->reduceSparseMatrix(Mbar, this->dirichletNodes, &M, &dummy, nNodes);
 
-	// Create Fdirichlet based on dirichlet boundaries
-	for (int col = 0; col < tempF.outerSize(); ++col) // iterate through columns 
-		for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
+	/*
+	for (int col = 0; col < K.outerSize(); ++col) // iterate through columns 
+		for (Eigen::SparseMatrix<float>::InnerIterator it(K, col); it; ++it) // iterate through rows that are nonzero
 		{	// col refers to the index in the dirichletNodes array
-			int nodeSub[3];
-			ind2sub(this->dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
-			float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
-			
+			std::cout << "Row: " << it.row() << ", Col: " << it.col() << ", Value: " << it.value() << std::endl;
+		}
+		
+	for (int col = 0; col < M.outerSize(); ++col) // iterate through columns 
+		for (Eigen::SparseMatrix<float>::InnerIterator it(M, col); it; ++it) // iterate through rows that are nonzero
+		{	// col refers to the index in the dirichletNodes array
+			std::cout << "Row: " << it.row() << ", Col: " << it.col() << ", Value: " << it.value() << std::endl;
+		}
+	*/
+
+
+	// Create Fdirichlet based on dirichlet boundaries
+	for (int col = 0; col < tempF.outerSize(); ++col) {// iterate through columns 
+		// col refers to the index in the dirichletNodes array
+		int nodeSub[3];
+		ind2sub(this->dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
+		float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
+
+		for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
+		{	
 			F(it.row()) -= it.value() * dirichletValue; // Subtract it from F
 		}
+	}
+
+	std::cout << "After F: ";
+	for (int i = 0; i < 8; i++) {
+		std::cout << F(i) << ", ";
+	}
+	std::cout << std::endl;
 
 	// Solve Euler Family 
 	// Initialize d vector
@@ -111,32 +140,41 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
 	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
 	int counter = 0;
-	for (int n = 0; n < nNodes; n++) {
-		if (std::find(dirichletNodes.begin(), dirichletNodes.end(), n) == dirichletNodes.end()) { //not in the list 
+	for (int n : validNodes) {
 			int nodeSub[3];
 			ind2sub(n, this->nodeSize, nodeSub);
 			dVec(counter) = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]];
 			vVec(counter) = 0;
-		}
+			counter++;
 	}
+
 	// Perform TimeStepping
-	
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float> > solver;
+	Eigen::SparseMatrix<float> fullM = M + this->alpha * deltaT * K;
+	solver.compute(fullM);
+	if (solver.info() != Eigen::Success) {
+		std::cout << "Decomposition Failed" << std::endl;
+	}
 	for (float t = deltaT; t < this->tFinal; t += this->deltaT) {
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		Eigen::ConjugateGradient<Eigen::SparseMatrix<float> > solver;
-		solver.compute(M + this->alpha * deltaT * K);
-		Eigen::VectorXf vVec2 = solver.solve(F - K * dTilde);
+		Eigen::VectorXf fullF = F - K * dTilde;
+		Eigen::VectorXf vVec2 = solver.solve(fullF);
+		if (solver.info() != Eigen::Success) {
+			std::cout << "Issue With Solver" << std::endl;
+		}
 		dVec = dVec + this->deltaT * (this->alpha * vVec2 + (1 - this->alpha) * vVec);
 
 		vVec = vVec2;
 	}
 
 	// Adjust our Temp with new d vector
-	for (int n = 0; n < nNodes; n++) {
+	counter = 0;
+	for (int n : validNodes) {
 		if (std::find(dirichletNodes.begin(), dirichletNodes.end(), n) == dirichletNodes.end()) { //not in the list 
 			int nodeSub[3];
 			ind2sub(n, this->nodeSize, nodeSub);
 			this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]] = dVec(counter);
+			counter++;
 		}
 	}
 }
@@ -477,8 +515,7 @@ float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
 
-	MABfunc = (NAa * NAb); // matrix math
-	MABfunc = MABfunc * J.determinant() * this->VHC; // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
+	MABfunc = (NAa * NAb) * J.determinant() * this->VHC; // matrix math
 	return MABfunc;
 }
 

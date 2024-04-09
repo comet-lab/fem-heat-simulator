@@ -83,7 +83,7 @@ public:
 	void getGlobalNodesFromElem(int elem, int nodes[8]); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
 	float createKABFunction(float xi[3], int Ai, int Bi); // function has test cases
-	float createMABFunction(float xi[3], int Ai, int Bi);
+	float createMABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createFintFunction(float xi[3], int Ai, int Bi);
 	float createFjFunction(float xi[3], int Ai, int dim);
 	float createFvFunction(float xi[3], int Ai, int dim);

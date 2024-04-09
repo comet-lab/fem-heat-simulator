@@ -8,7 +8,6 @@
 #include<memory>
 #include<iostream>
 #include "FEM_Simulator.h"
-#include "FEM_Simulator.cpp"
 
  //using namespace matlab::mex;
  //using namespace matlab::data;
@@ -18,6 +17,7 @@ private:
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
     std::ostringstream stream;
+    bool debug = false;
 
 public:
     /* Constructor for the class. */
@@ -93,11 +93,13 @@ public:
     */
     void displayOnMATLAB(std::ostringstream& stream) {
         // Pass stream content to MATLAB fprintf function
-        matlab::data::ArrayFactory factory;
-        matlabPtr->feval(u"fprintf", 0,
-            std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
-        // Clear stream buffer
-        stream.str("");
+        if (debug) {
+            matlab::data::ArrayFactory factory;
+            matlabPtr->feval(u"fprintf", 0,
+                std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
+            // Clear stream buffer
+            stream.str("");
+        }
     }
 
     void display3DVector(const std::vector<std::vector<std::vector<float>>>& vec, std::string title) {
@@ -152,9 +154,9 @@ public:
         float TC = inputs[5][1];
         float VHC = inputs[5][2];
         float HTC = inputs[5][3];
+        simulator->setMUA(MUA);
         simulator->setTC(TC);
         simulator->setVHC(VHC);
-        simulator->setMUA(MUA);
         simulator->setHTC(HTC);
         stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
         displayOnMATLAB(stream);
