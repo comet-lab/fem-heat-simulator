@@ -66,7 +66,6 @@ public:
 	Eigen::Matrix2<float> Js3;
 	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
-	int numDirichletNodes; 
 	element currElement;
 
 	std::vector<int> dirichletNodes;

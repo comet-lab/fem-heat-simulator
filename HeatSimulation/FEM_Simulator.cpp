@@ -574,26 +574,6 @@ float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
 void FEM_Simulator::initializeBoundaryNodes()
 {
 	// we only need to scan nodes on the surface. Since we are assuming a cuboid this is easy to predetermine
-	this->numDirichletNodes = 0;
-	if (this->boundaryType[0] == HEATSINK) { // Top Face
-		this->numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
-	}	
-	if (this->boundaryType[1] == HEATSINK) { // bottom face
-		this->numDirichletNodes += this->nodeSize[0] * this->nodeSize[1];
-	}
-	if (this->boundaryType[2] == HEATSINK) { // front face
-		this->numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2]-2);
-	}
-	if (this->boundaryType[4] == HEATSINK) { // back face
-		this->numDirichletNodes += this->nodeSize[0] * (this->nodeSize[2] - 2);
-	}
-	if (this->boundaryType[3] == HEATSINK) { // right face
-		this->numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
-	}
-	if (this->boundaryType[5] == HEATSINK) { // left face
-		this->numDirichletNodes += (this->nodeSize[1]-2) * (this->nodeSize[2] - 2);
-	}
-
 	// Create mapping
 	this->validNodes.clear();
 	this->dirichletNodes.clear();
