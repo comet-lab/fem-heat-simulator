@@ -5,7 +5,6 @@ const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-
 
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC)
 {
-	
 	this->setInitialTemperature(Temp);
 	this->setTissueSize(tissueSize);
 	this->setTC(TC);
