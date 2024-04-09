@@ -696,7 +696,7 @@ void FEM_Simulator::setJ() {
 void FEM_Simulator::setBoundaryConditions(int BC[6])
 {
 	for (int i = 0; i < 6; i++) {
-		this->boundaryType[i] = static_cast<boundaryCond>(i);
+		this->boundaryType[i] = static_cast<boundaryCond>(BC[i]);
 	}
 	this->initializeBoundaryNodes();
 }

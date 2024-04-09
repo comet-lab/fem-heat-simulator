@@ -17,6 +17,8 @@ class MexFunction : public matlab::mex::Function {
 private:
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
+    std::ostringstream stream;
+
 public:
     /* Constructor for the class. */
     MexFunction()
@@ -24,6 +26,7 @@ public:
         matlabPtr = getEngine();
         simulator = new FEM_Simulator();
     }
+
     /* Helper function to convert a matlab array to a std vector*/
     std::vector<std::vector<std::vector<float>>> convertMatlabArrayToVector(const matlab::data::Array& matlabArray) {
         std::vector<std::vector<std::vector<float>>> result;
@@ -86,6 +89,17 @@ public:
           factory.createScalar(errorMessage) }));
     }
 
+    /* Helper function to generate messages to matlab command window
+    */
+    void displayOnMATLAB(std::ostringstream& stream) {
+        // Pass stream content to MATLAB fprintf function
+        matlab::data::ArrayFactory factory;
+        matlabPtr->feval(u"fprintf", 0,
+            std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
+        // Clear stream buffer
+        stream.str("");
+    }
+
 
     /* This is the gateway routine for the MEX-file. */
     void
@@ -95,16 +109,36 @@ public:
         // Have to convert T0 and NFR to std::vector<<<float>>>
         std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
         simulator->setInitialTemperature(T0);
+        stream << "Initial Temperature: " << std::endl;
+        for (int k = 0; k < 3; k++) {
+            for (int j = 0; j < 3; j++) {
+                for (int i = 0; i < 3; i++) {
+                    stream << simulator->Temp[i][j][k] << ", ";
+                    displayOnMATLAB(stream);
+                }
+                stream << std::endl;
+            }
+            stream << std::endl;
+        }
+        stream << std::endl;
+        displayOnMATLAB(stream);
+
+
+
+        // Set tissue size
         float tissueSize[3];
         tissueSize[0] = inputs[2][0];
         tissueSize[1] = inputs[2][1];
         tissueSize[2] = inputs[2][2];
         simulator->setTissueSize(tissueSize);
 
+        // set time step and final time
         float tFinal = inputs[3][0];
         float deltaT = inputs[4][0];
-        simulator->tSpan[1] = tFinal;
+        simulator->tFinal = tFinal;
         simulator->deltaT = deltaT;
+
+        // set tissue properties
         float MUA = inputs[5][0];
         float TC = inputs[5][1];
         float VHC = inputs[5][2];
@@ -114,22 +148,44 @@ public:
         simulator->setMUA(MUA);
         simulator->setHTC(HTC);
 
+        // set boundary conditions
         int boundaryType[6] = { 0,0,0,0,0,0 };
         for (int i = 0; i < 6; i++) {
             boundaryType[i] = inputs[6][i];
+            stream << boundaryType[0] << ", ";
         }
+        stream << std::endl;
+        displayOnMATLAB(stream);
         simulator->setBoundaryConditions(boundaryType);
         
+        // set flux condition
         float Jn = inputs[7][0];
         simulator->Jn = Jn;
 
+        // set ambient temperature
         float ambientTemp = inputs[8][0];
         simulator->setAmbientTemp(ambientTemp);
 
+        // Run the FEA
         std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
         simulator->solveFEA(NFR);
-        // Have to convert the std::vector to a matlab array
-        outputs[0] = convertVectorToMatlabArray(simulator->Temp);
+
+        // Have to convert the std::vector to a matlab array for output
+        stream << "Final Temperature: " << std::endl;
+        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
+        for (int k = 0; k < 3; k++) {
+            for (int j = 0; j < 3; j++) {
+                for (int i = 0; i < 3; i++) {
+                    stream << simulator->Temp[i][j][k] << ", ";
+                    displayOnMATLAB(stream);
+                }
+                stream << std::endl;
+            }
+            stream << std::endl;
+        }
+        stream << std::endl;
+        displayOnMATLAB(stream);
+        outputs[0] = finalTemp;
     }
 
     /* This function makes sure that user has provided the proper inputs
