@@ -40,7 +40,7 @@ public:
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 
 	FEM_Simulator() = default;
-	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA);
+	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
 	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTissueSize(float tissueSize[3]);

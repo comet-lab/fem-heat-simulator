@@ -100,6 +100,26 @@ public:
         stream.str("");
     }
 
+    void display3DVector(const std::vector<std::vector<std::vector<float>>>& vec, std::string title) {
+        // Get dimensions of the input vector
+        size_t dim1 = vec.size();
+        size_t dim2 = (dim1 > 0) ? vec[0].size() : 0;
+        size_t dim3 = (dim2 > 0) ? vec[0][0].size() : 0;
+
+        stream << "\n" << title << std::endl;
+        for (int k = 0; k < dim3; k++) {
+            for (int j = 0; j < dim2; j++) {
+                for (int i = 0; i < dim1; i++) {
+                    stream << simulator->Temp[i][j][k] << ", ";
+                    displayOnMATLAB(stream);
+                }
+                stream << std::endl;
+            }
+            stream << std::endl;
+        }
+        displayOnMATLAB(stream);
+    }
+
 
     /* This is the gateway routine for the MEX-file. */
     void
@@ -109,22 +129,8 @@ public:
         // Have to convert T0 and NFR to std::vector<<<float>>>
         std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
         simulator->setInitialTemperature(T0);
-        stream << "Initial Temperature: " << std::endl;
-        for (int k = 0; k < 3; k++) {
-            for (int j = 0; j < 3; j++) {
-                for (int i = 0; i < 3; i++) {
-                    stream << simulator->Temp[i][j][k] << ", ";
-                    displayOnMATLAB(stream);
-                }
-                stream << std::endl;
-            }
-            stream << std::endl;
-        }
-        stream << std::endl;
-        displayOnMATLAB(stream);
-
-
-
+        display3DVector(simulator->Temp,"Initial Temp: ");
+ 
         // Set tissue size
         float tissueSize[3];
         tissueSize[0] = inputs[2][0];
@@ -137,6 +143,9 @@ public:
         float deltaT = inputs[4][0];
         simulator->tFinal = tFinal;
         simulator->deltaT = deltaT;
+        stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
+        displayOnMATLAB(stream);
+
 
         // set tissue properties
         float MUA = inputs[5][0];
@@ -147,6 +156,8 @@ public:
         simulator->setVHC(VHC);
         simulator->setMUA(MUA);
         simulator->setHTC(HTC);
+        stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
+        displayOnMATLAB(stream);
 
         // set boundary conditions
         int boundaryType[6] = { 0,0,0,0,0,0 };
@@ -171,20 +182,8 @@ public:
         simulator->solveFEA(NFR);
 
         // Have to convert the std::vector to a matlab array for output
-        stream << "Final Temperature: " << std::endl;
+        display3DVector(simulator->Temp, "Final Temp: ");
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
-        for (int k = 0; k < 3; k++) {
-            for (int j = 0; j < 3; j++) {
-                for (int i = 0; i < 3; i++) {
-                    stream << simulator->Temp[i][j][k] << ", ";
-                    displayOnMATLAB(stream);
-                }
-                stream << std::endl;
-            }
-            stream << std::endl;
-        }
-        stream << std::endl;
-        displayOnMATLAB(stream);
         outputs[0] = finalTemp;
     }
 

@@ -9,13 +9,33 @@ int main()
     std::vector<std::vector<std::vector<float>>> Temp = { { {50,50,50}, {50,50,50}, {50,50,50} },
                                                                    { {50,50,50}, {50,0,50}, {50,50,50} },
                                                                    { {50,50,50}, {50,50,50}, {50,50,50} } };
-    float tissueSize[3] = { 1,1,1 };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1);
+    float tissueSize[3] = { 1.0f,1.0f,1.0f };
+    /*
+    FEM_Simulator* simulator2 = new FEM_Simulator();
+    simulator2->setInitialTemperature(Temp);
+    for (int k = 0; k < 3; k++) {
+        for (int j = 0; j < 3; j++) {
+            for (int i = 0; i < 3; i++) {
+                std::cout << simulator2->Temp[i][j][k] << ", ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+    simulator2->setTissueSize(tissueSize);
+    simulator2->setTC(1);
+    simulator2->setVHC(1);
+    simulator2->setMUA(1);
+    simulator2->setHTC(1);
+    */
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1);
     simulator->deltaT = 0.01f;
-    simulator->tFinal = 0.2;
-    simulator->setHTC(1);
+    simulator->tFinal = 0.2f;
     int BC[6] = { 0,0,0,0,0,0 };
     simulator->setBoundaryConditions(BC);
+    simulator->Jn = 0;
+    simulator->setAmbientTemp(0);
     std::vector<std::vector<std::vector<float>>> NFR = { { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} },
                                                                    { {0,0,0}, {0,0,0}, {0,0,0} } };

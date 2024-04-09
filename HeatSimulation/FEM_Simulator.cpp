@@ -3,23 +3,15 @@
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}};
 
-FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA)
+FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC)
 {
-	this->Temp = Temp;
-	this->gridSize[0] = Temp.size() - 1; // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
-	this->gridSize[1] = Temp[1].size() - 1;
-	this->gridSize[2] = Temp[1][1].size() - 1;
-	for (int i = 0; i < 3; i++) {
-		this->tissueSize[i] = tissueSize[i];
-		this->nodeSize[i] = gridSize[i] + 1;
-	}
-	this->TC = TC;
-	this->VHC = VHC;
-	this->MUA = MUA;
-	// If we change assumption of uniform voxel size in cuboid this won't work anymore.
-	this->setJ();
 	
-	this->initializeBoundaryNodes();
+	this->setInitialTemperature(Temp);
+	this->setTissueSize(tissueSize);
+	this->setTC(TC);
+	this->setVHC(VHC);
+	this->setMUA(MUA);
+	this->setHTC(HTC);
 }
 
 void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
@@ -672,7 +664,7 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 
 void FEM_Simulator::setGridSize(int gridSize[3]) {
 	for (int i = 0; i < 3; i++) {
-		gridSize[i] = gridSize[i];
+		this->gridSize[i] = gridSize[i];
 		this->nodeSize[i] = gridSize[i] + 1;
 	}
 	this->setJ();
@@ -680,7 +672,7 @@ void FEM_Simulator::setGridSize(int gridSize[3]) {
 
 void FEM_Simulator::setNodeSize(int nodeSize[3]) {
 	for (int i = 0; i < 3; i++) {
-		gridSize[i] = nodeSize[i] - 1;
+		this->gridSize[i] = nodeSize[i] - 1;
 		this->nodeSize[i] = nodeSize[i];
 	}
 	setJ();
