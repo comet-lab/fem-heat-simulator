@@ -658,8 +658,8 @@ void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<fl
 	this->Temp = Temp;
 	int gridSize[3]; 
 	gridSize[0] = Temp.size() - 1; // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
-	gridSize[1] = Temp[1].size() - 1;
-	gridSize[2] = Temp[1][1].size() - 1;
+	gridSize[1] = Temp[0].size() - 1;
+	gridSize[2] = Temp[0][0].size() - 1;
 	this->setGridSize(gridSize);
 }
 
@@ -692,7 +692,7 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 
 void FEM_Simulator::setGridSize(int gridSize[3]) {
 	for (int i = 0; i < 3; i++) {
-		gridSize[i] = gridSize[0];
+		gridSize[i] = gridSize[i];
 		this->nodeSize[i] = gridSize[i] + 1;
 	}
 	this->setJ();
@@ -700,8 +700,8 @@ void FEM_Simulator::setGridSize(int gridSize[3]) {
 
 void FEM_Simulator::setNodeSize(int nodeSize[3]) {
 	for (int i = 0; i < 3; i++) {
-		gridSize[i] = nodeSize[0] - 1;
-		this->nodeSize[i] = nodeSize[0];
+		gridSize[i] = nodeSize[i] - 1;
+		this->nodeSize[i] = nodeSize[i];
 	}
 	setJ();
 }
