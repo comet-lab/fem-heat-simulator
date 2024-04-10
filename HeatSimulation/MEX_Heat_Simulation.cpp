@@ -173,7 +173,7 @@ public:
         
         // set flux condition
         float Jn = inputs[7][0];
-        simulator->Jn = Jn;
+        simulator->setJn(Jn);
 
         // set ambient temperature
         float ambientTemp = inputs[8][0];
