@@ -20,8 +20,10 @@ public:
 	// One node can belong to multiple faces so we use binary to set the face value
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face
 	enum tissueFace { INTERNAL = 0, TOP = 1, BOTTOM = 2, FRONT = 4, RIGHT = 8, BACK = 16, LEFT = 32 };
+	// This maps the face to the axis number and direction of the face: top, bottom, front, right, back, left
 	const int dimMap[6] = { 3, -3, -2, 1, 2, -1 };
-	const int BSurfMap[6][4] = { {4,5,6,7},{0,1,2,3},{0,1,4,5},{1,2,5,6},{2,3,6,7},{0,3,4,7} };
+	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
+	const int elemNodeSurfaceMap[6][4] = { {4,5,6,7},{0,1,2,3},{0,1,4,5},{1,2,5,6},{2,3,6,7},{0,3,4,7} };
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
@@ -56,6 +58,9 @@ public:
 	void setKe();
 	void setMe();
 	void setFeInt();
+	void setFj();
+	void setFv();
+	void setFvu();
 	void setBoundaryConditions(int BC[6]);
 
 
@@ -67,6 +72,9 @@ public:
 	Eigen::Matrix<float,8,8> Ke;
 	Eigen::Matrix<float,8,8> Me;
 	Eigen::Matrix<float, 8, 8> FeInt; 
+	Eigen::Matrix<float, 8, 6> Fj; // Fj is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::Matrix<float, 8, 6> Fv; // Fv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	std::vector<Eigen::Matrix<float,8,8>> Fvu; // Fvu is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having A 
 	Eigen::Matrix3<float> J;
 	Eigen::Matrix2<float> Js1;
 	Eigen::Matrix2<float> Js2;

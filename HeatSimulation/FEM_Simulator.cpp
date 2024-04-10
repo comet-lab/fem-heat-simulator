@@ -59,14 +59,15 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 				for (int f = 0; f < 6; f++) {
 					if ((nodeFace >> f) & 1) { // Node lies on a boundary
 						if (this->boundaryType[f] == FLUX) { // flux boundary
-							Fbar(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
+							// need to convert Ai to a value 0-3 based on 
+							Fbar(elementGlobalNodes[Ai]) += this->Fj(Ai, f);
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							Fbar(elementGlobalNodes[Ai]) += this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]);
-							for (int Bi : BSurfMap[f]) {
+							Fbar(elementGlobalNodes[Ai]) += this->Fv(Ai, f);
+							for (int Bi : elemNodeSurfaceMap[f]) {
 								int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 								// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-								Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+								Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Fvu[f](Ai, Bi);
 							}
 						}
 					} // if Node is face f
@@ -776,6 +777,37 @@ void FEM_Simulator::setFeInt()
 	for (int Ai = 0; Ai < 8; Ai++) {
 		for (int Bi = 0; Bi < 8; Bi++) {
 			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
+		}
+	}
+}
+
+void FEM_Simulator::setFj() {
+	this->Fj.setZero();
+	for (int f = 0; f < 6; f++) { // iterate through each face
+		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
+			this->Fj(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+		}
+	} // iterate through faces
+}
+
+void FEM_Simulator::setFv() {
+	this->Fv.setZero();
+	for (int f = 0; f < 6; f++) { // iterate through each face
+		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
+			this->Fv(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+		}
+	} // iterate through faces
+}
+
+void FEM_Simulator::setFvu() {
+	for (int f = 0; f < 6; f++) {
+		this->Fvu[f].setZero();
+		for (int Ai : elemNodeSurfaceMap[f]) {
+			for (int Bi : elemNodeSurfaceMap[f]) {
+				int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
+				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
+				this->Fvu[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+			}
 		}
 	}
 }
