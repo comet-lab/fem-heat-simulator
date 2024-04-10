@@ -28,7 +28,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	//Kbar.setZero();
 	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
 	Mbar.reserve(Eigen::VectorXi::Constant(nNodes, 27));
-	Mbar.setZero();
 	Eigen::VectorXf Fbar(nNodes); // Containts Fint, Fj, and Fd
 	Fbar.setZero();
 
@@ -76,12 +75,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 			// Now we will build the K, M and F matrice
 			for (int Bi = 0; Bi < 8; Bi++) {
-				/*
-				float Ktemp = this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
-				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Ktemp;
-				float Mtemp = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
-				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Mtemp;
-				*/
 				
 				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Ke(Ai, Bi);
 				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Me(Ai, Bi);
