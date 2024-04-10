@@ -64,8 +64,6 @@ public:
 	void setFvu();
 	void setBoundaryConditions(int BC[6]);
 
-
-
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
@@ -84,9 +82,11 @@ public:
 	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
 	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
-	element currElement;
-
 	std::vector<int> dirichletNodes;
+	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
+	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
+	std::vector<int> nodeMap; 
+	element currElement;
 
 	void initializeBoundaryNodes();
 	int determineNodeFace(int globalNode); // function has test cases

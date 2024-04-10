@@ -621,33 +621,32 @@ void FEM_Simulator::initializeBoundaryNodes()
 	this->validNodes.clear();
 	this->dirichletNodes.clear();
 
-	long nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	int positionCounter = 0;
+	bool validNode = true;
+	this->nodeMap = std::vector<int>(-1, nNodes); // initialize the mapping to -1. -1 indicates the node passed in is a dirichlet node.
 	for (int i = 0; i < nNodes; i++) {
 		int nodeFace = this->determineNodeFace(i);
 		int nodeSub[3];
 		this->ind2sub(i, this->nodeSize, nodeSub);
-
+		validNode = true;
 		// Determine if the node lies on a boundary and then determine what kind of boundary
-		bool dirichletFlag = false;
-		bool fluxFlag = false;
-		if (nodeFace == 0) { // This check saves a lot time since most nodes are not on a surface.
-			this->validNodes.push_back(i);
-		}
-		else {
-			bool valid = true;
+		if (nodeFace != 0) { // This check saves a lot time since most nodes are not on a surface.
 			for (int f = 0; f < 6; f++) {
-				if ((nodeFace >> f) & 1) { // Node lies on a boundary
+				if ((nodeFace >> f) & 1) { // Node lies on face f
 					if (this->boundaryType[f] == HEATSINK) { // flux boundary
-						valid = false;
+						validNode = false;
 						this->dirichletNodes.push_back(i);
 						break;
-					}
-				}
-			}
-			if (valid) { // if none of faces of the nodes are dirichlet boundaries
-				this->validNodes.push_back(i);
-			}
-		}
+					} // if heatsink
+				} // if node is on boundary
+			} // loop through each face
+		} // if node is not on a face
+		if (validNode) { // if none of faces of the nodes are dirichlet boundaries, the node is valid
+			this->validNodes.push_back(i);
+			this->nodeMap[i] = positionCounter;
+			positionCounter++;
+		} // The else condition is handled above in the for loop. 
 	}
 }
 
