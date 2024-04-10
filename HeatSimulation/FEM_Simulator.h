@@ -51,6 +51,7 @@ public:
 	void setVHC(float VHC);
 	void setMUA(float MUA);
 	void setHTC(float HTC);
+	void setJn(float Jn);
 	void setAmbientTemp(float ambientTemp);
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
@@ -69,16 +70,18 @@ public:
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::Matrix<float,8,8> Ke;
-	Eigen::Matrix<float,8,8> Me;
-	Eigen::Matrix<float, 8, 8> FeInt; 
-	Eigen::Matrix<float, 8, 6> Fj; // Fj is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::Matrix<float, 8, 6> Fv; // Fv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	std::vector<Eigen::Matrix<float,8,8>> Fvu; // Fvu is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having A 
-	Eigen::Matrix3<float> J;
-	Eigen::Matrix2<float> Js1;
-	Eigen::Matrix2<float> Js2;
-	Eigen::Matrix2<float> Js3;
+	Eigen::Matrix<float,8,8> Ke = Eigen::Matrix<float,8,8>::Constant(0.0f);
+	Eigen::Matrix<float,8,8> Me = Eigen::Matrix<float, 8, 8>::Constant(0.0f);
+	Eigen::Matrix<float, 8, 8> FeInt = Eigen::Matrix<float, 8, 8>::Constant(0.0f);
+	// Fj is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::Matrix<float, 8, 6> Fj = Eigen::Matrix<float, 8, 6>::Constant(0.0f); 
+	// Fv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::Matrix<float, 8, 6> Fv = Eigen::Matrix<float, 8, 6>::Constant(0.0f);
+	std::vector<Eigen::Matrix<float, 8, 8>> Fvu{ 6, Eigen::Matrix<float, 8, 8>::Constant(0.0f) }; // Fvu is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having A 
+	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
+	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
+	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
+	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
 	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	element currElement;

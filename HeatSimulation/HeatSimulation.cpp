@@ -29,7 +29,7 @@ int main()
     simulator->tFinal = 0.2f;
     int BC[6] = { 0,0,0,0,0,0 };
     simulator->setBoundaryConditions(BC);
-    simulator->Jn = 0;
+    simulator->setJn(0);
     simulator->setAmbientTemp(0);
     
     std::cout << "Running FEA" << std::endl;

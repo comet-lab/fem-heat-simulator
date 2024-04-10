@@ -710,10 +710,19 @@ void FEM_Simulator::setMUA(float MUA) {
 
 void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
+	this->setFv();
+	this->setFvu();
+}
+
+void FEM_Simulator::setJn(float Jn)
+{
+	this->Jn = Jn;
+	this->setFj();
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 	this->ambientTemp = ambientTemp;
+	this->setFv();
 }
 
 void FEM_Simulator::setGridSize(int gridSize[3]) {
