@@ -55,6 +55,7 @@ public:
 	void setJ();
 	void setKe();
 	void setMe();
+	void setFeInt();
 	void setBoundaryConditions(int BC[6]);
 
 
@@ -65,6 +66,7 @@ public:
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::Matrix<float,8,8> Ke;
 	Eigen::Matrix<float,8,8> Me;
+	Eigen::Matrix<float, 8, 8> FeInt; 
 	Eigen::Matrix3<float> J;
 	Eigen::Matrix2<float> Js1;
 	Eigen::Matrix2<float> Js2;

@@ -75,15 +75,22 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 			// Now we will build the K, M and F matrice
 			for (int Bi = 0; Bi < 8; Bi++) {
-				
+				// Sparse Matrix can't be filled through slicing, so we have to add each element individually by iterating over Ai and Bi
 				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Ke(Ai, Bi);
 				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Me(Ai, Bi);
-				
-				int BiSub[3];
-				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-				Fbar(elementGlobalNodes[Ai]) += (NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 			}
+		} // For loop through Ai
+
+		// Given the construction of Fbar, we don't need to loop through Ai. We also only need to loop through Bi to assemble the f_e vector 
+		// which contains the irradiance at each nodal point in the element. 
+		Eigen::Vector<float, 8> fE;
+		int BiSub[3];
+		for (int Bi = 0; Bi < 8; Bi++) {
+			ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
+			fE(Bi) = NFR[BiSub[0]][BiSub[1]][BiSub[2]]; // FeInt contains MUA so we don't need it here. 
 		}
+		Fbar(elementGlobalNodes) += this->FeInt * fE;
+
 	}
 
 
@@ -701,6 +708,7 @@ void FEM_Simulator::setVHC(float VHC) {
 
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
+	setFeInt();
 }
 
 void FEM_Simulator::setHTC(float HTC) {
@@ -734,6 +742,7 @@ void FEM_Simulator::setJ() {
 	this->Js3 = this->calculateJs(3);
 	setKe();
 	setMe();
+	setFeInt();
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
@@ -761,6 +770,16 @@ void FEM_Simulator::setMe() {
 	for (int Ai = 0; Ai < 8; Ai++) {
 		for (int Bi = 0; Bi < 8; Bi++) {
 			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+		}
+	}
+}
+
+void FEM_Simulator::setFeInt()
+{
+	this->FeInt.setZero();
+	for (int Ai = 0; Ai < 8; Ai++) {
+		for (int Bi = 0; Bi < 8; Bi++) {
+			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 		}
 	}
 }
