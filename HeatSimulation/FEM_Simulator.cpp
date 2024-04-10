@@ -90,7 +90,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			fE(Bi) = NFR[BiSub[0]][BiSub[1]][BiSub[2]]; // FeInt contains MUA so we don't need it here. 
 		}
 		Fbar(elementGlobalNodes) += this->FeInt * fE;
-
 	}
 
 
@@ -100,46 +99,43 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	startTime = stopTime;
 
 
-	// Remove the rows corresponding to Dirichlet Nodes
-	Eigen::VectorXf F = Fbar(this->validNodes);
-	// Remove unecessary members of Kbar
-	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size()); // K is the reduced Kbar matrix
-	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
-	Eigen::SparseMatrix<float> tempF(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // This will store the output of the dirichletBoundaryValues
-	this->reduceSparseMatrix(Kbar, this->dirichletNodes, &K, &tempF, nNodes);
-
-	// Remove unecessary memebers of Mbar
-	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size()); // M is the reduced Mbar matrix
+	Eigen::VectorXf F;
+	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-	Eigen::SparseMatrix<float> dummy(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
-	this->reduceSparseMatrix(Mbar, this->dirichletNodes, &M, &dummy, nNodes);
-
-	/*
-	for (int col = 0; col < K.outerSize(); ++col) // iterate through columns 
-		for (Eigen::SparseMatrix<float>::InnerIterator it(K, col); it; ++it) // iterate through rows that are nonzero
-		{	// col refers to the index in the dirichletNodes array
-			std::cout << "Row: " << it.row() << ", Col: " << it.col() << ", Value: " << it.value() << std::endl;
-		}
+	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	if (this->validNodes.size() != nNodes) { // if we have any dirichletNodes we have to complete the reductions step
+		//TODO This reduction step should not be necessary..... it takes up too much time
+		// we should be able to build the matrices already reduced. 
 		
-	for (int col = 0; col < M.outerSize(); ++col) // iterate through columns 
-		for (Eigen::SparseMatrix<float>::InnerIterator it(M, col); it; ++it) // iterate through rows that are nonzero
-		{	// col refers to the index in the dirichletNodes array
-			std::cout << "Row: " << it.row() << ", Col: " << it.col() << ", Value: " << it.value() << std::endl;
+		// Remove the rows corresponding to Dirichlet Nodes
+		F = Fbar(this->validNodes);
+		// Remove unecessary members of Kbar
+		K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
+		Eigen::SparseMatrix<float> tempF(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // This will store the output of the dirichletBoundaryValues
+		this->reduceSparseMatrix(Kbar, this->dirichletNodes, &K, &tempF, nNodes);
+
+		// Remove unecessary memebers of Mbar
+		Eigen::SparseMatrix<float> dummy(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
+		this->reduceSparseMatrix(Mbar, this->dirichletNodes, &M, &dummy, nNodes);
+
+		// Create Fdirichlet based on dirichlet boundaries
+		for (int col = 0; col < tempF.outerSize(); ++col) {// iterate through columns 
+			// col refers to the index in the dirichletNodes array
+			int nodeSub[3];
+			ind2sub(this->dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
+			float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
+
+			for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
+			{
+				F(it.row()) -= it.value() * dirichletValue; // Subtract it from F
+			}
 		}
-	*/
-
-
-	// Create Fdirichlet based on dirichlet boundaries
-	for (int col = 0; col < tempF.outerSize(); ++col) {// iterate through columns 
-		// col refers to the index in the dirichletNodes array
-		int nodeSub[3];
-		ind2sub(this->dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
-		float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
-
-		for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
-		{	
-			F(it.row()) -= it.value() * dirichletValue; // Subtract it from F
-		}
+	}
+	else {
+		M = Mbar;
+		K = Kbar;
+		F = Fbar;
 	}
 
 	stopTime = std::chrono::high_resolution_clock::now();
