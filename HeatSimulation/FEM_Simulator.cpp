@@ -23,13 +23,13 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	
 	this->initializeBoundaryNodes();
 
-	Eigen::SparseMatrix<float> Kbar(nNodes, nNodes);
-	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
-	//Kbar.setZero();
-	Eigen::SparseMatrix<float> Mbar(nNodes, nNodes);
-	Mbar.reserve(Eigen::VectorXi::Constant(nNodes, 27));
-	Eigen::VectorXf Fbar(nNodes); // Containts Fint, Fj, and Fd
-	Fbar.setZero();
+	// Initialize matrices so that we don't have to resize them later
+	Eigen::VectorX<float> F(nNodes - this->dirichletNodes.size());
+	F.setZero(); // have to set F to zero to remove garbage values
+	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
 
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
@@ -46,51 +46,60 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 		*/
 
 		int nodeFace;
+		int matrixInd[2];
 		for (int Ai = 0; Ai < 8; Ai++) {
 			nodeFace = this->determineNodeFace(elementGlobalNodes[Ai]);
+			matrixInd[0] = this->nodeMap[elementGlobalNodes[Ai]];
+			if (matrixInd[0] >= 0) { // Verify that the node we are working with is not a dirichlet node.
+				int AiSub[3];
+				this->ind2sub(elementGlobalNodes[Ai], this->nodeSize, AiSub);
 
-			int nodeSub[3];
-			this->ind2sub(elementGlobalNodes[Ai], this->nodeSize, nodeSub);
-
-			// Determine if the node lies on a boundary and then determine what kind of boundary
-			bool dirichletFlag = false;
-			bool fluxFlag = false;
-			if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
-				for (int f = 0; f < 6; f++) {
-					if ((nodeFace >> f) & 1) { // Node lies on a boundary
-						if (this->boundaryType[f] == FLUX) { // flux boundary
-							// need to convert Ai to a value 0-3 based on 
-							Fbar(elementGlobalNodes[Ai]) += this->Fj(Ai, f);
-						}
-						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							Fbar(elementGlobalNodes[Ai]) += this->Fv(Ai, f);
-							for (int Bi : elemNodeSurfaceMap[f]) {
-								int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
-								// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-								Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Fvu[f](Ai, Bi);
+				// Determine if the node lies on a boundary and then determine what kind of boundary
+				bool dirichletFlag = false;
+				bool fluxFlag = false;
+				if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
+					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
+						if ((nodeFace >> f) & 1) { // Node lies on face f
+							if ((this->boundaryType[f] == FLUX)) { // flux boundary
+								F(matrixInd[0]) += this->Fj(Ai, f);
 							}
-						}
-					} // if Node is face f
-				} // iterate through faces
-			} // if node is a face
+							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
+								F(matrixInd[0]) += this->Fv(Ai, f);
+								for (int Bi : elemNodeSurfaceMap[f]) {
+									matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
+									if (matrixInd[1] >= 0) {
+										int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
+										// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
+										K.coeffRef(matrixInd[0], matrixInd[1]) += this->Fvu[f](Ai, Bi);
+									}
+									else {
+										F(matrixInd[0]) += -this->Fvu[f](Ai, Bi);
+									}
+								}
+							}
+						} // if Node is face f
+					} // iterate through faces
+				} // if node is a face
 
-			// Now we will build the K, M and F matrice
-			for (int Bi = 0; Bi < 8; Bi++) {
-				// Sparse Matrix can't be filled through slicing, so we have to add each element individually by iterating over Ai and Bi
-				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Ke(Ai, Bi);
-				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Me(Ai, Bi);
-			}
+				// Now we will build the K, M and F matrice
+				int BiSub[3];
+				for (int Bi = 0; Bi < 8; Bi++) {
+					// Sparse Matrix can't be filled through slicing, so we have to add each element individually by iterating over Ai and Bi
+					ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub); // get our B value is a subscript
+
+					matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
+					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
+						K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
+						M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
+						F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+					}
+					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
+						F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
+						F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
+				} // For loop through Bi
+			} // If our node is not a dirichlet node
 		} // For loop through Ai
-
-		// Given the construction of Fbar, we don't need to loop through Ai. We also only need to loop through Bi to assemble the f_e vector 
-		// which contains the irradiance at each nodal point in the element. 
-		Eigen::Vector<float, 8> fE;
-		int BiSub[3];
-		for (int Bi = 0; Bi < 8; Bi++) {
-			ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
-			fE(Bi) = NFR[BiSub[0]][BiSub[1]][BiSub[2]]; // FeInt contains MUA so we don't need it here. 
-		}
-		Fbar(elementGlobalNodes) += this->FeInt * fE;
 	}
 
 
@@ -98,46 +107,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Building the Matrices: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
-
-
-	Eigen::VectorXf F;
-	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-	if (this->validNodes.size() != nNodes) { // if we have any dirichletNodes we have to complete the reductions step
-		//TODO This reduction step should not be necessary..... it takes up too much time
-		// we should be able to build the matrices already reduced. 
-		
-		// Remove the rows corresponding to Dirichlet Nodes
-		F = Fbar(this->validNodes);
-		// Remove unecessary members of Kbar
-		K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // there will be at most 27 non-zero entries per column 
-		Eigen::SparseMatrix<float> tempF(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // This will store the output of the dirichletBoundaryValues
-		this->reduceSparseMatrix(Kbar, this->dirichletNodes, &K, &tempF, nNodes);
-
-		// Remove unecessary memebers of Mbar
-		Eigen::SparseMatrix<float> dummy(nNodes - this->dirichletNodes.size(), this->dirichletNodes.size()); // we don't actually care about the columns of Mbar that are removed 
-		this->reduceSparseMatrix(Mbar, this->dirichletNodes, &M, &dummy, nNodes);
-
-		// Create Fdirichlet based on dirichlet boundaries
-		for (int col = 0; col < tempF.outerSize(); ++col) {// iterate through columns 
-			// col refers to the index in the dirichletNodes array
-			int nodeSub[3];
-			ind2sub(this->dirichletNodes[col], this->nodeSize, nodeSub); // convert the dirichletNodes index to a subscript
-			float dirichletValue = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]]; // Find the temperature value at that location
-
-			for (Eigen::SparseMatrix<float>::InnerIterator it(tempF, col); it; ++it) // iterate through rows that are nonzero
-			{
-				F(it.row()) -= it.value() * dirichletValue; // Subtract it from F
-			}
-		}
-	}
-	else {
-		M = Mbar;
-		K = Kbar;
-		F = Fbar;
-	}
 
 	stopTime = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
@@ -624,7 +593,7 @@ void FEM_Simulator::initializeBoundaryNodes()
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 	int positionCounter = 0;
 	bool validNode = true;
-	this->nodeMap = std::vector<int>(-1, nNodes); // initialize the mapping to -1. -1 indicates the node passed in is a dirichlet node.
+	this->nodeMap = std::vector<int>(nNodes, -1); // initialize the mapping to -1. -1 indicates the node passed in is a dirichlet node.
 	for (int i = 0; i < nNodes; i++) {
 		int nodeFace = this->determineNodeFace(i);
 		int nodeSub[3];
