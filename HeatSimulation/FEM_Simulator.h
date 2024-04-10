@@ -6,6 +6,7 @@
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>
+#include <chrono>
 
 class FEM_Simulator
 {
@@ -52,6 +53,8 @@ public:
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
 	void setJ();
+	void setKe();
+	void setMe();
 	void setBoundaryConditions(int BC[6]);
 
 
@@ -59,7 +62,9 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
-	// because of our assumptions, these don't need to be recalculated every time and be class variables.
+	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
+	Eigen::Matrix<float,8,8> Ke;
+	Eigen::Matrix<float,8,8> Me;
 	Eigen::Matrix3<float> J;
 	Eigen::Matrix2<float> Js1;
 	Eigen::Matrix2<float> Js2;

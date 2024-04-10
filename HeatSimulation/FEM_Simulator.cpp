@@ -16,9 +16,13 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 {
 	//this->NFR = NFR;
+	auto startTime = std::chrono::high_resolution_clock::now();
+
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	
 	this->initializeBoundaryNodes();
+
 	Eigen::SparseMatrix<float> Kbar(nNodes, nNodes);
 	Kbar.reserve(Eigen::VectorXi::Constant(nNodes, 27)); // there will be at most 27 non-zero entries per column 
 	//Kbar.setZero();
@@ -27,7 +31,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	Mbar.setZero();
 	Eigen::VectorXf Fbar(nNodes); // Containts Fint, Fj, and Fd
 	Fbar.setZero();
-
 
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
@@ -73,17 +76,28 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 			// Now we will build the K, M and F matrice
 			for (int Bi = 0; Bi < 8; Bi++) {
+				/*
 				float Ktemp = this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
 				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Ktemp;
 				float Mtemp = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
 				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += Mtemp;
-
+				*/
+				
+				Kbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Ke(Ai, Bi);
+				Mbar.coeffRef(elementGlobalNodes[Ai], elementGlobalNodes[Bi]) += this->Me(Ai, Bi);
+				
 				int BiSub[3];
 				ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub);
 				Fbar(elementGlobalNodes[Ai]) += (NFR[BiSub[0]][BiSub[1]][BiSub[2]]) * this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 			}
 		}
 	}
+
+
+	auto stopTime = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Building the Matrices: " << duration.count()/1000000.0 << std::endl;
+	startTime = stopTime;
 
 
 	// Remove the rows corresponding to Dirichlet Nodes
@@ -128,11 +142,10 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 		}
 	}
 
-	std::cout << "After F: ";
-	for (int i = 0; i < 8; i++) {
-		std::cout << F(i) << ", ";
-	}
-	std::cout << std::endl;
+	stopTime = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Reducing the Matrices: " << duration.count()/1000000.0 << std::endl;
+	startTime = stopTime;
 
 	// Solve Euler Family 
 	// Initialize d vector
@@ -177,6 +190,11 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			counter++;
 		}
 	}
+
+	stopTime = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Performing Time stepping: " << duration.count()/1000000.0 << std::endl;
+	startTime = stopTime;
 }
 
 void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> *newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes) {
@@ -680,10 +698,12 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
+	this->setKe();
 }
 
 void FEM_Simulator::setVHC(float VHC) {
 	this->VHC = VHC;
+	this->setMe();
 }
 
 void FEM_Simulator::setMUA(float MUA) {
@@ -719,6 +739,8 @@ void FEM_Simulator::setJ() {
 	this->Js1 = this->calculateJs(1);
 	this->Js2 = this->calculateJs(2);
 	this->Js3 = this->calculateJs(3);
+	setKe();
+	setMe();
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
@@ -727,4 +749,25 @@ void FEM_Simulator::setBoundaryConditions(int BC[6])
 		this->boundaryType[i] = static_cast<boundaryCond>(BC[i]);
 	}
 	this->initializeBoundaryNodes();
+}
+
+void FEM_Simulator::setKe() {
+	// Taking advantage of the fact that J is costant across element and TC is constant across elements
+	this->Ke.setZero();
+	for (int Ai = 0; Ai < 8; Ai++) {
+		for (int Bi = 0; Bi < 8; Bi++) {
+			this->Ke(Ai, Bi) = this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+		}
+	}
+
+}
+
+void FEM_Simulator::setMe() {
+	// Taking advantage of the fact that J is costant across element and VHC is constant across elements
+	this->Me.setZero();
+	for (int Ai = 0; Ai < 8; Ai++) {
+		for (int Bi = 0; Bi < 8; Bi++) {
+			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+		}
+	}
 }
