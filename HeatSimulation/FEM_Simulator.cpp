@@ -108,11 +108,6 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	std::cout << "Building the Matrices: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
 
-	stopTime = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Reducing the Matrices: " << duration.count()/1000000.0 << std::endl;
-	startTime = stopTime;
-
 	// Solve Euler Family 
 	// Initialize d vector
 	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
