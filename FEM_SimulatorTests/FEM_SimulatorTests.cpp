@@ -379,6 +379,29 @@ namespace FEMSimulatorTests
 			}
 			Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 		}
-
+		TEST_METHOD(TestCreateFjFunction1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			float VHC = 1.0f;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, VHC, 1.0f, 1.0f);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = FEM_Simulator::A[Ai][0];
+			xi[1] = FEM_Simulator::A[Ai][1];
+			xi[2] = FEM_Simulator::A[Ai][2];
+			float output1 = simulator->createFjFunction(xi, Ai, 1);
+			simulator->setFj();
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			Assert::IsTrue((abs(1 / 64.0f) - output1) < 0.0001);
+			for (int Ai = 0; Ai < 8; Ai++) {
+				Assert::IsTrue(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
+			}
+			Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
+		}
 	};
 }

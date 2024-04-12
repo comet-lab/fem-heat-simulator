@@ -517,6 +517,7 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 	float FjFunc = 0;
 	float NAa;
 	Eigen::Matrix2f Js; 
+	dim = abs(dim);
 	if (dim == 1) {
 		Js = this->Js1;
 	}
@@ -537,6 +538,7 @@ float FEM_Simulator::createFvFunction(float xi[3], int Ai, int dim)
 	float FvFunc = 0;
 	float NAa;
 	Eigen::Matrix2f Js;
+	dim = abs(dim);
 	if (dim == 1) {
 		Js = this->Js1;
 	}
@@ -560,6 +562,7 @@ float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
 	float NAa;
 	float NAb;
 	int dir = dim / abs(dim);
+	dim = abs(dim);
 	Eigen::Matrix2f Js;
 	if (dim == 1) { // y-z plane
 		Js = this->Js1;
