@@ -21,9 +21,9 @@ public:
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face
 	enum tissueFace { INTERNAL = 0, TOP = 1, BOTTOM = 2, FRONT = 4, RIGHT = 8, BACK = 16, LEFT = 32 };
 	// This maps the face to the axis number and direction of the face: top, bottom, front, right, back, left
-	const int dimMap[6] = { 3, -3, -2, 1, 2, -1 };
+	const int dimMap[6] = { -3, 3, -2, 1, 2, -1 }; // top is actually negative z axis... a bit confusing 
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
-	const int elemNodeSurfaceMap[6][4] = { {4,5,6,7},{0,1,2,3},{0,1,4,5},{1,2,5,6},{2,3,6,7},{0,3,4,7} };
+	const int elemNodeSurfaceMap[6][4] = { {0,1,2,3},{4,5,6,7},{0,1,4,5},{1,2,5,6},{2,3,6,7},{0,3,4,7} };
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 

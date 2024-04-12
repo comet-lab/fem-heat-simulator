@@ -8,7 +8,7 @@ int main()
 {
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 50,50,50};
+    int nodeSize[3] = { 5,5,5};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     for (int i = 0; i < nodeSize[0]; i++) {
@@ -27,9 +27,9 @@ int main()
 
     simulator->deltaT = 0.01f;
     simulator->tFinal = 0.2f;
-    int BC[6] = { 0,0,0,0,0,0 };
+    int BC[6] = { 1,1,1,1,1,1 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(0);
+    simulator->setJn(1);
     simulator->setAmbientTemp(0);
     
     std::cout << "Running FEA" << std::endl;
@@ -38,7 +38,7 @@ int main()
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
-    if (nodeSize[0] < 5) {
+    if (nodeSize[0] <= 5) {
         for (int k = 0; k < nodeSize[2]; k++) {
             for (int j = 0; j < nodeSize[1]; j++) {
                 for (int i = 0; i < nodeSize[0]; i++) {

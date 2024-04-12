@@ -399,7 +399,7 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 
 	for (int i = 0; i < points; i++) {
 		for (int j = 0; j < points; j++) {
-			if (dim == 0) { // integrate across all 3 axis
+			if (abs(dim) == 0) { // integrate across all 3 axis
 				for (int k = 0; k < points; k++) {
 					float xi[3] = { zeros[i], zeros[j], zeros[k] };
 					output += (this->*func)(xi, param1, param2) * weights[i] * weights[j] * weights[k];
