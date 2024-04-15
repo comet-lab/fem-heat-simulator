@@ -35,6 +35,7 @@ namespace FEMSimulatorTests
 			}
 			
 		}
+
 		TEST_METHOD(TestDetermineNodeFace1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
@@ -180,7 +181,6 @@ namespace FEMSimulatorTests
 				Assert::AreEqual(0.0f, output4);
 			}
 		}
-
 
 		TEST_METHOD(TestCalculateNA_Zeta1)
 		{
@@ -379,6 +379,7 @@ namespace FEMSimulatorTests
 			}
 			Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 		}
+
 		TEST_METHOD(TestCreateFjFunction1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },

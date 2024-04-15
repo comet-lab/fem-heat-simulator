@@ -17,7 +17,7 @@ private:
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
     std::ostringstream stream;
-    bool debug = false;
+    bool debug = true;
 
 public:
     /* Constructor for the class. */
@@ -131,7 +131,7 @@ public:
         // Have to convert T0 and NFR to std::vector<<<float>>>
         std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
         simulator->setInitialTemperature(T0);
-        display3DVector(simulator->Temp,"Initial Temp: ");
+        //display3DVector(simulator->Temp,"Initial Temp: ");
  
         // Set tissue size
         float tissueSize[3];
@@ -184,7 +184,7 @@ public:
         simulator->solveFEA(NFR);
 
         // Have to convert the std::vector to a matlab array for output
-        display3DVector(simulator->Temp, "Final Temp: ");
+        //display3DVector(simulator->Temp, "Final Temp: ");
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
         outputs[0] = finalTemp;
     }

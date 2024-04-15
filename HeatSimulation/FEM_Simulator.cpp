@@ -17,6 +17,10 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 {
 	//this->NFR = NFR;
 	auto startTime = std::chrono::high_resolution_clock::now();
+	bool  elemNFR = false; //flag determining if the NFR passed in is nodal or element-wise
+	if (NFR[0].size() == gridSize[0]) {
+		elemNFR = true;
+	}
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
@@ -91,11 +95,21 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
 						K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
 						M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
-						F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
+							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[eSub[0]][eSub[1]][eSub[2]];
+						}
+						else {//nodal NFR so use as given
+							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
 					}
 					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
 						F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
-						F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
+							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[eSub[0]][eSub[1]][eSub[2]];
+						}
+						else {//nodal NFR so use as given
+							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
 			} // If our node is not a dirichlet node
