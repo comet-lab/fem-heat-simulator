@@ -119,7 +119,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Building the Matrices: " << duration.count()/1000000.0 << std::endl;
+	std::cout << "Built the Matrices: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
 
 	// Solve Euler Family 
@@ -143,7 +143,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-	for (float t = deltaT; t < this->tFinal; t += this->deltaT) {
+	for (float t = this->deltaT; t <= this->tFinal; t += this->deltaT) {
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::VectorXf fullF = F - K * dTilde;
 		Eigen::VectorXf vVec2 = solver.solve(fullF);
@@ -158,17 +158,15 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	// Adjust our Temp with new d vector
 	counter = 0;
 	for (int n : validNodes) {
-		if (std::find(dirichletNodes.begin(), dirichletNodes.end(), n) == dirichletNodes.end()) { //not in the list 
 			int nodeSub[3];
 			ind2sub(n, this->nodeSize, nodeSub);
 			this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]] = dVec(counter);
 			counter++;
-		}
 	}
 
 	stopTime = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Performing Time stepping: " << duration.count()/1000000.0 << std::endl;
+	std::cout << "Performed Time stepping: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
 }
 
