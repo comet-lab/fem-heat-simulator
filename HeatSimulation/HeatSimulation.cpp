@@ -8,7 +8,7 @@ int main()
 {
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 101,101,101};
+    int nodeSize[3] = { 80,80,80};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     for (int i = 0; i < nodeSize[0]; i++) {
@@ -25,9 +25,9 @@ int main()
 
     std::cout << "Object Created " << std::endl;
 
-    simulator->deltaT = 0.2f;
-    simulator->tFinal = 0.2f;
-    int BC[6] = { 1,1,1,1,1,1 };
+    simulator->deltaT = 0.1f;
+    simulator->tFinal = 1.0f;
+    int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(1);
     simulator->setAmbientTemp(0);

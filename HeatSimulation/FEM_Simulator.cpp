@@ -136,13 +136,25 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 			counter++;
 	}
 
+	stopTime = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "D initialized: " << duration.count() / 1000000.0 << std::endl;
+	startTime = stopTime;
+
 	// Perform TimeStepping
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float> > solver;
+	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
 	Eigen::SparseMatrix<float> fullM = M + this->alpha * deltaT * K;
 	solver.compute(fullM);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
+
+	stopTime = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Matrix Factorized: " << duration.count() / 1000000.0 << std::endl;
+	startTime = stopTime;
+
 	for (float t = this->deltaT; t <= this->tFinal; t += this->deltaT) {
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::VectorXf fullF = F - K * dTilde;
@@ -155,6 +167,11 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 		vVec = vVec2;
 	}
 
+	stopTime = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Time Stepping Completed: " << duration.count() / 1000000.0 << std::endl;
+	startTime = stopTime;
+
 	// Adjust our Temp with new d vector
 	counter = 0;
 	for (int n : validNodes) {
@@ -166,7 +183,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 	stopTime = std::chrono::high_resolution_clock::now();
 	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Performed Time stepping: " << duration.count()/1000000.0 << std::endl;
+	std::cout << "Updated Temp Variable: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
 }
 
