@@ -38,6 +38,12 @@ int main()
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
+    simulator->NFR = NFR;
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Set NFR: " << duration.count() / 1000000.0 << std::endl;
+    simulator->createKMF();
+
     if (nodeSize[0] <= 5) {
         for (int k = 0; k < nodeSize[2]; k++) {
             for (int j = 0; j < nodeSize[1]; j++) {
@@ -51,6 +57,8 @@ int main()
         std::cout << std::endl;
     }
     
+    
+
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

@@ -1,7 +1,7 @@
 #include "FEM_Simulator.h"
 #include <iostream>
 
-const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{1,1,-1},{-1,1,-1},{-1,-1,1},{1,-1,1},{1,1,1},{-1,1,1}};
+const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
 
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC)
 {
@@ -214,6 +214,99 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 		} // end if row is not in our rows to remove
 	} // end for each row
 } //reduceSparseMatrix
+
+void FEM_Simulator::createKMF() {
+	//this->NFR = NFR;
+	auto startTime = std::chrono::high_resolution_clock::now();
+	bool  elemNFR = false; //flag determining if the NFR passed in is nodal or element-wise
+	if (this->NFR[0].size() == gridSize[0]) {
+		elemNFR = true;
+	}
+
+	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
+	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+
+	this->initializeBoundaryNodes();
+
+	// Initialize matrices so that we don't have to resize them later
+	Eigen::VectorX<float> F(nNodes - this->dirichletNodes.size());
+	F.setZero(); // have to set F to zero to remove garbage values
+	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+
+	int nodeFace = 0;
+	int matrixInd[2] = { 0,0 };
+	// iterate through the non-dirichlet nodes. Any dirichlet nodes don't get a row entry in the matrices/vectors
+	for (int row = 0; row < this->validNodes.size(); row++) {	
+		int globalNode = this->validNodes[row]; // get our global node
+		nodeFace = this->determineNodeFace(globalNode); // determine what faces our node is on
+		Eigen::Vector<float,27> vectorNFR; // Set this value 
+
+		Eigen::Matrix<float,1,27> Kconv = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // The result the convection boundary has on K(row,col)
+		// Handle Flux and Convection Boundaries 
+		if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
+			for (int f = 0; f < 6; f++) { // Iterate through each face of the element
+				if ((nodeFace >> f) & 1) { // Node lies on face f
+					std::vector<int> localNodes = this->convertToLocalNode(globalNode,f);
+					for (int Ai : localNodes) { // iterate through the localNodes associated with the current global node
+						if ((this->boundaryType[f] == FLUX)) { // flux boundary
+							F(row) += this->Fj(Ai, f);
+						}
+						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
+							F(row) += this->Fv(Ai, f);
+							for (int Bi : elemNodeSurfaceMap[f]) {
+
+								int BiGlobal = this->convertToGlobalNode(Bi,globalNode,Ai); // Need some conversion from Ai,Bi,n to global position of Bi
+								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
+								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
+									Kconv(BiNeighbor) += this->Fvu[f](Ai, Bi);
+								}
+								else { // Bi is a dirichlet node
+									F(row) += -this->Fvu[f](Ai, Bi);
+								}
+							}
+						} // If Convection Boundary
+					} // iterate through the elements that contain our global node
+				} // if Node is face f
+			} // iterate through faces
+		}
+
+		// Need to iterate through all 27 nodes (including itself) that the current global node touches
+		int nodeSub[3];
+		int neighborSub[3];
+		this->ind2sub(globalNode, this->nodeSize, nodeSub);
+		int kStart = ((nodeSub[2] == 0) ? 1 : 0); // start at 0 if we are not on top layer, else start at 1
+		int kEnd = ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 2 : 3); // end at 1 if we are on bottom layer, else end at 2.
+		int jStart = ((nodeSub[1] == 0) ? 1 : 0);
+		int jEnd = ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 2 : 3);
+		int iStart = ((nodeSub[0] == 0) ? 1 : 0);
+		int iEnd = ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 2 : 3);
+		for (int k = kStart; k < kEnd; k++) {
+			for (int j = jStart; j < jEnd; j++) {
+				for (int i = iStart; i < iEnd; i++) {
+					int idx = i + 3 * j + 9 * k; // a value between 0 and 26 to properly index into matrices 
+					int neighbor = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
+					ind2sub(neighbor, this->nodeSize, neighborSub);
+					// Could replace with vector dot product, but that means building the sub-vector of NFR - doesn't seem worth it
+					F(row) += this->FnInt(idx) * this->NFR[neighborSub[0]][neighborSub[1]][neighborSub[2]];
+
+					if (this->nodeMap[neighbor] > 0) { // if our neighbor is not a Dirichlet Node
+						M.insert(row, neighbor) = this->Mn(idx); // Fill (row,col) of M
+						K.insert(row, neighbor) = this->Kn(idx) + Kconv(idx); // Fill (row,col) of K
+					}
+					else {
+						F(row) += -this->Kn(idx) * this->Temp[neighborSub[0]][neighborSub[1]][neighborSub[2]]; // Our K column gets moved to the forcing function if its a dirichlet node
+					}
+				}
+			}
+		}
+	}
+	auto stopTime = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+}
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
@@ -495,6 +588,110 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 	position[2] = sub[2] * deltaZ;
 }
 
+Eigen::Vector<int,27> FEM_Simulator::getNodeNeighbors(int globalNode)
+{
+	//returns a 27 element vector, idicating the 27 neighbors of our node (including the node itself). 
+	// if a node does not exist in that neighbor idx, there will be a -1 in its place. For example, if our node is global node 0
+	// then the first 13 elements would be -1, and so on.  
+	
+	// if the order changes here, need to change convertToNeighborIdx()
+	Eigen::Vector<int,27> neighbors = Eigen::Vector<int,27>::Constant(-1);
+	int nodeSub[3];
+	this->ind2sub(globalNode, this->nodeSize, nodeSub);
+	// I feel there is a more efficient way to do these checks
+	int kStart = ((nodeSub[2] == 0) ? 1 : 0); // start at 0 if we are not on top layer, else start at 1
+	int kEnd = ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 2 : 3); // end at 1 if we are on bottom layer, else end at 2.
+	int jStart = ((nodeSub[1] == 0) ? 1 : 0);
+	int jEnd = ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 2 : 3);
+	int iStart = ((nodeSub[0] == 0) ? 1 : 0);
+	int iEnd = ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 2 : 3);
+	for (int k = kStart; k < kEnd; k++) {
+		for (int j = jStart; j < jEnd; j++) {
+			for (int i = iStart; i < iEnd; i++) {
+				int idx = i + 3 * j + 9 * k;
+				neighbors(idx) = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
+			}
+		}
+	}
+	return neighbors;
+}
+
+std::vector<int> FEM_Simulator::convertToLocalNode(int globalNode, int f)
+{
+	// TO DO, make this function look at this->A for its boundary checking. 
+	std::vector<int> localIndices;
+	int nodeSub[3];
+	this->ind2sub(globalNode, this->nodeSize, nodeSub);
+	bool validFlag = false;
+	for (int nodeOption : elemNodeSurfaceMap[f]) { // go through each option based on the current face
+		switch (nodeOption) {
+		case 0: // for 0 to be an option, the global node cant be on the positive x y or z boundary
+			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == this->nodeSize[2] - 1))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 1:// for 1 to be an option, the global node can't be on the negative x or positive y/z boundary
+			if (!((nodeSub[0] == 0) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == this->nodeSize[2] - 1))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 2:// for 2 to be an option, the global node can't be on the negative y or positive x/z boundary
+			if (!((nodeSub[0] == this->nodeSize[1] - 1) || (nodeSub[1] == 0) || (nodeSub[2] == this->nodeSize[2] - 1))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 3:// for 3 to be an option, the global node can't be on the negative x/y or positive z boundary
+			if (!((nodeSub[0] == 0) || (nodeSub[1] == 0) || (nodeSub[2] == this->nodeSize[2] - 1))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 4:// for 4 to be an option, the global node can't be on the negative z or positive x/y boundary
+			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == 0))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 5:// for 5 to be an option, the global node can't be on the negative z/x or positive y boundary
+			if (!((nodeSub[0] == 0) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == 0))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 6:// for 6 to be an option, the global node can't be on the negative y/z or positive x boundary
+			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == 0) || (nodeSub[2] == 0))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		case 7:// for 7 to be an option, the global node can't be on the negative x/y/z boundary
+			if (!((nodeSub[0] == 0) || (nodeSub[1] == 0) || (nodeSub[2] == 0))) {
+				localIndices.push_back(nodeOption);
+			}
+			break;
+		}
+	}
+
+	return localIndices;
+}
+
+int FEM_Simulator::convertToGlobalNode(int localNode, int globalReference, int localReference)
+{
+	// if structure of this->A changes, this function will be wrong. 
+	int xShift = (localNode - localReference) % 2;
+	int yShift = ((localNode - localReference) % 4)/ 2; 
+	int zShift = (localNode - localReference) / 4;
+	int globalNode = globalReference + xShift + yShift * this->nodeSize[0] + zShift * this->nodeSize[1] * this->nodeSize[0];
+	return globalNode;
+}
+
+int FEM_Simulator::convertToNeighborIdx(int globalNode, int globalReference)
+{
+	// getNodeNeighbors is used as reference to create this mapping. 
+	int difference = globalNode - globalReference; // the addition keeps the value positive and lets us use modulos
+	int kShift = (difference / (this->nodeSize[0]*this->nodeSize[1])); // provides a value between -1 and 1
+	int jShift = (difference % (this->nodeSize[0] * this->nodeSize[1])) / this->nodeSize[0]; // provides a value between -1 and 1
+	int iShift = (difference % this->nodeSize[0]); // provides a value between -1 and 1
+	int neighborIdx = kShift*9 + jShift*3 + iShift + 13; // if globalNode == globalReference, that is idx 13. 
+	return neighborIdx;
+}
+
 float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 {
 	float KABfunc = 0;
@@ -765,6 +962,29 @@ void FEM_Simulator::setKe() {
 
 }
 
+void FEM_Simulator::setKn()
+{
+	this->Kn.setZero();
+	for (int i = 0; i < 27; i++) {
+		int nodeSub[3];
+		this->ind2sub(i, this->nodeSize, nodeSub);
+		for (int e = 0; e < 8; e++) {
+			int size[3] = { 2,2,2 };
+			int eSub[3];
+			this->ind2sub(e, size, eSub);
+			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
+			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
+			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
+			if (firstCond && secondCond && thirdCond) {
+				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1])*2 + (nodeSub[2] - 1 == eSub[2])*4;
+				int Bi = 7-e;
+				this->Kn(i) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);;
+			}
+		}
+		
+	}
+}
+
 void FEM_Simulator::setMe() {
 	// Taking advantage of the fact that J is costant across element and VHC is constant across elements
 	this->Me.setZero();
@@ -775,6 +995,29 @@ void FEM_Simulator::setMe() {
 	}
 }
 
+void FEM_Simulator::setMn()
+{
+	this->Mn.setZero();
+	for (int i = 0; i < 27; i++) {
+		int nodeSub[3];
+		this->ind2sub(i, this->nodeSize, nodeSub);
+		for (int e = 0; e < 8; e++) {
+			int size[3] = { 2,2,2 };
+			int eSub[3];
+			this->ind2sub(e, size, eSub);
+			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
+			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
+			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
+			if (firstCond && secondCond && thirdCond) {
+				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1])*2 + (nodeSub[2] - 1 == eSub[2])*4;
+				int Bi = 7-e;
+				this->Mn(i) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);;
+			}
+		}
+		
+	}
+}
+
 void FEM_Simulator::setFeInt()
 {
 	this->FeInt.setZero();
@@ -782,6 +1025,29 @@ void FEM_Simulator::setFeInt()
 		for (int Bi = 0; Bi < 8; Bi++) {
 			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
 		}
+	}
+}
+
+void FEM_Simulator::setFnInt()
+{
+	this->FnInt.setZero();
+	for (int i = 0; i < 27; i++) {
+		int nodeSub[3];
+		this->ind2sub(i, this->nodeSize, nodeSub);
+		for (int e = 0; e < 8; e++) {
+			int size[3] = { 2,2,2 };
+			int eSub[3];
+			this->ind2sub(e, size, eSub);
+			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
+			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
+			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
+			if (firstCond && secondCond && thirdCond) {
+				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1]) * 2 + (nodeSub[2] - 1 == eSub[2]) * 4;
+				int Bi = 7 - e;
+				this->FnInt(i) += this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);;
+			}
+		}
+
 	}
 }
 

@@ -21,9 +21,10 @@ public:
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face
 	enum tissueFace { INTERNAL = 0, TOP = 1, BOTTOM = 2, FRONT = 4, RIGHT = 8, BACK = 16, LEFT = 32 };
 	// This maps the face to the axis number and direction of the face: top, bottom, front, right, back, left
-	const int dimMap[6] = { -3, 3, -2, 1, 2, -1 }; // top is actually negative z axis... a bit confusing 
+	const int dimMap[6] = { -3, 3, -2, 1, 2, -1 }; // top is actually negative z axis... a bit confusing
+
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
-	const int elemNodeSurfaceMap[6][4] = { {0,1,2,3},{4,5,6,7},{0,1,4,5},{1,2,5,6},{2,3,6,7},{0,3,4,7} };
+	const int elemNodeSurfaceMap[6][4] = { {0,1,2,3},{4,5,6,7},{0,1,4,5},{1,3,5,7},{2,3,6,7},{0,2,4,6} };
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
@@ -45,6 +46,7 @@ public:
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
 	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
+	void createKMF();
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTissueSize(float tissueSize[3]);
 	void setTC(float TC);
@@ -57,8 +59,11 @@ public:
 	void setNodeSize(int nodeSize[3]);
 	void setJ();
 	void setKe();
+	void setKn();
 	void setMe();
+	void setMn();
 	void setFeInt();
+	void setFnInt();
 	void setFj();
 	void setFv();
 	void setFvu();
@@ -68,9 +73,12 @@ public:
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::Matrix<float,8,8> Ke = Eigen::Matrix<float,8,8>::Constant(0.0f);
-	Eigen::Matrix<float,8,8> Me = Eigen::Matrix<float, 8, 8>::Constant(0.0f);
-	Eigen::Matrix<float, 8, 8> FeInt = Eigen::Matrix<float, 8, 8>::Constant(0.0f);
+	Eigen::Matrix<float,8,8> Ke = Eigen::Matrix<float,8,8>::Constant(0.0f); // Elemental Construction of K
+	Eigen::Matrix<float, 1, 27> Kn = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // Nodal Construction of K
+	Eigen::Matrix<float,8,8> Me = Eigen::Matrix<float, 8, 8>::Constant(0.0f); // Elemental construction of M
+	Eigen::Matrix<float, 1, 27> Mn = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of M
+	Eigen::Matrix<float, 8, 8> FeInt = Eigen::Matrix<float, 8, 8>::Constant(0.0f); // Elemental Construction of F_int
+	Eigen::Matrix<float, 1, 27> FnInt = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of F_int
 	// Fj is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
 	Eigen::Matrix<float, 8, 6> Fj = Eigen::Matrix<float, 8, 6>::Constant(0.0f); 
 	// Fv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
@@ -83,6 +91,7 @@ public:
 	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
+	std::vector<std::vector<std::vector<float>>> NFR; 
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 
@@ -100,6 +109,10 @@ public:
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
 	void getGlobalNodesFromElem(int elem, int nodes[8]); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
+	Eigen::Vector<int,27> getNodeNeighbors(int globalNode);
+	std::vector<int> convertToLocalNode(int globalNode,int f);
+	int convertToGlobalNode(int localNode,int globalReference,int localReference);
+	int convertToNeighborIdx(int globalNode, int globalReference);
 	float createKABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createMABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createFintFunction(float xi[3], int Ai, int Bi);
