@@ -46,7 +46,7 @@ public:
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
-	void solveFEA();
+	void performTimeStepping();
 	void createKMF();
 	void createKMFelem();
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);

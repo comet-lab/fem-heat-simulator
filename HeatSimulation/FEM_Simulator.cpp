@@ -13,7 +13,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setHTC(HTC);
 }
 
-void FEM_Simulator::solveFEA()
+void FEM_Simulator::performTimeStepping()
 {
 	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
@@ -302,6 +302,9 @@ void FEM_Simulator::createKMFelem()
 			} // If our node is not a dirichlet node
 		} // For loop through Ai
 	}
+	auto stopTime = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
 }
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)

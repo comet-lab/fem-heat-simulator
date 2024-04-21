@@ -131,8 +131,13 @@ public:
         // Have to convert T0 and NFR to std::vector<<<float>>>
         std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
         simulator->setInitialTemperature(T0);
+
+        // Set the NFR
+        std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
+        simulator->setNFR(NFR);
+
         //display3DVector(simulator->Temp,"Initial Temp: ");
- 
+        simulator
         // Set tissue size
         float tissueSize[3];
         tissueSize[0] = inputs[2][0];
@@ -179,9 +184,8 @@ public:
         float ambientTemp = inputs[8][0];
         simulator->setAmbientTemp(ambientTemp);
 
-        // Run the FEA
-        std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
-        simulator->solveFEA(NFR);
+        simulator->createKMFelem();
+        simulator->performTimeStepping();
 
         // Have to convert the std::vector to a matlab array for output
         //display3DVector(simulator->Temp, "Final Temp: ");

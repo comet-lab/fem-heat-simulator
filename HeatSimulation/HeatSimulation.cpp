@@ -31,19 +31,16 @@ int main()
     simulator->setBoundaryConditions(BC);
     simulator->setJn(1);
     simulator->setAmbientTemp(0);
-    
-    std::cout << "Running FEA" << std::endl;
     simulator->setNFR(NFR);
+
+    std::cout << "Running FEA" << std::endl;
     simulator->createKMFelem();
-    simulator->solveFEA();
+    simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
-    simulator->NFR = NFR;
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "Set NFR: " << duration.count() / 1000000.0 << std::endl;
+
     simulator->createKMF();
 
     if (nodeSize[0] <= 5) {
