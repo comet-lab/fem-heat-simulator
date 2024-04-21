@@ -13,110 +13,13 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setHTC(HTC);
 }
 
-void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
+void FEM_Simulator::solveFEA()
 {
 	//this->NFR = NFR;
-	auto startTime = std::chrono::high_resolution_clock::now();
-	bool  elemNFR = false; //flag determining if the NFR passed in is nodal or element-wise
-	if (NFR[0].size() == gridSize[0]) {
-		elemNFR = true;
-	}
-
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-	
-	this->initializeBoundaryNodes();
 
-	// Initialize matrices so that we don't have to resize them later
-	Eigen::VectorX<float> F(nNodes - this->dirichletNodes.size());
-	F.setZero(); // have to set F to zero to remove garbage values
-	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-
-	for (int e = 0; e < numElems; e++) {
-		this->currElement.elementNumber = e;
-
-		int eSub[3];
-		this->ind2sub(e, this->gridSize, eSub);
-		int elementGlobalNodes[8]; //global nodes for element e
-		this->getGlobalNodesFromElem(e, elementGlobalNodes);
-
-		/* We are assuming a uniform cuboid so we don't need this
-		for (int Ai = 0; Ai < 8; Ai++) {// x,y,z coordinates for each of the global nodes
-			this->getGlobalPosition(elementGlobalNodes[Ai], this->currElement.globalNodePositions[Ai]);
-		}
-		*/
-
-		int nodeFace;
-		int matrixInd[2];
-		for (int Ai = 0; Ai < 8; Ai++) {
-			nodeFace = this->determineNodeFace(elementGlobalNodes[Ai]);
-			matrixInd[0] = this->nodeMap[elementGlobalNodes[Ai]];
-			if (matrixInd[0] >= 0) { // Verify that the node we are working with is not a dirichlet node.
-				int AiSub[3];
-				this->ind2sub(elementGlobalNodes[Ai], this->nodeSize, AiSub);
-
-				// Determine if the node lies on a boundary and then determine what kind of boundary
-				bool dirichletFlag = false;
-				bool fluxFlag = false;
-				if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
-					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
-						if ((nodeFace >> f) & 1) { // Node lies on face f
-							if ((this->boundaryType[f] == FLUX)) { // flux boundary
-								F(matrixInd[0]) += this->Fj(Ai, f);
-							}
-							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								F(matrixInd[0]) += this->Fv(Ai, f);
-								for (int Bi : elemNodeSurfaceMap[f]) {
-									matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
-									if (matrixInd[1] >= 0) {
-										int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
-										// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										K.coeffRef(matrixInd[0], matrixInd[1]) += this->Fvu[f](Ai, Bi);
-									}
-									else {
-										F(matrixInd[0]) += -this->Fvu[f](Ai, Bi);
-									}
-								}
-							}
-						} // if Node is face f
-					} // iterate through faces
-				} // if node is a face
-
-				// Now we will build the K, M and F matrice
-				int BiSub[3];
-				for (int Bi = 0; Bi < 8; Bi++) {
-					// Sparse Matrix can't be filled through slicing, so we have to add each element individually by iterating over Ai and Bi
-					ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub); // get our B value is a subscript
-
-					matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
-					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
-						K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
-						M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
-						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[eSub[0]][eSub[1]][eSub[2]];
-						}
-						else {//nodal NFR so use as given
-							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
-						}
-					}
-					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
-						F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
-						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
-							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[eSub[0]][eSub[1]][eSub[2]];
-						}
-						else {//nodal NFR so use as given
-							F(matrixInd[0]) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
-						}
-					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
-				} // For loop through Bi
-			} // If our node is not a dirichlet node
-		} // For loop through Ai
-	}
-
-
+	auto startTime = std::chrono::high_resolution_clock::now();
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count()/1000000.0 << std::endl;
@@ -144,7 +47,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> fullM = M + this->alpha * deltaT * K;
+	Eigen::SparseMatrix<float> fullM = this->M + this->alpha * deltaT * this->K;
 	solver.compute(fullM);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
@@ -157,7 +60,7 @@ void FEM_Simulator::solveFEA(std::vector<std::vector<std::vector<float>>> NFR)
 
 	for (float t = this->deltaT; t <= this->tFinal; t += this->deltaT) {
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		Eigen::VectorXf fullF = F - K * dTilde;
+		Eigen::VectorXf fullF = this->F - this->K * dTilde;
 		Eigen::VectorXf vVec2 = solver.solve(fullF);
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
@@ -218,10 +121,6 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 void FEM_Simulator::createKMF() {
 	//this->NFR = NFR;
 	auto startTime = std::chrono::high_resolution_clock::now();
-	bool  elemNFR = false; //flag determining if the NFR passed in is nodal or element-wise
-	if (this->NFR[0].size() == gridSize[0]) {
-		elemNFR = true;
-	}
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
@@ -229,12 +128,11 @@ void FEM_Simulator::createKMF() {
 	this->initializeBoundaryNodes();
 
 	// Initialize matrices so that we don't have to resize them later
-	Eigen::VectorX<float> F(nNodes - this->dirichletNodes.size());
-	F.setZero(); // have to set F to zero to remove garbage values
-	Eigen::SparseMatrix<float> M(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
-	Eigen::SparseMatrix<float> K(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
 
 	int nodeFace = 0;
 	int matrixInd[2] = { 0,0 };
@@ -252,10 +150,10 @@ void FEM_Simulator::createKMF() {
 					std::vector<int> localNodes = this->convertToLocalNode(globalNode,f);
 					for (int Ai : localNodes) { // iterate through the localNodes associated with the current global node
 						if ((this->boundaryType[f] == FLUX)) { // flux boundary
-							F(row) += this->Fj(Ai, f);
+							this->F(row) += this->Fj(Ai, f);
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							F(row) += this->Fv(Ai, f);
+							this->F(row) += this->Fv(Ai, f);
 							for (int Bi : elemNodeSurfaceMap[f]) {
 
 								int BiGlobal = this->convertToGlobalNode(Bi,globalNode,Ai); // Need some conversion from Ai,Bi,n to global position of Bi
@@ -264,7 +162,7 @@ void FEM_Simulator::createKMF() {
 									Kconv(BiNeighbor) += this->Fvu[f](Ai, Bi);
 								}
 								else { // Bi is a dirichlet node
-									F(row) += -this->Fvu[f](Ai, Bi);
+									this->F(row) += -this->Fvu[f](Ai, Bi);
 								}
 							}
 						} // If Convection Boundary
@@ -290,14 +188,14 @@ void FEM_Simulator::createKMF() {
 					int neighbor = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
 					ind2sub(neighbor, this->nodeSize, neighborSub);
 					// Could replace with vector dot product, but that means building the sub-vector of NFR - doesn't seem worth it
-					F(row) += this->FnInt(idx) * this->NFR[neighborSub[0]][neighborSub[1]][neighborSub[2]];
+					this->F(row) += this->FnInt(idx) * this->NFR[neighborSub[0]][neighborSub[1]][neighborSub[2]];
 
 					if (this->nodeMap[neighbor] > 0) { // if our neighbor is not a Dirichlet Node
-						M.insert(row, neighbor) = this->Mn(idx); // Fill (row,col) of M
-						K.insert(row, neighbor) = this->Kn(idx) + Kconv(idx); // Fill (row,col) of K
+						this->M.insert(row, neighbor) = this->Mn(idx); // Fill (row,col) of M
+						this->K.insert(row, neighbor) = this->Kn(idx) + Kconv(idx); // Fill (row,col) of K
 					}
 					else {
-						F(row) += -this->Kn(idx) * this->Temp[neighborSub[0]][neighborSub[1]][neighborSub[2]]; // Our K column gets moved to the forcing function if its a dirichlet node
+						this->F(row) += -this->Kn(idx) * this->Temp[neighborSub[0]][neighborSub[1]][neighborSub[2]]; // Our K column gets moved to the forcing function if its a dirichlet node
 					}
 				}
 			}
@@ -306,6 +204,104 @@ void FEM_Simulator::createKMF() {
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+}
+
+void FEM_Simulator::createKMFelem()
+{
+	auto startTime = std::chrono::high_resolution_clock::now();
+
+	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
+	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+
+	this->initializeBoundaryNodes();
+
+	// Initialize matrices so that we don't have to resize them later
+	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+
+	for (int e = 0; e < numElems; e++) {
+		this->currElement.elementNumber = e;
+
+		int eSub[3];
+		this->ind2sub(e, this->gridSize, eSub);
+		int elementGlobalNodes[8]; //global nodes for element e
+		this->getGlobalNodesFromElem(e, elementGlobalNodes);
+
+		/* We are assuming a uniform cuboid so we don't need this
+		for (int Ai = 0; Ai < 8; Ai++) {// x,y,z coordinates for each of the global nodes
+			this->getGlobalPosition(elementGlobalNodes[Ai], this->currElement.globalNodePositions[Ai]);
+		}
+		*/
+
+		int nodeFace;
+		int matrixInd[2];
+		for (int Ai = 0; Ai < 8; Ai++) {
+			nodeFace = this->determineNodeFace(elementGlobalNodes[Ai]);
+			matrixInd[0] = this->nodeMap[elementGlobalNodes[Ai]];
+			if (matrixInd[0] >= 0) { // Verify that the node we are working with is not a dirichlet node.
+				int AiSub[3];
+				this->ind2sub(elementGlobalNodes[Ai], this->nodeSize, AiSub);
+
+				// Determine if the node lies on a boundary and then determine what kind of boundary
+				bool dirichletFlag = false;
+				bool fluxFlag = false;
+				if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
+					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
+						if ((nodeFace >> f) & 1) { // Node lies on face f
+							if ((this->boundaryType[f] == FLUX)) { // flux boundary
+								this->F(matrixInd[0]) += this->Fj(Ai, f);
+							}
+							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
+								this->F(matrixInd[0]) += this->Fv(Ai, f);
+								for (int Bi : elemNodeSurfaceMap[f]) {
+									matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
+									if (matrixInd[1] >= 0) {
+										int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
+										// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
+										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Fvu[f](Ai, Bi);
+									}
+									else {
+										this->F(matrixInd[0]) += -this->Fvu[f](Ai, Bi);
+									}
+								}
+							}
+						} // if Node is face f
+					} // iterate through faces
+				} // if node is a face
+
+				// Now we will build the K, M and F matrice
+				int BiSub[3];
+				for (int Bi = 0; Bi < 8; Bi++) {
+					// Sparse Matrix can't be filled through slicing, so we have to add each element individually by iterating over Ai and Bi
+					ind2sub(elementGlobalNodes[Bi], this->nodeSize, BiSub); // get our B value is a subscript
+
+					matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
+					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
+						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
+						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
+						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
+						}
+						else {//nodal NFR so use as given
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
+					}
+					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
+						this->F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
+						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
+						}
+						else {//nodal NFR so use as given
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
+					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
+				} // For loop through Bi
+			} // If our node is not a dirichlet node
+		} // For loop through Ai
+	}
 }
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
@@ -876,6 +872,21 @@ void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<fl
 	gridSize[1] = Temp[0].size() - 1;
 	gridSize[2] = Temp[0][0].size() - 1;
 	this->setGridSize(gridSize);
+}
+
+void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
+{
+	this->NFR = NFR;
+
+	if ((NFR[0].size() == this->gridSize[0]) && (NFR[1].size() == this->gridSize[1]) && (NFR[2].size() == this->gridSize[2])) {
+		this->elemNFR = true;
+	}
+	else if ((NFR[0].size() == this->nodeSize[0]) && (NFR[1].size() == this->nodeSize[1]) && (NFR[2].size() == this->nodeSize[2])) {
+		this->elemNFR = false;
+	}
+	else {
+		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
+	}
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {

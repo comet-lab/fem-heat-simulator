@@ -41,13 +41,16 @@ public:
 	float tFinal = 1; // total duration of simulation [s]
 	float Jn = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	bool elemNFR = false; // whether the NFR pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
-	void solveFEA(std::vector<std::vector<std::vector<float>>> NFR);
+	void solveFEA();
 	void createKMF();
+	void createKMFelem();
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
+	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setTissueSize(float tissueSize[3]);
 	void setTC(float TC);
 	void setVHC(float VHC);
@@ -71,6 +74,11 @@ public:
 
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
+
+	// The K, M, and F matrices for the entire domain
+	Eigen::SparseMatrix<float> K;
+	Eigen::SparseMatrix<float> M;
+	Eigen::VectorXf F;
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::Matrix<float,8,8> Ke = Eigen::Matrix<float,8,8>::Constant(0.0f); // Elemental Construction of K

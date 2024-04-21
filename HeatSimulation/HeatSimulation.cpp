@@ -33,7 +33,9 @@ int main()
     simulator->setAmbientTemp(0);
     
     std::cout << "Running FEA" << std::endl;
-    simulator->solveFEA(NFR);
+    simulator->setNFR(NFR);
+    simulator->createKMFelem();
+    simulator->solveFEA();
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
