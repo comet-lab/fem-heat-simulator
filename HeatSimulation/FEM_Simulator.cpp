@@ -119,7 +119,7 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 } //reduceSparseMatrix
 
 void FEM_Simulator::createKMF() {
-	//this->NFR = NFR;
+	// CURRENTLY DOESN'T HANDLE ELEMENTAL NFR
 	auto startTime = std::chrono::high_resolution_clock::now();
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
@@ -140,7 +140,6 @@ void FEM_Simulator::createKMF() {
 	for (int row = 0; row < this->validNodes.size(); row++) {	
 		int globalNode = this->validNodes[row]; // get our global node
 		nodeFace = this->determineNodeFace(globalNode); // determine what faces our node is on
-		Eigen::Vector<float,27> vectorNFR; // Set this value 
 
 		Eigen::Matrix<float,1,27> Kconv = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // The result the convection boundary has on K(row,col)
 		// Handle Flux and Convection Boundaries 
@@ -159,7 +158,9 @@ void FEM_Simulator::createKMF() {
 								int BiGlobal = this->convertToGlobalNode(Bi,globalNode,Ai); // Need some conversion from Ai,Bi,n to global position of Bi
 								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
 								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
-									Kconv(BiNeighbor) += this->Fvu[f](Ai, Bi);
+									//Kconv(BiNeighbor) += this->Fvu[f](Ai, Bi);
+									this->K.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Fvu[f](Ai, Bi);
+									//Ktriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Fvu[f](Ai, Bi)));
 								}
 								else { // Bi is a dirichlet node
 									this->F(row) += -this->Fvu[f](Ai, Bi);
@@ -171,36 +172,42 @@ void FEM_Simulator::createKMF() {
 			} // iterate through faces
 		}
 
-		// Need to iterate through all 27 nodes (including itself) that the current global node touches
+		// determine which elements in a 8 element box exist if we assume our node is position 13 in the 8 element box
 		int nodeSub[3];
-		int neighborSub[3];
+		int eOpts = 0b11111111; //binary number where a 1 indicates a valid element, LSB order
 		this->ind2sub(globalNode, this->nodeSize, nodeSub);
-		int kStart = ((nodeSub[2] == 0) ? 1 : 0); // start at 0 if we are not on top layer, else start at 1
-		int kEnd = ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 2 : 3); // end at 1 if we are on bottom layer, else end at 2.
-		int jStart = ((nodeSub[1] == 0) ? 1 : 0);
-		int jEnd = ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 2 : 3);
-		int iStart = ((nodeSub[0] == 0) ? 1 : 0);
-		int iEnd = ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 2 : 3);
-		for (int k = kStart; k < kEnd; k++) {
-			for (int j = jStart; j < jEnd; j++) {
-				for (int i = iStart; i < iEnd; i++) {
-					int idx = i + 3 * j + 9 * k; // a value between 0 and 26 to properly index into matrices 
-					int neighbor = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
-					ind2sub(neighbor, this->nodeSize, neighborSub);
-					// Could replace with vector dot product, but that means building the sub-vector of NFR - doesn't seem worth it
-					this->F(row) += this->FnInt(idx) * this->NFR[neighborSub[0]][neighborSub[1]][neighborSub[2]];
-
-					if (this->nodeMap[neighbor] > 0) { // if our neighbor is not a Dirichlet Node
-						this->M.insert(row, neighbor) = this->Mn(idx); // Fill (row,col) of M
-						this->K.insert(row, neighbor) = this->Kn(idx) + Kconv(idx); // Fill (row,col) of K
+		eOpts &= ((nodeSub[2] == 0) ? 0b11110000 : 0b11111111); // valid elements if we are at top layer: 4,5,6,7
+		eOpts &= ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 0b00001111 : 0b11111111); // valid elements if we are at bottom layer: 0,1,2,3
+		eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
+		eOpts &= ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 0b00110011 : 0b11111111); // valid elements if we are at back wall: 0,1,4,5
+		eOpts &= ((nodeSub[0] == 0) ? 0b10101010 : 0b11111111); // valid elements if we are at left wall: 1,3,5,7
+		eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
+		for (int e = 0; e < 8; e ++) { // iterate through possible elements
+			if ((eOpts >> e) & 1) {// if valid elements
+				int eSub[3]; 
+				
+				int Ai = 7 - e; // Our current node's local index is just 7-e -- assuming our current node is node 13 (0-26) in an 8 element box
+				for (int Bi = 0; Bi < 8; Bi++) {
+					int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai);
+					int BiSub[3];
+					ind2sub(BiGlobal, this->nodeSize, BiSub);
+					if (this->nodeMap[BiGlobal] >= 0) {
+						this->K.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Ke(Ai, Bi);
+						this->M.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Me(Ai, Bi);
+						//Ktriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Ke(Ai, Bi)));
+						//Mtriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Me(Ai, Bi)));
+						F(row) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
 					}
-					else {
-						this->F(row) += -this->Kn(idx) * this->Temp[neighborSub[0]][neighborSub[1]][neighborSub[2]]; // Our K column gets moved to the forcing function if its a dirichlet node
+					else
+					{
+						F(row) += this->Ke(Ai, Bi);
 					}
 				}
 			}
 		}
 	}
+	//this->K.setFromTriplets(Ktriplets.begin(), Ktriplets.end());
+	//this->M.setFromTriplets(Mtriplets.begin(), Mtriplets.end());
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
@@ -221,6 +228,10 @@ void FEM_Simulator::createKMFelem()
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
 	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	//std::vector<Eigen::Triplet<float>> Ktriplets;
+	//Ktriplets.reserve(numElems * 10 * 10);
+	//std::vector<Eigen::Triplet<float>> Mtriplets;
+	//Mtriplets.reserve(numElems * 8 * 8);
 
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
@@ -262,6 +273,7 @@ void FEM_Simulator::createKMFelem()
 										int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 										// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
 										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Fvu[f](Ai, Bi);
+										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Fvu[f](Ai, Bi)));
 									}
 									else {
 										this->F(matrixInd[0]) += -this->Fvu[f](Ai, Bi);
@@ -281,7 +293,9 @@ void FEM_Simulator::createKMFelem()
 					matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
 						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
+						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Ke(Ai, Bi)));
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
+						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
 						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
 							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
 						}
@@ -302,6 +316,9 @@ void FEM_Simulator::createKMFelem()
 			} // If our node is not a dirichlet node
 		} // For loop through Ai
 	}
+
+	this->K.makeCompressed();
+	this->M.makeCompressed();
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
@@ -673,9 +690,14 @@ std::vector<int> FEM_Simulator::convertToLocalNode(int globalNode, int f)
 int FEM_Simulator::convertToGlobalNode(int localNode, int globalReference, int localReference)
 {
 	// if structure of this->A changes, this function will be wrong. 
-	int xShift = (localNode - localReference) % 2;
-	int yShift = ((localNode - localReference) % 4)/ 2; 
-	int zShift = (localNode - localReference) / 4;
+	int nodeSub[3];
+	int refSub[3];
+	int tempSize[3] = { 2,2,2 };
+	ind2sub(localNode, tempSize, nodeSub);
+	ind2sub(localReference, tempSize, refSub);
+	int xShift = nodeSub[0] - refSub[0];
+	int yShift = nodeSub[1] - refSub[1];
+	int zShift = nodeSub[2] - refSub[2];
 	int globalNode = globalReference + xShift + yShift * this->nodeSize[0] + zShift * this->nodeSize[1] * this->nodeSize[0];
 	return globalNode;
 }
@@ -902,16 +924,19 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
 	this->setKe();
+	this->setKn();
 }
 
 void FEM_Simulator::setVHC(float VHC) {
 	this->VHC = VHC;
 	this->setMe();
+	this->setMn();
 }
 
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
 	setFeInt();
+	this->setFnInt();
 }
 
 void FEM_Simulator::setHTC(float HTC) {
@@ -952,9 +977,12 @@ void FEM_Simulator::setJ() {
 	this->Js1 = this->calculateJs(1);
 	this->Js2 = this->calculateJs(2);
 	this->Js3 = this->calculateJs(3);
-	setKe();
-	setMe();
-	setFeInt();
+	this->setKe();
+	this->setMe();
+	this->setFeInt();
+	this->setKn();
+	this->setMn();
+	this->setFnInt();
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
@@ -981,18 +1009,19 @@ void FEM_Simulator::setKn()
 	this->Kn.setZero();
 	for (int i = 0; i < 27; i++) {
 		int nodeSub[3];
-		this->ind2sub(i, this->nodeSize, nodeSub);
+		int tempNodeSize[3] = { 3,3,3 };
+		this->ind2sub(i, tempNodeSize, nodeSub);
 		for (int e = 0; e < 8; e++) {
-			int size[3] = { 2,2,2 };
+			int tempElemSize[3] = { 2,2,2 };
 			int eSub[3];
-			this->ind2sub(e, size, eSub);
+			this->ind2sub(e, tempElemSize, eSub);
 			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
 			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
 			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
 			if (firstCond && secondCond && thirdCond) {
 				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1])*2 + (nodeSub[2] - 1 == eSub[2])*4;
 				int Bi = 7-e;
-				this->Kn(i) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);;
+				this->Kn(i) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
 			}
 		}
 		
@@ -1014,7 +1043,8 @@ void FEM_Simulator::setMn()
 	this->Mn.setZero();
 	for (int i = 0; i < 27; i++) {
 		int nodeSub[3];
-		this->ind2sub(i, this->nodeSize, nodeSub);
+		int tempNodeSize[3] = { 3,3,3 };
+		this->ind2sub(i, tempNodeSize, nodeSub);
 		for (int e = 0; e < 8; e++) {
 			int size[3] = { 2,2,2 };
 			int eSub[3];
@@ -1047,7 +1077,8 @@ void FEM_Simulator::setFnInt()
 	this->FnInt.setZero();
 	for (int i = 0; i < 27; i++) {
 		int nodeSub[3];
-		this->ind2sub(i, this->nodeSize, nodeSub);
+		int tempNodeSize[3] = { 3,3,3 };
+		this->ind2sub(i, tempNodeSize, nodeSub);
 		for (int e = 0; e < 8; e++) {
 			int size[3] = { 2,2,2 };
 			int eSub[3];

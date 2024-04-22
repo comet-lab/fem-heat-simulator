@@ -3,6 +3,7 @@
 #include "../HeatSimulation/FEM_Simulator.h"
 #include "../HeatSimulation/FEM_Simulator.cpp"
 #include <iostream>
+#include <string>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -268,12 +269,12 @@ namespace FEMSimulatorTests
 			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
 			Assert::AreEqual(0,elementGlobalNodes[0]);
 			Assert::AreEqual(1, elementGlobalNodes[1]);
-			Assert::AreEqual(4, elementGlobalNodes[2]);
-			Assert::AreEqual(3, elementGlobalNodes[3]);
+			Assert::AreEqual(3, elementGlobalNodes[2]);
+			Assert::AreEqual(4, elementGlobalNodes[3]);
 			Assert::AreEqual(9, elementGlobalNodes[4]);
 			Assert::AreEqual(10, elementGlobalNodes[5]);
-			Assert::AreEqual(13, elementGlobalNodes[6]);
-			Assert::AreEqual(12, elementGlobalNodes[7]);
+			Assert::AreEqual(12, elementGlobalNodes[6]);
+			Assert::AreEqual(13, elementGlobalNodes[7]);
 
 		}
 
@@ -290,12 +291,12 @@ namespace FEMSimulatorTests
 			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
 			Assert::AreEqual(10, elementGlobalNodes[0]);
 			Assert::AreEqual(11, elementGlobalNodes[1]);
-			Assert::AreEqual(14, elementGlobalNodes[2]);
-			Assert::AreEqual(13, elementGlobalNodes[3]);
+			Assert::AreEqual(13, elementGlobalNodes[2]);
+			Assert::AreEqual(14, elementGlobalNodes[3]);
 			Assert::AreEqual(19, elementGlobalNodes[4]);
 			Assert::AreEqual(20, elementGlobalNodes[5]);
-			Assert::AreEqual(23, elementGlobalNodes[6]);
-			Assert::AreEqual(22, elementGlobalNodes[7]);
+			Assert::AreEqual(22, elementGlobalNodes[6]);
+			Assert::AreEqual(23, elementGlobalNodes[7]);
 
 		}
 
@@ -312,12 +313,12 @@ namespace FEMSimulatorTests
 			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
 			Assert::AreEqual(13, elementGlobalNodes[0]);
 			Assert::AreEqual(14, elementGlobalNodes[1]);
-			Assert::AreEqual(17, elementGlobalNodes[2]);
-			Assert::AreEqual(16, elementGlobalNodes[3]);
+			Assert::AreEqual(16, elementGlobalNodes[2]);
+			Assert::AreEqual(17, elementGlobalNodes[3]);
 			Assert::AreEqual(22, elementGlobalNodes[4]);
 			Assert::AreEqual(23, elementGlobalNodes[5]);
-			Assert::AreEqual(26, elementGlobalNodes[6]);
-			Assert::AreEqual(25, elementGlobalNodes[7]);
+			Assert::AreEqual(25, elementGlobalNodes[6]);
+			Assert::AreEqual(26, elementGlobalNodes[7]);
 
 		}
 
@@ -403,6 +404,49 @@ namespace FEMSimulatorTests
 			//	Assert::IsTrue(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
 			//}
 			//Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
+		}
+
+		TEST_METHOD(TestCreateKMF1) {
+			//checking that createKMF and createKMFelem create the same matrices.
+			int nodeSize[3] = { 10,10,10 };
+			std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			for (int i = 0; i < nodeSize[0]; i++) {
+				for (int j = 0; j < nodeSize[1]; j++) {
+					for (int k = 0; k < nodeSize[2]; k++) {
+						Temp[i][j][k] = 0.0f;
+						NFR[i][j][k] = 1.0f;
+					}
+				}
+			}
+			float tissueSize[3] = { 1.0f,1.0f,1.0f };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+			simulator->deltaT = 0.1f;
+			simulator->tFinal = 1.0f;
+			int BC[6] = { 2,2,2,2,2,2 };
+			simulator->setBoundaryConditions(BC);
+			simulator->setJn(1);
+			simulator->setAmbientTemp(0);
+			simulator->setNFR(NFR);
+
+			simulator->createKMFelem();
+			Eigen::VectorXf Felem = simulator->F;
+			Eigen::SparseMatrix<float> Kelem = simulator->K;
+			Eigen::SparseMatrix<float> Melem = simulator->M;
+			simulator->createKMF();
+			Eigen::VectorXf Fnode = simulator->F;
+			Eigen::SparseMatrix<float> Knode = simulator->K;
+			Eigen::SparseMatrix<float> Mnode = simulator->M;
+			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2];
+			for (int i = 0; i < totalNodes; i++) {
+				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001);
+				for (int j = 0; j < totalNodes; j++) {
+					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+				}
+			}
+
+			simulator->performTimeStepping();
 		}
 	};
 }
