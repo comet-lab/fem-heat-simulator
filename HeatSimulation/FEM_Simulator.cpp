@@ -22,7 +22,6 @@ void FEM_Simulator::performTimeStepping()
 	auto startTime = std::chrono::high_resolution_clock::now();
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Built the Matrices: " << duration.count()/1000000.0 << std::endl;
 	startTime = stopTime;
 
 	// Solve Euler Family 

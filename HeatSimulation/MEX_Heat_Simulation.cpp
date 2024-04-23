@@ -184,7 +184,7 @@ public:
         float ambientTemp = inputs[8][0];
         simulator->setAmbientTemp(ambientTemp);
 
-        simulator->createKMFelem();
+        simulator->createKMF();
         simulator->performTimeStepping();
 
         // Have to convert the std::vector to a matlab array for output
@@ -208,6 +208,13 @@ public:
         }
         if (inputs[1].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("NFR must be an Array of type Single.");
+        }
+        if (!((inputs[1].getDimensions()[0] == inputs[0].getDimensions()[0]) && (inputs[1].getDimensions()[1] != inputs[0].getDimensions()[1])
+            && (inputs[1].getDimensions()[2] != inputs[0].getDimensions()[2])) 
+            ||
+            !((inputs[1].getDimensions()[0] != (inputs[0].getDimensions()[0] - 1)) && (inputs[1].getDimensions()[1] != (inputs[0].getDimensions()[1] - 1))
+                && ) (inputs[1].getDimensions()[1] != (inputs[0].getDimensions()[2] - 1))) {
+            displayError("NFR must have either the same dimensions as Temp, or one less in each axis")
         }
         if ((inputs[2].getDimensions()[0] != 3) || (inputs[2].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
