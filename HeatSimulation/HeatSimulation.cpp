@@ -14,8 +14,8 @@ int main()
     for (int i = 0; i < nodeSize[0]; i++) {
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
-                Temp[i][j][k] = 0.0f;
-                NFR[i][j][k] = 0.0f;
+                Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+                NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
             }
         }
     }
