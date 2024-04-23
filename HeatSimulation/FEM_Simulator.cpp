@@ -158,56 +158,77 @@ void FEM_Simulator::createKMF() {
 								int BiGlobal = this->convertToGlobalNode(Bi,globalNode,Ai); // Need some conversion from Ai,Bi,n to global position of Bi
 								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
 								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
-									//Kconv(BiNeighbor) += this->Fvu[f](Ai, Bi);
-									this->K.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Fvu[f](Ai, Bi);
-									//Ktriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Fvu[f](Ai, Bi)));
+									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Fvu[f](Ai, Bi);
 								}
 								else { // Bi is a dirichlet node
 									this->F(row) += -this->Fvu[f](Ai, Bi);
 								}
 							}
-						} // If Convection Boundary
-					} // iterate through the elements that contain our global node
-				} // if Node is face f
+						} // ENDIf Convection Boundary
+					} // END iterate through the elements that contain our global node
+				} // ENDIF Node is face f
 			} // iterate through faces
-		}
 
-		// determine which elements in a 8 element box exist if we assume our node is position 13 in the 8 element box
-		int nodeSub[3];
-		int eOpts = 0b11111111; //binary number where a 1 indicates a valid element, LSB order
-		this->ind2sub(globalNode, this->nodeSize, nodeSub);
-		eOpts &= ((nodeSub[2] == 0) ? 0b11110000 : 0b11111111); // valid elements if we are at top layer: 4,5,6,7
-		eOpts &= ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 0b00001111 : 0b11111111); // valid elements if we are at bottom layer: 0,1,2,3
-		eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
-		eOpts &= ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 0b00110011 : 0b11111111); // valid elements if we are at back wall: 0,1,4,5
-		eOpts &= ((nodeSub[0] == 0) ? 0b10101010 : 0b11111111); // valid elements if we are at left wall: 1,3,5,7
-		eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
-		for (int e = 0; e < 8; e ++) { // iterate through possible elements
-			if ((eOpts >> e) & 1) {// if valid elements
-				int eSub[3]; 
-				
-				int Ai = 7 - e; // Our current node's local index is just 7-e -- assuming our current node is node 13 (0-26) in an 8 element box
-				for (int Bi = 0; Bi < 8; Bi++) {
-					int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai);
-					int BiSub[3];
-					ind2sub(BiGlobal, this->nodeSize, BiSub);
-					if (this->nodeMap[BiGlobal] >= 0) {
-						this->K.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Ke(Ai, Bi);
-						this->M.coeffRef(globalNode, this->nodeMap[BiGlobal]) += this->Me(Ai, Bi);
-						//Ktriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Ke(Ai, Bi)));
-						//Mtriplets.push_back(Eigen::Triplet<float>(row, this->nodeMap[BiGlobal], this->Me(Ai, Bi)));
-						F(row) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+
+			// Handle special cases of K, M, and F;
+			// determine which elements in a 8 element box exist if we assume our node is position 13 in the 8 element box
+			int nodeSub[3];
+			int eOpts = 0b11111111; //binary number where a 1 indicates a valid element, LSB order
+			this->ind2sub(globalNode, this->nodeSize, nodeSub);
+			eOpts &= ((nodeSub[2] == 0) ? 0b11110000 : 0b11111111); // valid elements if we are at top layer: 4,5,6,7
+			eOpts &= ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 0b00001111 : 0b11111111); // valid elements if we are at bottom layer: 0,1,2,3
+			eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
+			eOpts &= ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 0b00110011 : 0b11111111); // valid elements if we are at back wall: 0,1,4,5
+			eOpts &= ((nodeSub[0] == 0) ? 0b10101010 : 0b11111111); // valid elements if we are at left wall: 1,3,5,7
+			eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
+			for (int e = 0; e < 8; e++) { // iterate through possible elements
+				if ((eOpts >> e) & 1) {// if valid elements
+					int eSub[3];
+
+					int Ai = 7 - e; // Our current node's local index is just 7-e -- assuming our current node is node 13 (0-26) in an 8 element box
+					for (int Bi = 0; Bi < 8; Bi++) {
+						int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai);
+						int BiSub[3];
+						ind2sub(BiGlobal, this->nodeSize, BiSub);
+						if (this->nodeMap[BiGlobal] >= 0) {
+							this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Ke(Ai, Bi);
+							this->M.coeffRef(row, this->nodeMap[BiGlobal]) += this->Me(Ai, Bi);
+						}
+						else
+						{
+							this->F(row) += this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
+						this->F(row) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
 					}
-					else
-					{
-						F(row) += this->Ke(Ai, Bi);
+				}
+			}
+		}
+		else
+		{// we know the node does not lie on a face so we can assume it is surrounded by 26 other nodes
+			int idx = 0;
+			int neighbor = 0;
+			int BiSub[3];
+			for (int k = 0; k < 3; k++) {
+				for (int j = 0; j < 3; j++) {
+					for (int i = 0; i < 3; i++) {
+						idx = i + 3 * j + 9 * k;
+						neighbor = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
+						ind2sub(neighbor, this->nodeSize, BiSub);
+						if (this->nodeMap[neighbor] >= 0) { // - check if any of the neighbors are dirichlet still
+							this->K.insert(row, this->nodeMap[neighbor]) = this->Kn(idx);
+							this->M.insert(row, this->nodeMap[neighbor]) = this->Mn(idx);
+						}
+						else { // if dirichlet we add K to the force vector 
+							this->F(row) += this->Kn(idx) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
+						
+						this->F(row) += this->FnInt(idx) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
 					}
 				}
 			}
 		}
 	}
-	//this->K.setFromTriplets(Ktriplets.begin(), Ktriplets.end());
-	//this->M.setFromTriplets(Mtriplets.begin(), Mtriplets.end());
+
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;

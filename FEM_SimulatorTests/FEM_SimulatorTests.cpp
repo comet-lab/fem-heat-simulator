@@ -423,7 +423,7 @@ namespace FEMSimulatorTests
 			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
 			simulator->deltaT = 0.1f;
 			simulator->tFinal = 1.0f;
-			int BC[6] = { 2,2,2,2,2,2 };
+			int BC[6] = { 0,0,1,1,2,2 };
 			simulator->setBoundaryConditions(BC);
 			simulator->setJn(1);
 			simulator->setAmbientTemp(0);
@@ -437,9 +437,9 @@ namespace FEMSimulatorTests
 			Eigen::VectorXf Fnode = simulator->F;
 			Eigen::SparseMatrix<float> Knode = simulator->K;
 			Eigen::SparseMatrix<float> Mnode = simulator->M;
-			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2];
+			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
 			for (int i = 0; i < totalNodes; i++) {
-				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001);
+				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
 				for (int j = 0; j < totalNodes; j++) {
 					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
