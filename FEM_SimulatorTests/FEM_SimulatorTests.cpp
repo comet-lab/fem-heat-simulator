@@ -415,7 +415,7 @@ namespace FEMSimulatorTests
 				for (int j = 0; j < nodeSize[1]; j++) {
 					for (int k = 0; k < nodeSize[2]; k++) {
 						Temp[i][j][k] = 0.0f;
-						NFR[i][j][k] = 1.0f;
+						NFR[i][j][k] = 1.5f;
 					}
 				}
 			}
@@ -423,7 +423,7 @@ namespace FEMSimulatorTests
 			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
 			simulator->deltaT = 0.1f;
 			simulator->tFinal = 1.0f;
-			int BC[6] = { 0,0,1,1,2,2 };
+			int BC[6] = { 1,0,1,0,2,2 };
 			simulator->setBoundaryConditions(BC);
 			simulator->setJn(1);
 			simulator->setAmbientTemp(0);
@@ -442,6 +442,56 @@ namespace FEMSimulatorTests
 				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
 				for (int j = 0; j < totalNodes; j++) {
 					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+				}
+			}
+
+			simulator->performTimeStepping();
+		}
+
+		TEST_METHOD(TestCreateKMF2) {
+			//checking that createKMF and createKMFelem create the same matrices for elemental NFR.
+			int nodeSize[3] = { 10,10,10 };
+			std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0]-1, std::vector<std::vector<float>>(nodeSize[1]-1, std::vector<float>(nodeSize[2]-1)));
+			for (int i = 0; i < nodeSize[0]; i++) {
+				for (int j = 0; j < nodeSize[1]; j++) {
+					for (int k = 0; k < nodeSize[2]; k++) {
+						Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+					}
+				}
+			}
+			// setting up elemental NFR
+			for (int i = 0; i < nodeSize[0]-1; i++) {
+				for (int j = 0; j < nodeSize[1]-1; j++) {
+					for (int k = 0; k < nodeSize[2]-1; k++) {
+						NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+					}
+				}
+			}
+			float tissueSize[3] = { 1.0f,1.0f,1.0f };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+			simulator->deltaT = 0.1f;
+			simulator->tFinal = 1.0f;
+			int BC[6] = { 1,0,1,0,2,2 };
+			simulator->setBoundaryConditions(BC);
+			simulator->setJn(1);
+			simulator->setAmbientTemp(0);
+			simulator->setNFR(NFR);
+
+			simulator->createKMFelem();
+			Eigen::VectorXf Felem = simulator->F;
+			Eigen::SparseMatrix<float> Kelem = simulator->K;
+			Eigen::SparseMatrix<float> Melem = simulator->M;
+			simulator->createKMF();
+			Eigen::VectorXf Fnode = simulator->F;
+			Eigen::SparseMatrix<float> Knode = simulator->K;
+			Eigen::SparseMatrix<float> Mnode = simulator->M;
+			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
+			for (int i = 0; i < totalNodes; i++) {
+				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
+				for (int j = 0; j < totalNodes; j++) {
+					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 				}
 			}

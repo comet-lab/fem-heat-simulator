@@ -136,10 +136,12 @@ void FEM_Simulator::createKMF() {
 
 	int nodeFace = 0;
 	int matrixInd[2] = { 0,0 };
+	int nodeSub[3];
 	// iterate through the non-dirichlet nodes. Any dirichlet nodes don't get a row entry in the matrices/vectors
 	for (int row = 0; row < this->validNodes.size(); row++) {	
 		int globalNode = this->validNodes[row]; // get our global node
 		nodeFace = this->determineNodeFace(globalNode); // determine what faces our node is on
+		this->ind2sub(globalNode, this->nodeSize, nodeSub);
 
 		Eigen::Matrix<float,1,27> Kconv = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // The result the convection boundary has on K(row,col)
 		// Handle Flux and Convection Boundaries 
@@ -172,9 +174,8 @@ void FEM_Simulator::createKMF() {
 
 			// Handle special cases of K, M, and F;
 			// determine which elements in a 8 element box exist if we assume our node is position 13 in the 8 element box
-			int nodeSub[3];
+			
 			int eOpts = 0b11111111; //binary number where a 1 indicates a valid element, LSB order
-			this->ind2sub(globalNode, this->nodeSize, nodeSub);
 			eOpts &= ((nodeSub[2] == 0) ? 0b11110000 : 0b11111111); // valid elements if we are at top layer: 4,5,6,7
 			eOpts &= ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 0b00001111 : 0b11111111); // valid elements if we are at bottom layer: 0,1,2,3
 			eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
@@ -183,8 +184,11 @@ void FEM_Simulator::createKMF() {
 			eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
 			for (int e = 0; e < 8; e++) { // iterate through possible elements
 				if ((eOpts >> e) & 1) {// if valid elements
-					int eSub[3];
-
+					int eSub[3] = { nodeSub[0],nodeSub[1],nodeSub[2] };
+					eSub[0] = (((e%2) == 0) ? nodeSub[0] - 1 : nodeSub[0]); // local element 0,2,4,6 requires we shift the x
+					eSub[1] = ((((e/2) % 2) == 0) ? nodeSub[1] - 1 : nodeSub[1]); // local element 0,1,4,5 requires we shift the y
+					eSub[2] = (((e / 4) == 0) ? nodeSub[2] - 1 : nodeSub[2]); // local element 0,1,2,3 requires we shift the z
+					
 					int Ai = 7 - e; // Our current node's local index is just 7-e -- assuming our current node is node 13 (0-26) in an 8 element box
 					for (int Bi = 0; Bi < 8; Bi++) {
 						int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai);
@@ -198,7 +202,12 @@ void FEM_Simulator::createKMF() {
 						{
 							this->F(row) += this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
 						}
-						this->F(row) += this->FeInt(Ai, Bi) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						if (this->elemNFR) {
+							this->F(row) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
+						}
+						else {
+							this->F(row) += this->FeInt(Ai, Bi) * this->NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
 					}
 				}
 			}
@@ -221,8 +230,35 @@ void FEM_Simulator::createKMF() {
 						else { // if dirichlet we add K to the force vector 
 							this->F(row) += this->Kn(idx) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
 						}
-						
-						this->F(row) += this->FnInt(idx) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						if (this->elemNFR) {
+							// for elemental NFR we need to average the elementNFR's that the neighbor
+							// and global node are both in. It will either be 1 element, 2 elements, 4 elements, or 8 elements
+							// We are assuming that the elemental NFR is the average/center NFR experienced by the element.
+							float interpNFR = 0;
+							int biShift = nodeSub[0] - BiSub[0]; // 0: same index, 1: BiSub is left, -1: BiSub is right
+							int bjShift = nodeSub[1] - BiSub[1]; // 0: same index, 1: BiSub is forward, -1: BiSub is back
+							int bkShift = nodeSub[2] - BiSub[2]; // 0: smae index, 1: BiSub is up, -1: Bi Sub is down
+							int eShift[3] = {1 - abs(biShift), 1 - abs(bjShift), 1 - abs(bkShift)};
+							for (int ei = 0; ei <= eShift[0]; ei++) {
+								for (int ej = 0; ej <= eShift[1]; ej++) {
+									for (int ek = 0; ek <= eShift[2]; ek++) {
+										// the division is for the linear interpolation, we can just divide because we know each elemental NFR will contribute
+										// equally to the node in question and we know that each voxel has the same width/length/height.
+										// Because of uniform voxel sizes, the Jacobian is the same regardless of the element, meaning we don't have to 
+										// worry about additional weights on the terms
+										int eSub[3] = { BiSub[0] - ei - (biShift < 0), BiSub[1] - ej - (bjShift < 0), BiSub[2] - ek - (bkShift < 0) };
+										interpNFR += NFR[eSub[0]][eSub[1]][eSub[2]] * 1 / float(pow(2, eShift[0] + eShift[1] + eShift[2]));
+									}
+								}
+							}
+							// Remember that FnInt contains the contributions the node 'neighbor' in each element shared with our global node
+							// if we were using nodal NFR, then the NFR at node neighbor is constant. With elemental NFR we calculate the NFR
+							// at the neighbor by averaging the NFRs of the shared nodes. 
+							this->F(row) += this->FnInt(idx) * interpNFR;
+						}
+						else {
+							this->F(row) += this->FnInt(idx) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
+						}
 					}
 				}
 			}
