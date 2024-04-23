@@ -131,13 +131,12 @@ public:
         // Have to convert T0 and NFR to std::vector<<<float>>>
         std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
         simulator->setInitialTemperature(T0);
+        //display3DVector(simulator->Temp,"Initial Temp: ");
 
         // Set the NFR
         std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
         simulator->setNFR(NFR);
 
-        //display3DVector(simulator->Temp,"Initial Temp: ");
-        simulator
         // Set tissue size
         float tissueSize[3];
         tissueSize[0] = inputs[2][0];
@@ -209,12 +208,12 @@ public:
         if (inputs[1].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("NFR must be an Array of type Single.");
         }
-        if (!((inputs[1].getDimensions()[0] == inputs[0].getDimensions()[0]) && (inputs[1].getDimensions()[1] != inputs[0].getDimensions()[1])
-            && (inputs[1].getDimensions()[2] != inputs[0].getDimensions()[2])) 
-            ||
-            !((inputs[1].getDimensions()[0] != (inputs[0].getDimensions()[0] - 1)) && (inputs[1].getDimensions()[1] != (inputs[0].getDimensions()[1] - 1))
-                && ) (inputs[1].getDimensions()[1] != (inputs[0].getDimensions()[2] - 1))) {
-            displayError("NFR must have either the same dimensions as Temp, or one less in each axis")
+        if (!((inputs[1].getDimensions()[0] == inputs[0].getDimensions()[0]) && (inputs[1].getDimensions()[1] == inputs[0].getDimensions()[1])
+            && (inputs[1].getDimensions()[2] == inputs[0].getDimensions()[2]))
+            &&
+            !((inputs[1].getDimensions()[0] == (inputs[0].getDimensions()[0] - 1)) && (inputs[1].getDimensions()[1] == (inputs[0].getDimensions()[1] - 1))
+                && (inputs[1].getDimensions()[2] == (inputs[0].getDimensions()[2] - 1)))) {
+            displayError("NFR must have either the same dimensions as Temp, or one less in each axis");
         }
         if ((inputs[2].getDimensions()[0] != 3) || (inputs[2].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
@@ -227,7 +226,7 @@ public:
         if ((inputs[5].getDimensions()[0] != 4) || (inputs[5].getDimensions()[1] != 1)) {
             displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
         }
-        if ((inputs[6].getDimensions()[0] != 6) || (inputs[7].getDimensions()[1] != 1)) {
+        if ((inputs[6].getDimensions()[0] != 6) || (inputs[6].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
         }
         if ((inputs[6].getType() != matlab::data::ArrayType::INT32)) {
