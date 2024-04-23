@@ -14,8 +14,8 @@ int main()
     for (int i = 0; i < nodeSize[0]; i++) {
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
-                Temp[i][j][k] = 0.0f;
-                NFR[i][j][k] = 0.0f;
+                Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+                NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
             }
         }
     }
@@ -31,13 +31,18 @@ int main()
     simulator->setBoundaryConditions(BC);
     simulator->setJn(1);
     simulator->setAmbientTemp(0);
-    
+    simulator->setNFR(NFR);
+
     std::cout << "Running FEA" << std::endl;
-    simulator->solveFEA(NFR);
+    simulator->createKMFelem();
+    simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
+
+    simulator->createKMF();
+
     if (nodeSize[0] <= 5) {
         for (int k = 0; k < nodeSize[2]; k++) {
             for (int j = 0; j < nodeSize[1]; j++) {
@@ -51,6 +56,8 @@ int main()
         std::cout << std::endl;
     }
     
+    
+
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
