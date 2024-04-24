@@ -15,14 +15,21 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 
 void FEM_Simulator::performTimeStepping()
 {
+	auto startTime = std::chrono::high_resolution_clock::now();
 	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 
-	auto startTime = std::chrono::high_resolution_clock::now();
-	auto stopTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	startTime = stopTime;
+	// Create sensorTemperature Vectors and reserve sizes
+	int nSensors = this->tempSensorLocations.size();
+	if (nSensors == 0) { // if there weren't any sensors initialized, put one at 0,0,0
+		nSensors = 1;
+		this->tempSensorLocations.push_back({ 0,0,0 });
+	}
+	this->sensorTemps.resize(nSensors);
+	for (int s = 0; s < nSensors; s++) {
+		this->sensorTemps[s].resize(ceil(this->tFinal / deltaT) + 1);
+	}
 
 	// Solve Euler Family 
 	// Initialize d vector
@@ -38,8 +45,10 @@ void FEM_Simulator::performTimeStepping()
 			counter++;
 	}
 
-	stopTime = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+	this->updateTemperatureSensors(0, dVec);
+	
+	auto stopTime = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "D initialized: " << duration.count() / 1000000.0 << std::endl;
 	startTime = stopTime;
 
@@ -66,6 +75,7 @@ void FEM_Simulator::performTimeStepping()
 		}
 		dVec = dVec + this->deltaT * (this->alpha * vVec2 + (1 - this->alpha) * vVec);
 
+		this->updateTemperatureSensors(round(t/this->deltaT), dVec);
 		vVec = vVec2;
 	}
 
@@ -378,6 +388,39 @@ void FEM_Simulator::createKMFelem()
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+}
+
+void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
+	int nSensors = this->tempSensorLocations.size();
+	// Input time = 0 information into temperature sensors
+	float spacing[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->tissueSize[2] / float(this->gridSize[2]) };
+	for (int s = 0; s < nSensors; s++) {
+		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
+		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0]),
+										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0])},
+			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1]),
+										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1])},
+			{floor(sensorLocation[2] / spacing[2]),
+										ceil(sensorLocation[2] / spacing[0])} };
+		float tempValue = 0;
+		float xi[3];
+		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacing[0] - this->tissueSize[0] / 2.0f)) * 2 / spacing[0] - 1;
+		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacing[1] - this->tissueSize[1] / 2.0f)) * 2 / spacing[1] - 1;;
+		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacing[2] - this->tissueSize[2] / 2.0f)) * 2 / spacing[2] - 1;;
+		for (int Ai = 0; Ai < 8; Ai++) {
+			int globalNodeSub[3] = { globalNodeOptions[0][Ai & 1],globalNodeOptions[1][(Ai & 2) >> 1], globalNodeOptions[2][(Ai & 4) >> 2] };
+			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
+				tempValue += this->calculateNA(xi, Ai) * dVec(this->nodeMap[globalNode]);
+			}
+			else { // dirichlet node
+				tempValue += this->calculateNA(xi, Ai) * this->Temp[globalNodeSub[0]][globalNodeSub[1]][globalNodeSub[2]];
+			}
+			
+		}
+		this->sensorTemps[s][timeIdx] = tempValue;
+	}
+
 }
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
@@ -1026,6 +1069,23 @@ void FEM_Simulator::setNodeSize(int nodeSize[3]) {
 		this->nodeSize[i] = nodeSize[i];
 	}
 	setJ();
+}
+
+void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
+{
+	this->tempSensorLocations = tempSensorLocations;
+	bool errorFlag = false;
+	for (int s = 0; s < tempSensorLocations.size(); s++) {
+		if ((tempSensorLocations[s][0] < -this->tissueSize[0] / 2.0f) || (tempSensorLocations[s][0] > this->tissueSize[0] / 2.0f) ||
+			(tempSensorLocations[s][1] < -this->tissueSize[1] / 2.0f) || (tempSensorLocations[s][1] > this->tissueSize[1] / 2.0f) ||
+			(tempSensorLocations[s][2] < 0) || (tempSensorLocations[s][2] > this->tissueSize[2])) {
+			errorFlag = true;
+			break;
+		}	
+	}
+	if (errorFlag) {
+		throw std::invalid_argument("All sensor locations must be within the tissue block");
+	}
 }
 
 void FEM_Simulator::setJ() {
