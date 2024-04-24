@@ -43,12 +43,15 @@ public:
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
+	std::vector< std::array<float, 3 >> tempSensorLocations;
+	std::vector<std::vector<float>> sensorTemps;
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
 	void performTimeStepping();
 	void createKMF();
 	void createKMFelem();
+	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setTissueSize(float tissueSize[3]);
@@ -60,6 +63,7 @@ public:
 	void setAmbientTemp(float ambientTemp);
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
+	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
 	void setJ();
 	void setKe();
 	void setKn();

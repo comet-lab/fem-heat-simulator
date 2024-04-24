@@ -183,6 +183,18 @@ public:
         float ambientTemp = inputs[8][0];
         simulator->setAmbientTemp(ambientTemp);
 
+        auto sensorTempsInput = inputs[9];
+        std::vector<std::array<float, 3>> sensorTemps;
+        for (int s = 0; s < sensorTempsInput.getDimensions()[0]; s++) {
+            sensorTemps.push_back({ sensorTempsInput[s][0],sensorTempsInput[s][1] ,sensorTempsInput[s][2] });
+        }
+        try {
+            simulator->setSensorLocations(sensorTemps);
+        }
+        catch (const std::exception& e){
+            displayError(e.what());
+        }
+
         simulator->createKMF();
         simulator->performTimeStepping();
 
@@ -190,17 +202,28 @@ public:
         //display3DVector(simulator->Temp, "Final Temp: ");
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
         outputs[0] = finalTemp;
+        matlab::data::ArrayFactory factory;
+        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ simulator->sensorTemps.size(), simulator->sensorTemps[0].size()});
+        for (size_t i = 0; i < simulator->sensorTemps.size(); ++i) {
+            for (size_t j = 0; j < simulator->sensorTemps[i].size(); ++j) {
+                sensorTempsOutput[i][j] = simulator->sensorTemps[i][j];
+            }
+        }
+        outputs[1] = sensorTempsOutput;
     }
 
     /* This function makes sure that user has provided the proper inputs
     * Inputs: T0, NFR, tissueSize TC, VHC, MUA, HTC, boundaryConditions
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        if (inputs.size() != 9) {
-            displayError("Nine inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp");
+        if (inputs.size() != 10) {
+            displayError("Nine inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp,sensorLocations");
         }
-        if (outputs.size() > 1) {
+        if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
+        }
+        if (outputs.size() < 2) {
+            displayError("Not enough outputs specified.");
         }
         if (inputs[0].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("T0 must be an Array of type Single.");
@@ -231,6 +254,9 @@ public:
         }
         if ((inputs[6].getType() != matlab::data::ArrayType::INT32)) {
             displayError("Boundary Conditions must be an int");
+        }
+        if ((inputs[9].getDimensions()[1] != 3)) {
+            displayError("Sensor Locations must be n x 3");
         }
     }
 };
