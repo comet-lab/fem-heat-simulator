@@ -8,7 +8,7 @@ int main()
 {
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 80,80,80};
+    int nodeSize[3] = { 101,101,201};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     for (int i = 0; i < nodeSize[0]; i++) {
@@ -35,13 +35,11 @@ int main()
 
     std::cout << "Running FEA" << std::endl;
     simulator->createKMFelem();
-    simulator->performTimeStepping();
+    //simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
-
-    simulator->createKMF();
 
     if (nodeSize[0] <= 5) {
         for (int k = 0; k < nodeSize[2]; k++) {

@@ -167,6 +167,7 @@ public:
 
         // set boundary conditions
         int boundaryType[6] = { 0,0,0,0,0,0 };
+        stream << "Boundary Conditions: ";
         for (int i = 0; i < 6; i++) {
             boundaryType[i] = inputs[6][i];
             stream << boundaryType[0] << ", ";
@@ -194,6 +195,10 @@ public:
         catch (const std::exception& e){
             displayError(e.what());
         }
+        
+        Eigen::setNbThreads(Eigen::nbThreads()/2);
+        stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
+        displayOnMATLAB(stream);
 
         simulator->createKMF();
         simulator->performTimeStepping();
