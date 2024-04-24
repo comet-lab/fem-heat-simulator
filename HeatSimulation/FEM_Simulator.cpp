@@ -1002,10 +1002,10 @@ void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 {
 	this->NFR = NFR;
 
-	if ((NFR[0].size() == this->gridSize[0]) && (NFR[1].size() == this->gridSize[1]) && (NFR[2].size() == this->gridSize[2])) {
+	if ((NFR.size() == this->gridSize[0]) && (NFR[0].size() == this->gridSize[1]) && (NFR[0][0].size() == this->gridSize[2])) {
 		this->elemNFR = true;
 	}
-	else if ((NFR[0].size() == this->nodeSize[0]) && (NFR[1].size() == this->nodeSize[1]) && (NFR[2].size() == this->nodeSize[2])) {
+	else if ((NFR.size() == this->nodeSize[0]) && (NFR[0].size() == this->nodeSize[1]) && (NFR[0][0].size() == this->nodeSize[2])) {
 		this->elemNFR = false;
 	}
 	else {
