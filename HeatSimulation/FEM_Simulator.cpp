@@ -128,7 +128,7 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 } //reduceSparseMatrix
 
 void FEM_Simulator::createKMF() {
-	// CURRENTLY DOESN'T HANDLE ELEMENTAL NFR
+	
 	auto startTime = std::chrono::high_resolution_clock::now();
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
