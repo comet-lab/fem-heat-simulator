@@ -6,6 +6,7 @@
 
 int main()
 {
+
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
     int nodeSize[3] = { 101,101,201};
@@ -34,7 +35,7 @@ int main()
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
-    simulator->createKMFelem();
+    simulator->createKMF();
     //simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
