@@ -66,7 +66,7 @@ void FEM_Simulator::performTimeStepping()
 	std::cout << "Matrix Factorized: " << duration.count() / 1000000.0 << std::endl;
 	startTime = stopTime;
 
-	for (float t = this->deltaT; t <= this->tFinal; t += this->deltaT) {
+	for (float t = 1; t <= (this->tFinal/this->deltaT); t ++) { 
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::VectorXf fullF = this->F - this->K * dTilde;
 		Eigen::VectorXf vVec2 = solver.solve(fullF);
@@ -75,7 +75,7 @@ void FEM_Simulator::performTimeStepping()
 		}
 		dVec = dVec + this->deltaT * (this->alpha * vVec2 + (1 - this->alpha) * vVec);
 
-		this->updateTemperatureSensors(round(t/this->deltaT), dVec);
+		this->updateTemperatureSensors(t, dVec);
 		vVec = vVec2;
 	}
 

@@ -9,7 +9,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 101,101,201};
+    int nodeSize[3] = { 51,51,51};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     for (int i = 0; i < nodeSize[0]; i++) {
@@ -35,8 +35,10 @@ int main()
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
+    Eigen::setNbThreads(Eigen::nbThreads() / 2);
+    std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
     simulator->createKMF();
-    //simulator->performTimeStepping();
+    simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
