@@ -67,6 +67,9 @@ void FEM_Simulator::performTimeStepping()
 	startTime = stopTime;
 
 	for (float t = 1; t <= (this->tFinal/this->deltaT); t ++) { 
+		/*std::stringstream msg;
+		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
+		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::VectorXf fullF = this->F - this->K * dTilde;
 		Eigen::VectorXf vVec2 = solver.solve(fullF);
@@ -139,13 +142,13 @@ void FEM_Simulator::createKMF() {
 	// Initialize matrices so that we don't have to resize them later
 	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column/row
 	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column
+	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column/row
 
 	// iterate through the non-dirichlet nodes. Any dirichlet nodes don't get a row entry in the matrices/vectors
 #ifdef _OPENMP
-#pragma omp parallel for 
+#pragma omp parallel for schedule(static)
 #endif
 	for (int row = 0; row < this->validNodes.size(); row++) {
 		int nodeSub[3];
@@ -272,7 +275,6 @@ void FEM_Simulator::createKMF() {
 					}
 				}
 			}
-
 		}
 	}
 

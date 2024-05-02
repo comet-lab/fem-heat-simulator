@@ -80,8 +80,8 @@ public:
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// The K, M, and F matrices for the entire domain
-	Eigen::SparseMatrix<float> K;
-	Eigen::SparseMatrix<float> M;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
+	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	Eigen::VectorXf F;
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
