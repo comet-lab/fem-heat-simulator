@@ -80,8 +80,8 @@ public:
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// The K, M, and F matrices for the entire domain
-	Eigen::SparseMatrix<float> K;
-	Eigen::SparseMatrix<float> M;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
+	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	Eigen::VectorXf F;
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
@@ -91,11 +91,11 @@ public:
 	Eigen::Matrix<float, 1, 27> Mn = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of M
 	Eigen::Matrix<float, 8, 8> FeInt = Eigen::Matrix<float, 8, 8>::Constant(0.0f); // Elemental Construction of F_int
 	Eigen::Matrix<float, 1, 27> FnInt = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of F_int
-	// Fj is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::Matrix<float, 8, 6> Fj = Eigen::Matrix<float, 8, 6>::Constant(0.0f); 
-	// Fv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::Matrix<float, 8, 6> Fv = Eigen::Matrix<float, 8, 6>::Constant(0.0f);
-	std::vector<Eigen::Matrix<float, 8, 8>> Fvu{ 6, Eigen::Matrix<float, 8, 8>::Constant(0.0f) }; // Fvu is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having A 
+	// Fje is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::Matrix<float, 8, 6> Fje = Eigen::Matrix<float, 8, 6>::Constant(0.0f); 
+	// Fve is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::Matrix<float, 8, 6> Fve = Eigen::Matrix<float, 8, 6>::Constant(0.0f);
+	std::vector<Eigen::Matrix<float, 8, 8>> Kje{ 6, Eigen::Matrix<float, 8, 8>::Constant(0.0f) }; // Kje is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
 	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);

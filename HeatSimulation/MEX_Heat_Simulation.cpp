@@ -126,63 +126,69 @@ public:
     /* This is the gateway routine for the MEX-file. */
     void
         operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        try {
+            checkArguments(outputs, inputs);
+            // Have to convert T0 and NFR to std::vector<<<float>>>
+            std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
+            simulator->setInitialTemperature(T0);
+            //display3DVector(simulator->Temp,"Initial Temp: ");
 
-        checkArguments(outputs, inputs);
-        // Have to convert T0 and NFR to std::vector<<<float>>>
-        std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
-        simulator->setInitialTemperature(T0);
-        //display3DVector(simulator->Temp,"Initial Temp: ");
+            // Set the NFR
+            std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
+            simulator->setNFR(NFR);
 
-        // Set the NFR
-        std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
-        simulator->setNFR(NFR);
+            // Set tissue size
+            float tissueSize[3];
+            tissueSize[0] = inputs[2][0];
+            tissueSize[1] = inputs[2][1];
+            tissueSize[2] = inputs[2][2];
+            simulator->setTissueSize(tissueSize);
 
-        // Set tissue size
-        float tissueSize[3];
-        tissueSize[0] = inputs[2][0];
-        tissueSize[1] = inputs[2][1];
-        tissueSize[2] = inputs[2][2];
-        simulator->setTissueSize(tissueSize);
-
-        // set time step and final time
-        float tFinal = inputs[3][0];
-        float deltaT = inputs[4][0];
-        simulator->tFinal = tFinal;
-        simulator->deltaT = deltaT;
-        stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
-        displayOnMATLAB(stream);
+            // set time step and final time
+            float tFinal = inputs[3][0];
+            float deltaT = inputs[4][0];
+            simulator->tFinal = tFinal;
+            simulator->deltaT = deltaT;
+            stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
+            displayOnMATLAB(stream);
 
 
-        // set tissue properties
-        float MUA = inputs[5][0];
-        float TC = inputs[5][1];
-        float VHC = inputs[5][2];
-        float HTC = inputs[5][3];
-        simulator->setMUA(MUA);
-        simulator->setTC(TC);
-        simulator->setVHC(VHC);
-        simulator->setHTC(HTC);
-        stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
-        displayOnMATLAB(stream);
+            // set tissue properties
+            float MUA = inputs[5][0];
+            float TC = inputs[5][1];
+            float VHC = inputs[5][2];
+            float HTC = inputs[5][3];
+            simulator->setMUA(MUA);
+            simulator->setTC(TC);
+            simulator->setVHC(VHC);
+            simulator->setHTC(HTC);
+            stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
+            displayOnMATLAB(stream);
 
-        // set boundary conditions
-        int boundaryType[6] = { 0,0,0,0,0,0 };
-        stream << "Boundary Conditions: ";
-        for (int i = 0; i < 6; i++) {
-            boundaryType[i] = inputs[6][i];
-            stream << boundaryType[0] << ", ";
+            // set boundary conditions
+            int boundaryType[6] = { 0,0,0,0,0,0 };
+            stream << "Boundary Conditions: ";
+            for (int i = 0; i < 6; i++) {
+                boundaryType[i] = inputs[6][i];
+                stream << boundaryType[0] << ", ";
+            }
+            stream << std::endl;
+            displayOnMATLAB(stream);
+            simulator->setBoundaryConditions(boundaryType);
+
+            // set flux condition
+            float Jn = inputs[7][0];
+            simulator->setJn(Jn);
+
+            // set ambient temperature
+            float ambientTemp = inputs[8][0];
+            simulator->setAmbientTemp(ambientTemp);
         }
-        stream << std::endl;
-        displayOnMATLAB(stream);
-        simulator->setBoundaryConditions(boundaryType);
-        
-        // set flux condition
-        float Jn = inputs[7][0];
-        simulator->setJn(Jn);
-
-        // set ambient temperature
-        float ambientTemp = inputs[8][0];
-        simulator->setAmbientTemp(ambientTemp);
+        catch (const std::exception& e) {
+            stream << "Error in Setup: " << std::endl;
+            displayOnMATLAB(stream);
+            displayError(e.what());
+        }
 
         auto sensorTempsInput = inputs[9];
         std::vector<std::array<float, 3>> sensorTemps;
@@ -199,9 +205,23 @@ public:
         Eigen::setNbThreads(Eigen::nbThreads()/2);
         stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
+        try {
+            simulator->createKMF();
+        }
+        catch (const std::exception& e) {
+            stream << "Error in createKMF() " << std::endl;
+            displayOnMATLAB(stream);
+            displayError(e.what());
+        }
+        try {
+            simulator->performTimeStepping();
+        }
+        catch (const std::exception& e) {
+            stream << "Error in performTimeStepping() " << std::endl;
+            displayOnMATLAB(stream);
+            displayError(e.what());
+        }
 
-        simulator->createKMF();
-        simulator->performTimeStepping();
 
         // Have to convert the std::vector to a matlab array for output
         //display3DVector(simulator->Temp, "Final Temp: ");
