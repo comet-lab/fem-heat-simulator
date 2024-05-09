@@ -55,8 +55,8 @@ void FEM_Simulator::performTimeStepping()
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> fullM = this->M + this->alpha * deltaT * this->K;
-	solver.compute(fullM);
+	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->K;
+	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
@@ -71,15 +71,14 @@ void FEM_Simulator::performTimeStepping()
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		Eigen::VectorXf fullF = this->F - this->K * dTilde;
-		Eigen::VectorXf vVec2 = solver.solve(fullF);
+		Eigen::VectorXf RHS = this->alpha * this->deltaT * this->F + this->M * dTilde;
+		vVec = solver.solve(RHS);
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
-		dVec = dVec + this->deltaT * (this->alpha * vVec2 + (1 - this->alpha) * vVec);
+		dVec = dTilde + this->alpha * this->deltaT * vVec;
 
 		this->updateTemperatureSensors(t, dVec);
-		vVec = vVec2;
 	}
 
 	stopTime = std::chrono::high_resolution_clock::now();
