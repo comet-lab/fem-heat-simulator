@@ -148,7 +148,7 @@ void FEM_Simulator::createKMF() {
 
 	// iterate through the non-dirichlet nodes. Any dirichlet nodes don't get a row entry in the matrices/vectors
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(dynamic)
 #endif
 	for (int row = 0; row < this->validNodes.size(); row++) {
 		int nodeSub[3];
@@ -164,19 +164,21 @@ void FEM_Simulator::createKMF() {
 					std::vector<int> localNodes = this->convertToLocalNode(globalNode, f);
 					for (int Ai : localNodes) { // iterate through the localNodes associated with the current global node
 						if ((this->boundaryType[f] == FLUX)) { // flux boundary
-							this->F(row) += this->Fj(Ai, f);
+							this->F(row) += this->Fje(Ai, f);
 						}
 						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-							this->F(row) += this->Fv(Ai, f);
+							this->F(row) += this->Fve(Ai, f);
 							for (int Bi : elemNodeSurfaceMap[f]) {
 
 								int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai); // Need some conversion from Ai,Bi,n to global position of Bi
 								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
 								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
-									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Fvu[f](Ai, Bi);
+									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Kje[f](Ai, Bi);
 								}
 								else { // Bi is a dirichlet node
-									this->F(row) += -this->Fvu[f](Ai, Bi);
+									int BiSub[3];
+									ind2sub(BiGlobal, this->nodeSize, BiSub);
+									this->F(row) += -this->Kje[f](Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
 								}
 							}
 						} // ENDIf Convection Boundary
@@ -333,20 +335,20 @@ void FEM_Simulator::createKMFelem()
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
 							if ((this->boundaryType[f] == FLUX)) { // flux boundary
-								this->F(matrixInd[0]) += this->Fj(Ai, f);
+								this->F(matrixInd[0]) += this->Fje(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								this->F(matrixInd[0]) += this->Fv(Ai, f);
+								this->F(matrixInd[0]) += this->Fve(Ai, f);
 								for (int Bi : elemNodeSurfaceMap[f]) {
 									matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
 									if (matrixInd[1] >= 0) {
 										int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 										// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Fvu[f](Ai, Bi);
-										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Fvu[f](Ai, Bi)));
+										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Kje[f](Ai, Bi);
+										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kje[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->Fvu[f](Ai, Bi);
+										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi);
 									}
 								}
 							}
@@ -1217,31 +1219,31 @@ void FEM_Simulator::setFnInt()
 }
 
 void FEM_Simulator::setFj() {
-	this->Fj.setZero();
+	this->Fje.setZero();
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fj(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->Fje(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
 
 void FEM_Simulator::setFv() {
-	this->Fv.setZero();
+	this->Fve.setZero();
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fv(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->Fve(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
 
 void FEM_Simulator::setFvu() {
 	for (int f = 0; f < 6; f++) {
-		this->Fvu[f].setZero();
+		this->Kje[f].setZero();
 		for (int Ai : elemNodeSurfaceMap[f]) {
 			for (int Bi : elemNodeSurfaceMap[f]) {
 				int AiBi = Bi * 8 + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-				this->Fvu[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+				this->Kje[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
 			}
 		}
 	}
