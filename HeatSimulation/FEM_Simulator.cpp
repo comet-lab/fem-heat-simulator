@@ -71,7 +71,7 @@ void FEM_Simulator::performTimeStepping()
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		Eigen::VectorXf RHS = this->alpha * this->deltaT * this->F + this->M * dTilde;
+		Eigen::VectorXf RHS = this->F - this->K * dTilde;
 		vVec = solver.solve(RHS);
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
