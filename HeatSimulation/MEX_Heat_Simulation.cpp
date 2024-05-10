@@ -168,10 +168,10 @@ public:
             // set boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
             //stream << "Boundary Conditions: ";
-            // for (int i = 0; i < 6; i++) {
-            //     boundaryType[i] = inputs[6][i];
+            for (int i = 0; i < 6; i++) {
+               boundaryType[i] = inputs[6][i];
             //     stream << boundaryType[0] << ", ";
-            // }
+            }
             stream << std::endl;
             //displayOnMATLAB(stream);
             simulator->setBoundaryConditions(boundaryType);
