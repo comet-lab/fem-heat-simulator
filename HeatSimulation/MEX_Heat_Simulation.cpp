@@ -149,8 +149,8 @@ public:
             float deltaT = inputs[4][0];
             simulator->tFinal = tFinal;
             simulator->deltaT = deltaT;
-            stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
-            displayOnMATLAB(stream);
+            //stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
+            //displayOnMATLAB(stream);
 
 
             // set tissue properties
@@ -162,18 +162,18 @@ public:
             simulator->setTC(TC);
             simulator->setVHC(VHC);
             simulator->setHTC(HTC);
-            stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
-            displayOnMATLAB(stream);
+            //stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
+            //displayOnMATLAB(stream);
 
             // set boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
-            stream << "Boundary Conditions: ";
-            for (int i = 0; i < 6; i++) {
-                boundaryType[i] = inputs[6][i];
-                stream << boundaryType[0] << ", ";
-            }
+            //stream << "Boundary Conditions: ";
+            // for (int i = 0; i < 6; i++) {
+            //     boundaryType[i] = inputs[6][i];
+            //     stream << boundaryType[0] << ", ";
+            // }
             stream << std::endl;
-            displayOnMATLAB(stream);
+            //displayOnMATLAB(stream);
             simulator->setBoundaryConditions(boundaryType);
 
             // set flux condition
@@ -203,8 +203,8 @@ public:
         }
         
         Eigen::setNbThreads(Eigen::nbThreads()/2);
-        stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
-        displayOnMATLAB(stream);
+        //stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
+        //displayOnMATLAB(stream);
         try {
             simulator->createKMF();
         }
