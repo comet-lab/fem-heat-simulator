@@ -202,7 +202,7 @@ public:
             displayError(e.what());
         }
         
-        Eigen::setNbThreads(Eigen::nbThreads()/2);
+        Eigen::setNbThreads(omp_get_num_threads()/2);
         //stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
         //displayOnMATLAB(stream);
         try {
