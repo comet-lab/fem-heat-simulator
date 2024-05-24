@@ -11,6 +11,8 @@
 class FEM_Simulator
 {
 public:
+	bool silentMode = false;
+
 	struct element {             // Structure declaration
 		int elementNumber;         // Member (int variable)
 		float globalNodePositions[8][3];   // Member (string variable)

@@ -17,7 +17,8 @@ private:
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
     std::ostringstream stream;
-    bool debug = true;
+    bool silentMode = true;
+    bool useAllCPUs = true;
 
 public:
     /* Constructor for the class. */
@@ -93,7 +94,7 @@ public:
     */
     void displayOnMATLAB(std::ostringstream& stream) {
         // Pass stream content to MATLAB fprintf function
-        if (debug) {
+        if (!silentMode) {
             matlab::data::ArrayFactory factory;
             matlabPtr->feval(u"fprintf", 0,
                 std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
@@ -136,7 +137,7 @@ public:
             // Set the NFR
             std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
             simulator->setNFR(NFR);
-
+            
             // Set tissue size
             float tissueSize[3];
             tissueSize[0] = inputs[2][0];
@@ -149,8 +150,8 @@ public:
             float deltaT = inputs[4][0];
             simulator->tFinal = tFinal;
             simulator->deltaT = deltaT;
-            //stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
-            //displayOnMATLAB(stream);
+            stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
+            displayOnMATLAB(stream);
 
 
             // set tissue properties
@@ -162,18 +163,18 @@ public:
             simulator->setTC(TC);
             simulator->setVHC(VHC);
             simulator->setHTC(HTC);
-            //stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
-            //displayOnMATLAB(stream);
+            stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
+            displayOnMATLAB(stream);
 
             // set boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
-            //stream << "Boundary Conditions: ";
+            stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
                boundaryType[i] = inputs[6][i];
-            //     stream << boundaryType[0] << ", ";
+                 stream << boundaryType[0] << ", ";
             }
             stream << std::endl;
-            //displayOnMATLAB(stream);
+            displayOnMATLAB(stream);
             simulator->setBoundaryConditions(boundaryType);
 
             // set flux condition
@@ -202,9 +203,16 @@ public:
             displayError(e.what());
         }
         
-        Eigen::setNbThreads(omp_get_num_threads()/2);
-        //stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
-        //displayOnMATLAB(stream);
+
+        Eigen::setNbThreads(1);
+#ifdef _OPENMP
+        if (useAllCPUs) { //useAllCPUs is true
+            Eigen::setNbThreads(omp_get_num_procs() / 2);
+        }
+#endif
+        
+        stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
+        displayOnMATLAB(stream);
         try {
             simulator->createKMF();
         }
@@ -241,8 +249,15 @@ public:
     * Inputs: T0, NFR, tissueSize TC, VHC, MUA, HTC, boundaryConditions
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        if (inputs.size() != 10) {
-            displayError("Nine inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp,sensorLocations");
+        if (inputs.size() < 10) {
+            displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp,sensorLocations, (useAllCPUs), (silentMode)");
+        }
+        if (inputs.size() > 10) {
+            useAllCPUs = inputs[10][0];
+        }
+        if (inputs.size() > 11) {
+            silentMode = inputs[11][0];
+            simulator->silentMode = silentMode;
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");

@@ -16,6 +16,9 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 void FEM_Simulator::performTimeStepping()
 {
 	auto startTime = std::chrono::high_resolution_clock::now();
+	auto stopTime = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+
 	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
@@ -46,11 +49,12 @@ void FEM_Simulator::performTimeStepping()
 	}
 
 	this->updateTemperatureSensors(0, dVec);
-	
-	auto stopTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "D initialized: " << duration.count() / 1000000.0 << std::endl;
-	startTime = stopTime;
+	if (!this->silentMode) {
+		stopTime = std::chrono::high_resolution_clock::now();
+		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "D initialized: " << duration.count() / 1000000.0 << std::endl;
+		startTime = stopTime;
+	}
 
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
@@ -60,11 +64,12 @@ void FEM_Simulator::performTimeStepping()
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-
-	stopTime = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Matrix Factorized: " << duration.count() / 1000000.0 << std::endl;
-	startTime = stopTime;
+	if (!this->silentMode) {
+		stopTime = std::chrono::high_resolution_clock::now();
+		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "Matrix Factorized: " << duration.count() / 1000000.0 << std::endl;
+		startTime = stopTime;
+	}
 
 	for (float t = 1; t <= (this->tFinal/this->deltaT); t ++) { 
 		/*std::stringstream msg;
@@ -72,7 +77,10 @@ void FEM_Simulator::performTimeStepping()
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		Eigen::VectorXf RHS = this->F - this->K * dTilde;
-		vVec = solver.solve(RHS);
+		vVec = solver.solveWithGuess(RHS,vVec);
+		//vVec = solver.solve(RHS);
+		//std::cout << "#iterations:     " << solver.iterations() << std::endl;
+		//std::cout << "estimated error: " << solver.error() << std::endl;
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
@@ -80,11 +88,12 @@ void FEM_Simulator::performTimeStepping()
 
 		this->updateTemperatureSensors(t, dVec);
 	}
-
-	stopTime = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Time Stepping Completed: " << duration.count() / 1000000.0 << std::endl;
-	startTime = stopTime;
+	if (!this->silentMode) {
+		stopTime = std::chrono::high_resolution_clock::now();
+		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "Time Stepping Completed: " << duration.count() / 1000000.0 << std::endl;
+		startTime = stopTime;
+	}
 
 	// Adjust our Temp with new d vector
 	counter = 0;
@@ -95,10 +104,12 @@ void FEM_Simulator::performTimeStepping()
 			counter++;
 	}
 
-	stopTime = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Updated Temp Variable: " << duration.count()/1000000.0 << std::endl;
-	startTime = stopTime;
+	if (!this->silentMode) {
+		stopTime = std::chrono::high_resolution_clock::now();
+		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "Updated Temp Variable: " << duration.count() / 1000000.0 << std::endl;
+		startTime = stopTime;
+	}
 }
 
 void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> *newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes) {

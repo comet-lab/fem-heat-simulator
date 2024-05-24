@@ -9,9 +9,10 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 51,51,51};
+    int nodeSize[3] = { 25,25,601};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+    srand(1);
     for (int i = 0; i < nodeSize[0]; i++) {
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
@@ -26,7 +27,7 @@ int main()
 
     std::cout << "Object Created " << std::endl;
 
-    simulator->deltaT = 0.1f;
+    simulator->deltaT = 0.05f;
     simulator->tFinal = 1.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
@@ -35,7 +36,14 @@ int main()
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
-    Eigen::setNbThreads(Eigen::nbThreads() / 2);
+
+#ifdef _OPENMP
+    Eigen::setNbThreads(omp_get_num_procs()/2);
+#else
+    Eigen::setNbThreads(1);
+#endif
+
+    
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
     simulator->createKMF();
     simulator->performTimeStepping();
@@ -55,6 +63,9 @@ int main()
             std::cout << std::endl;
         }
         std::cout << std::endl;
+    }
+    else {
+        std::cout << "Center Temp: " << simulator->Temp[12][12][0] << std::endl;
     }
     
     
