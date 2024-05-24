@@ -127,6 +127,7 @@ public:
     /* This is the gateway routine for the MEX-file. */
     void
         operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        stream.str("");
         try {
             checkArguments(outputs, inputs);
             // Have to convert T0 and NFR to std::vector<<<float>>>
@@ -207,7 +208,7 @@ public:
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
         if (useAllCPUs) { //useAllCPUs is true
-            Eigen::setNbThreads(omp_get_num_procs() / 2);
+            Eigen::setNbThreads(omp_get_num_procs());
         }
 #endif
         
