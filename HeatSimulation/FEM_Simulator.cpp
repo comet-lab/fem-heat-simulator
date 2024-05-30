@@ -31,7 +31,7 @@ void FEM_Simulator::performTimeStepping()
 	}
 	this->sensorTemps.resize(nSensors);
 	for (int s = 0; s < nSensors; s++) {
-		this->sensorTemps[s].resize(ceil(this->tFinal / deltaT) + 1);
+		this->sensorTemps[s].resize(round(this->tFinal / deltaT) + 1);
 	}
 
 	// Solve Euler Family 
@@ -71,7 +71,7 @@ void FEM_Simulator::performTimeStepping()
 		startTime = stopTime;
 	}
 
-	for (float t = 1; t <= (this->tFinal/this->deltaT); t ++) { 
+	for (float t = 1; t <= round(this->tFinal/this->deltaT); t ++) { 
 		/*std::stringstream msg;
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
