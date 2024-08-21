@@ -9,29 +9,31 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 25,25,601};
+    int nodeSize[3] = { 5,5,5};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     srand(1);
     for (int i = 0; i < nodeSize[0]; i++) {
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
-                Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
-                NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+                Temp[i][j][k] = 0;
+                NFR[i][j][k] = 1;
             }
         }
     }
 
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1);
 
+    std::cout << "Number of nodes: " << simulator->nodeSize[0] << std::endl;
+    std::cout << "Number of elems: " << simulator->gridSize[0] << std::endl;
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;
     simulator->tFinal = 1.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(1);
+    simulator->setJn(0);
     simulator->setAmbientTemp(0);
     simulator->setNFR(NFR);
 
@@ -43,9 +45,10 @@ int main()
     Eigen::setNbThreads(1);
 #endif
 
+    Eigen::setNbThreads(1);
     
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
-    simulator->createKMF();
+    simulator->createKMFelem();
     simulator->performTimeStepping();
     
     auto end = std::chrono::high_resolution_clock::now();
