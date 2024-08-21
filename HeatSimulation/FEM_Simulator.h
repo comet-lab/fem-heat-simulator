@@ -7,6 +7,7 @@
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>
 #include <chrono>
+#include <stdexcept>
 
 class FEM_Simulator
 {
@@ -43,6 +44,7 @@ public:
 	float tFinal = 1; // total duration of simulation [s]
 	float Jn = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	int Nn1d = 2;
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	std::vector< std::array<float, 3 >> tempSensorLocations;
@@ -114,8 +116,11 @@ public:
 	void initializeBoundaryNodes();
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
+	float calculateNABase(float xi, int Ai, int Nn1d);
 	Eigen::Matrix3<float> calculateJ(); // function has test cases
-	Eigen::Matrix2<float> calculateJs(int dim); // function has test cases
+	Eigen::Matrix2<float> calculateJs(int dim);
+	float calculateNADotBase(float xi, int Ai);
+	// function has test cases
 	static Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	static float calculateNA_xi(float xi[3], int Ai); // function has test cases
 	static float calculateNA_eta(float xi[3], int Ai); // function has test cases
