@@ -116,17 +116,14 @@ public:
 	void initializeBoundaryNodes();
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
-	float calculateNABase(float xi, int Ai, int Nn1d);
+	float calculateNABase(float xi, int Ai);
 	Eigen::Matrix3<float> calculateJ(); // function has test cases
 	Eigen::Matrix2<float> calculateJs(int dim);
 	float calculateNADotBase(float xi, int Ai);
+	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	// function has test cases
-	static Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
-	static float calculateNA_xi(float xi[3], int Ai); // function has test cases
-	static float calculateNA_eta(float xi[3], int Ai); // function has test cases
-	static float calculateNA_zeta(float xi[3], int Ai); // function has test cases
+	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
-	void getGlobalNodesFromElem(int elem, int nodes[8]); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
 	Eigen::Vector<int,27> getNodeNeighbors(int globalNode);
 	std::vector<int> convertToLocalNode(int globalNode,int f);
@@ -139,7 +136,7 @@ public:
 	float createFvFunction(float xi[3], int Ai, int dim);
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
-	static void ind2sub(int index, int size[3], int sub[3]); // function has test cases
+	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float>* newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes);
 	
 

@@ -299,13 +299,12 @@ void FEM_Simulator::createKMFelem()
 {
 	int nodeFace;
 	int matrixInd[2];
-	int elemNodeSize = { this->Nn1d, this->Nn1d, this->Nn1d };
+	int elemNodeSize[3] = {this->Nn1d, this->Nn1d, this->Nn1d};
 	int eSub[3];
 	int AiSub[3];
 	int BiSub[3];
 	int globalNodeSub[3];
 	int globalNodeIdx;
-	int BglobalNodeSub[3];
 	int BglobalNodeIdx;
 	bool dirichletFlag = false;
 	bool fluxFlag = false;
@@ -313,11 +312,11 @@ void FEM_Simulator::createKMFelem()
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-	if (this->Nn1d == 2)&&(nNodes != (numElems + 1)) {
-		throw std::exception("Number of Nodes does not match")
+	if ((this->Nn1d == 2)&&(nNodes != (numElems + 1))) {
+		throw std::exception("Number of Nodes does not match");
 	}
-	else if (this->Nn1d == 3) && (nNodes != (2*numElems + 1)) {
-		throw std::exception("Number of Nodes does not match")
+	else if ((this->Nn1d == 3) && (nNodes != (2*numElems + 1))) {
+		throw std::exception("Number of Nodes does not match");
 	}
 
 	this->initializeBoundaryNodes();
@@ -337,8 +336,10 @@ void FEM_Simulator::createKMFelem()
 
 		for (int Ai = 0; Ai < Nne; Ai++) {
 			this->ind2sub(Ai, elemNodeSize, AiSub);
-			globalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + AiSub[0], eSub[1] * this(Nn1d - 1) + AiSub[1], eSub[2] * this(Nn1d - 1) + AiSub[2] };
-			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + this->globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			for (int ii = 0; ii < 3; ii++) {
+				globalNodeSub[ii] = eSub[ii] * (this->Nn1d - 1) + AiSub[ii];
+			}
+			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
 
 			nodeFace = this->determineNodeFace(globalNodeIdx);
 			matrixInd[0] = this->nodeMap[globalNodeIdx];
@@ -357,7 +358,7 @@ void FEM_Simulator::createKMFelem()
 								this->F(matrixInd[0]) += this->Fve(Ai, f);
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
-									BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * this(Nn1d - 1) + BiSub[1], eSub[2] * this(Nn1d - 1) + BiSub[2] };
+									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
 									BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
 
 									matrixInd[1] = this->nodeMap[BglobalNodeIdx];
@@ -378,10 +379,10 @@ void FEM_Simulator::createKMFelem()
 
 				for (int Bi = 0; Bi < Nne; Bi++) {
 					this->ind2sub(Bi, elemNodeSize, BiSub);
-					BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * this(Nn1d - 1) + BiSub[1], eSub[2] * this(Nn1d - 1) + BiSub[2] };
+					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
 					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
 
-					matrixInd[1] = this->nodeMap[elementGlobalNodes[Bi]];
+					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
 						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
 						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Ke(Ai, Bi)));
@@ -452,9 +453,9 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
 	float output = 1.0f;
-	float AiVec[3];
+	int AiVec[3];
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
-	ind2sub(Ai,size, AiVec)
+	ind2sub(Ai, size, AiVec);
 	for (int i = 0; i < 3; i++) {
 		output *= this->calculateNABase(xi[0], AiVec[0]);
 	}
@@ -465,8 +466,8 @@ float FEM_Simulator::calculateNABase(float xi, int Ai) {
 	/* This function calculates the building block for the basis functions given the number of nodes in 1 Dimension
 	* It uses the equation \prod^Nn1d_{B = 1; B != A} (xi - xi^B)/(xi^A - xi^B)
 	*/
-	float ouptut = 1.0f;
-	float xiA = -1 + Ai * (2 / float(this->Nn1D - 1));
+	float output = 1.0f;
+	float xiA = -1 + Ai * (2 / float(this->Nn1d - 1));
 	for (int i = 0; i < this->Nn1d; i++) {
 		if (i != Ai) {
 			float xiB = -1 + i * (2 / float(this->Nn1d - 1));
@@ -490,7 +491,7 @@ float FEM_Simulator::calculateNADotBase(float xi, int Ai) {
 			output = (2 * xi - 1) / 2;
 		}
 		else if (Ai == 1) {
-			output = -2*xi
+			output = -2 * xi;
 		}
 		else if (Ai == 2) {
 			output = (2 * xi + 1) / 2;
@@ -504,9 +505,9 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 	float AiVec[3];
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
 	this->ind2sub(Ai, size, AiVec);
-	NA_dot(0) = FEM_Simulator::calculateNADotBase(xi[0], AiVec[0]) * FEM_Simulator::calculateNABase(xi[1], AiVec[1] * FEM_Simulator::calculateNABase(xi[2], AiVec[2]);
-	NA_dot(1) = FEM_Simulator::calculateNADotBase(xi[1], AiVec[1]) * FEM_Simulator::calculateNABase(xi[0], AiVec[0] * FEM_Simulator::calculateNABase(xi[2], AiVec[2]);
-	NA_dot(2) = FEM_Simulator::calculateNADotBase(xi[2], AiVec[2]) * FEM_Simulator::calculateNABase(xi[1], AiVec[1] * FEM_Simulator::calculateNABase(xi[0], AiVec[0]);
+	NA_dot(0) = this->calculateNADotBase(xi[0], AiVec[0]) * this->calculateNABase(xi[1], AiVec[1] * this->calculateNABase(xi[2], AiVec[2]);
+	NA_dot(1) = this->calculateNADotBase(xi[1], AiVec[1]) * this->calculateNABase(xi[0], AiVec[0] * this->calculateNABase(xi[2], AiVec[2]);
+	NA_dot(2) = this->calculateNADotBase(xi[2], AiVec[2]) * this->calculateNABase(xi[1], AiVec[1] * this->calculateNABase(xi[0], AiVec[0]);
 	
 	NA_dot = NA_dot * (this->J.inverse());
 	return NA_dot;
@@ -706,7 +707,7 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 	return output;
 }
 
-void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[])
+void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
 {
 	int Nne = pow(this->Nn1d, 3);
 	int sub[3];
