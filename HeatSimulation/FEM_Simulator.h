@@ -51,7 +51,7 @@ public:
 	std::vector<std::vector<float>> sensorTemps;
 
 	FEM_Simulator() = default;
-	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
+	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	void performTimeStepping();
 	void createKMF();
 	void createKMFelem();

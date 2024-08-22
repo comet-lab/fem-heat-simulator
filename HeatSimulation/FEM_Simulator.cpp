@@ -3,9 +3,9 @@
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
 
-FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC)
+FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
 {
-	this->Nn1d = 3;
+	this->Nn1d = Nn1d;
 	this->setInitialTemperature(Temp);
 	this->setTissueSize(tissueSize);
 	this->setTC(TC);
@@ -82,8 +82,8 @@ void FEM_Simulator::performTimeStepping()
 		Eigen::VectorXf RHS = this->F - this->K * dTilde;
 		vVec = solver.solveWithGuess(RHS,vVec);
 		//vVec = solver.solve(RHS);
-		std::cout << "#iterations:     " << solver.iterations() << std::endl;
-		std::cout << "estimated error: " << solver.error() << std::endl;
+		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
+		std::cout << "estimated error: " << solver.error() << std::endl;*/
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
@@ -324,9 +324,9 @@ void FEM_Simulator::createKMFelem()
 	// Initialize matrices so that we don't have to resize them later
 	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 125)); // at most 27 non-zero entries per column
+	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
 	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 125)); // at most 27 non-zero entries per column
+	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 
 	for (int e = 0; e < numElems; e++) {

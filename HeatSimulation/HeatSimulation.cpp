@@ -9,7 +9,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = { 5,5,5};
+    int nodeSize[3] = {5,5,5};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     srand(1);
@@ -23,15 +23,15 @@ int main()
     }
 
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1,2);
 
-    std::cout << "Number of nodes: " << simulator->nodeSize[0] << std::endl;
-    std::cout << "Number of elems: " << simulator->gridSize[0] << std::endl;
+    std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
+    std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;
     simulator->tFinal = 1.0f;
-    int BC[6] = { 2,2,2,2,2,2 };
+    int BC[6] = { 0,0,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0);
     simulator->setAmbientTemp(0);
