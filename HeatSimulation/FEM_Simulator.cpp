@@ -313,6 +313,8 @@ void FEM_Simulator::createKMFelem()
 	bool fluxFlag = false;
 	auto startTime = std::chrono::high_resolution_clock::now();
 
+	std::cout << "Creating Global Matrices" << std::endl;
+
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
@@ -1070,6 +1072,10 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp) {
 	this->Temp = Temp;
 	int gridSize[3]; 
+	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
+		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
+		throw std::exception("Invalid number of nodes");
+	}
 	gridSize[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
 	gridSize[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
 	gridSize[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
@@ -1087,6 +1093,7 @@ void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 		this->elemNFR = false;
 	}
 	else {
+		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
 }
