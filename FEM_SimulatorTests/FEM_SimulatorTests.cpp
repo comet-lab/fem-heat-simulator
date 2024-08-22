@@ -218,6 +218,47 @@ namespace FEMSimulatorTests
 			}
 		}
 
+		TEST_METHOD(TestCalculateNADot2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			int Nne = pow(Nn1d, 3);
+			float xi1[3], xi2[3], xi3[3], xi4[3];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] - 1;
+				xi1[1] = AiSub[1] - 1;
+				xi1[2] = AiSub[2] - 1;
+
+				xi2[0] = (((AiSub[0] + 1) % Nn1d) - 1);
+				xi2[1] = (((AiSub[1] + 1) % Nn1d) - 1);
+				xi2[2] = (((AiSub[2] + 1) % Nn1d) - 1);
+
+				Eigen::Vector3f output1 = simulator->calculateNA_dot(xi1, Ai);
+				Eigen::Vector3f output2 = simulator->calculateNA_dot(xi2, Ai);
+
+				for (int i = 0; i < 3; i++) {
+					if (xi1[i] == -1) {
+						Assert::AreEqual(-1.5f, output1(i));
+					}
+					else if (xi1[i] == 0) {
+						Assert::AreEqual(0.0f, output1(i));
+					}
+					else if (xi1[i] == 1) {
+						Assert::AreEqual(1.5f, output1(i));
+					}
+					Assert::AreEqual(0.0f, output2(i));
+				}
+			}
+		}
+
 		TEST_METHOD(TestDetermineNodeFace1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
