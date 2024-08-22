@@ -874,7 +874,7 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	NAdotA = this->calculateNA_dot(xi, Ai);
 	NAdotB = this->calculateNA_dot(xi, Bi);
 	
-	KABfunc = (NAdotA.transpose()* Jinv * Jinv.transpose()*NAdotB); // matrix math
+	KABfunc = (NAdotB.transpose()* Jinv * Jinv.transpose()*NAdotA); // matrix math
 	KABfunc = float(J.determinant() * this->TC * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
 	return KABfunc;
 }
@@ -1193,7 +1193,7 @@ void FEM_Simulator::setKe() {
 	this->Ke = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->Ke(Ai, Bi) = this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+			this->Ke(Ai, Bi) = this->integrate(&FEM_Simulator::createKABFunction, 3, 0, Ai, Bi);
 		}
 	}
 
@@ -1229,7 +1229,7 @@ void FEM_Simulator::setMe() {
 	this->Me = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::createMABFunction, 3, 0, Ai, Bi);
 		}
 	}
 }
@@ -1264,7 +1264,7 @@ void FEM_Simulator::setFeInt()
 	this->FeInt = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);
+			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 3, 0, Ai, Bi);
 		}
 	}
 }
@@ -1298,7 +1298,7 @@ void FEM_Simulator::setFj() {
 	this->Fje = Eigen::MatrixXf::Zero(Nne, 6);
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fje(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->Fje(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
@@ -1308,7 +1308,7 @@ void FEM_Simulator::setFv() {
 	this->Fve = Eigen::MatrixXf::Zero(Nne, 6);
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fve(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 2, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->Fve(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
@@ -1321,7 +1321,7 @@ void FEM_Simulator::setFvu() {
 			for (int Bi : this->elemNodeSurfaceMap[f]) {
 				int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-				this->Kje[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 2, this->dimMap[f], AiBi, this->dimMap[f]);
+				this->Kje[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 3, this->dimMap[f], AiBi, this->dimMap[f]);
 			}
 		}
 	}

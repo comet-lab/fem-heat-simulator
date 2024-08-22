@@ -440,6 +440,34 @@ namespace FEMSimulatorTests
 			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
 		}
 
+		TEST_METHOD(TestCreateKABFunction2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, Nn1d);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = -1;
+			xi[1] = -1;
+			xi[2] = -1;
+			float output1 = simulator->createKABFunction(xi, Ai, Bi);
+			simulator->setKe();
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 1.0
+			Assert::IsTrue(abs(3.375f - output1) < 0.0001);
+			Assert::IsTrue(abs(0.1244f - simulator->Ke(0, 0)) < 0.0001);
+			Assert::IsTrue(abs(0.4267f - simulator->Ke(1, 1)) < 0.0001);
+			Assert::IsTrue(abs(1.4222f - simulator->Ke(4, 4)) < 0.0001);
+			Assert::IsTrue(abs(4.5511f - simulator->Ke(13, 13)) < 0.0001);
+			Assert::IsTrue(abs(-0.0415f - simulator->Ke(9, 15)) < 0.0001);
+			Assert::IsTrue(abs(-0.0059f - simulator->Ke(21, 5)) < 0.0001);
+			Assert::IsTrue(abs(-0.0370f - simulator->Ke(21, 15)) < 0.0001);
+		}
+
 		TEST_METHOD(TestCreateMABFunction1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
