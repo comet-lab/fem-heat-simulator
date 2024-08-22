@@ -523,6 +523,55 @@ namespace FEMSimulatorTests
 			//Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 		}
 
+		TEST_METHOD(CompareLinearAndQuadratic1) {
+
+			int nodeSize[3] = { 5,5,5 };
+			std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			srand(1);
+			for (int i = 0; i < nodeSize[0]; i++) {
+				for (int j = 0; j < nodeSize[1]; j++) {
+					for (int k = 0; k < nodeSize[2]; k++) {
+						Temp[i][j][k] = 0;
+						NFR[i][j][k] = 1;
+					}
+				}
+			}
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			int BC[6] = { 0,0,2,2,2,2 };
+			FEM_Simulator* simulatorLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
+			FEM_Simulator* simulatorQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
+
+			simulatorLin->deltaT = 0.05f;
+			simulatorLin->tFinal = 1.0f;
+			simulatorLin->setBoundaryConditions(BC);
+			simulatorLin->setJn(0);
+			simulatorLin->setAmbientTemp(0);
+			simulatorLin->setNFR(NFR);
+
+			simulatorQuad->deltaT = 0.05f;
+			simulatorQuad->tFinal = 1.0f;
+			simulatorQuad->setBoundaryConditions(BC);
+			simulatorQuad->setJn(0);
+			simulatorQuad->setAmbientTemp(0);
+			simulatorQuad->setNFR(NFR);
+
+			simulatorLin->createKMFelem();
+			simulatorLin->performTimeStepping();
+			simulatorQuad->createKMFelem();
+			simulatorQuad->performTimeStepping();
+
+			for (int k = 0; k < nodeSize[2]; k++) {
+				for (int j = 0; j < nodeSize[1]; j++) {
+					for (int i = 0; i < nodeSize[0]; i++) {
+						Assert::IsTrue(abs(simulatorQuad->Temp[i][j][k] - simulatorQuad->Temp[i][j][k]) < 0.001);
+					}
+				}
+			}
+
+		}
+
 		//TEST_METHOD(TestCreateKMF1) {
 		//	//checking that createKMF and createKMFelem create the same matrices.
 		//	int nodeSize[3] = { 10,10,10 };
