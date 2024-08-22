@@ -457,7 +457,7 @@ float FEM_Simulator::calculateNA(float xi[3], int Ai)
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
 	ind2sub(Ai, size, AiVec);
 	for (int i = 0; i < 3; i++) {
-		output *= this->calculateNABase(xi[0], AiVec[0]);
+		output *= this->calculateNABase(xi[i], AiVec[i]);
 	}
 	return output;
 }

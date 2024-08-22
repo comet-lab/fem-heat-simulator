@@ -78,29 +78,77 @@ namespace FEMSimulatorTests
 			}
 		}
 
-		/*TEST_METHOD(TestCalculateNA1)
+		TEST_METHOD(TestCalculateNA1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int Nn1d = 2;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+			
+			int Nne = pow(Nn1d, 3);
 			float xi1[3], xi2[3];
-			for (int Ai = 0; Ai < 8; Ai++) {
-				xi1[0] = FEM_Simulator::A[Ai][0];
-				xi1[1] = FEM_Simulator::A[Ai][1];
-				xi1[2] = FEM_Simulator::A[Ai][2];
-				xi2[0] = FEM_Simulator::A[(Ai + 1) % 8][0];
-				xi2[1] = FEM_Simulator::A[(Ai + 1) % 8][1];
-				xi2[2] = FEM_Simulator::A[(Ai + 1) % 8][2];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] * 2 - 1;
+				xi1[1] = AiSub[1] * 2 - 1;
+				xi1[2] = AiSub[2] * 2 - 1;
+				xi2[0] = (((AiSub[0] + 1) % 2) * 2 - 1);
+				xi2[1] = (((AiSub[1] + 1) % 2) * 2 - 1);;
+				xi2[2] = (((AiSub[2] + 1) % 2) * 2 - 1);;
 				float output1 = simulator->calculateNA(xi1, Ai);
 				float output2 = simulator->calculateNA(xi2, Ai);
 
 				Assert::AreEqual(1.0f, output1);
 				Assert::AreEqual(0.0f, output2);				
 			}
-			
-		}*/
+		}
+
+		TEST_METHOD(TestCalculateNA2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			int Nne = pow(Nn1d, 3);
+			float xi1[3], xi2[3], xi3[3], xi4[3];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] - 1;
+				xi1[1] = AiSub[1] - 1;
+				xi1[2] = AiSub[2] - 1;
+
+				xi2[0] = (((AiSub[0] + 1) % Nn1d) - 1);
+				xi2[1] = AiSub[1] - 1;
+				xi2[2] = AiSub[2] - 1;
+
+				xi3[0] = AiSub[0] - 1;
+				xi3[1] = (((AiSub[1] + 1) % Nn1d) - 1);
+				xi3[2] = AiSub[2] - 1;
+
+				xi4[0] = AiSub[0] - 1;
+				xi4[1] = AiSub[1] - 1;
+				xi4[2] = (((AiSub[2] + 1) % Nn1d) - 1);
+
+				float output1 = simulator->calculateNA(xi1, Ai);
+				float output2 = simulator->calculateNA(xi2, Ai);
+				float output3 = simulator->calculateNA(xi3, Ai);
+				float output4 = simulator->calculateNA(xi4, Ai);
+
+				Assert::AreEqual(1.0f, output1);
+				Assert::AreEqual(0.0f, output2);
+				Assert::AreEqual(0.0f, output3);
+				Assert::AreEqual(0.0f, output4);
+			}
+		}
 
 		/*TEST_METHOD(TestDetermineNodeFace1)
 		{
