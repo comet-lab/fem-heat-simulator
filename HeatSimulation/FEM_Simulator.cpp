@@ -510,8 +510,6 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 	NA_dot(0) = this->calculateNADotBase(xi[0], AiVec[0]) * this->calculateNABase(xi[1], AiVec[1]) * this->calculateNABase(xi[2], AiVec[2]);
 	NA_dot(1) = this->calculateNADotBase(xi[1], AiVec[1]) * this->calculateNABase(xi[0], AiVec[0]) * this->calculateNABase(xi[2], AiVec[2]);
 	NA_dot(2) = this->calculateNADotBase(xi[2], AiVec[2]) * this->calculateNABase(xi[0], AiVec[0]) * this->calculateNABase(xi[1], AiVec[1]);
-	Eigen::Matrix3f Jinv = this->J.inverse();
-	NA_dot = (Jinv.transpose()) * NA_dot;
 	return NA_dot;
 }
 
@@ -870,11 +868,13 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	Eigen::Vector3<float> NAdotA;
 	Eigen::Vector3<float> NAdotB;
 	Eigen::Matrix3<float> J = this->J;
+	Eigen::Matrix3f Jinv = J.inverse();
+
 
 	NAdotA = this->calculateNA_dot(xi, Ai);
 	NAdotB = this->calculateNA_dot(xi, Bi);
-
-	KABfunc = (NAdotA.transpose() * NAdotB); // matrix math
+	
+	KABfunc = (NAdotA.transpose()* Jinv * Jinv.transpose()*NAdotB); // matrix math
 	KABfunc = float(J.determinant() * this->TC * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
 	return KABfunc;
 }
