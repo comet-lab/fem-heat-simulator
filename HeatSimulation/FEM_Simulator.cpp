@@ -481,21 +481,21 @@ float FEM_Simulator::calculateNADotBase(float xi, int Ai) {
 	float output = 0;
 	if (this->Nn1d == 2) {
 		if (Ai == 0) {
-			output = -1 / 2;
+			output = -1 / 2.0f;
 		}
 		else if (Ai == 1) {
-			output = 1 / 2;
+			output = 1 / 2.0f;
 		}
 	}
 	else if (this->Nn1d == 3) {
 		if (Ai == 0) {
-			output = (2 * xi - 1) / 2;
+			output = (2 * xi - 1) / 2.0f;
 		}
 		else if (Ai == 1) {
 			output = -2 * xi;
 		}
 		else if (Ai == 2) {
-			output = (2 * xi + 1) / 2;
+			output = (2 * xi + 1) / 2.0f;
 		}
 	}
 	return output;

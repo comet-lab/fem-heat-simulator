@@ -150,7 +150,75 @@ namespace FEMSimulatorTests
 			}
 		}
 
-		/*TEST_METHOD(TestDetermineNodeFace1)
+		TEST_METHOD(TestcalculateNADotBase1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+
+				float output1 = simulator->calculateNADotBase(-1, Ai);
+				float output2 = simulator->calculateNADotBase(0, Ai);
+				float output3 = simulator->calculateNADotBase(1, Ai);
+				float output4 = simulator->calculateNADotBase(-0.5, Ai);
+
+				if (Ai == 0) {
+					Assert::AreEqual(-1 / 2.0f, output1);
+					Assert::AreEqual(-1 / 2.0f, output2);
+					Assert::AreEqual(-1 / 2.0f, output3);
+					Assert::AreEqual(-1 / 2.0f, output4);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(1 / 2.0f, output1);
+					Assert::AreEqual(1 / 2.0f, output2);
+					Assert::AreEqual(1 / 2.0f, output3);
+					Assert::AreEqual(1 / 2.0f, output4);
+				}
+			}
+		}
+
+		TEST_METHOD(TestcalculateNADotBase2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+
+				float output1 = simulator->calculateNADotBase(-1, Ai);
+				float output2 = simulator->calculateNADotBase(0, Ai);
+				float output3 = simulator->calculateNADotBase(1, Ai);
+				float output4 = simulator->calculateNADotBase(-0.5, Ai);
+
+				if (Ai == 0) {
+					Assert::AreEqual(-3/2.0f, output1);
+					Assert::AreEqual(-1/2.0f, output2);
+					Assert::AreEqual(1/2.0f, output3);
+					Assert::AreEqual(-1.0f, output4);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(2.0f, output1);
+					Assert::AreEqual(0.0f, output2);
+					Assert::AreEqual(-2.0f, output3);
+					Assert::AreEqual(1.0f, output4);
+				}
+				else if (Ai == 2) {
+					Assert::AreEqual(-1 / 2.0f , output1);
+					Assert::AreEqual(1 / 2.0f, output2);
+					Assert::AreEqual(3 / 2.0f, output3);
+					Assert::AreEqual(0.0f, output4);
+				}
+			}
+		}
+
+		TEST_METHOD(TestDetermineNodeFace1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
@@ -172,7 +240,7 @@ namespace FEMSimulatorTests
 			Assert::AreEqual(expected13, faces[13]);
 			Assert::AreEqual(expected16, faces[16]);
 			Assert::AreEqual(expected22, faces[22]);
-		}*/
+		}
 
 		TEST_METHOD(TestCalculateJ1)
 		{
