@@ -9,7 +9,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = {41,41,41};
+    int nodeSize[3] = {81,81,81};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     srand(1);
@@ -34,7 +34,7 @@ int main()
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0);
-    simulator->setAmbientTemp(0);
+    simulator->setAmbientTemp(1);
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
@@ -44,8 +44,6 @@ int main()
 #else
     Eigen::setNbThreads(1);
 #endif
-
-    Eigen::setNbThreads(1);
     
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
     simulator->createKMFelem();

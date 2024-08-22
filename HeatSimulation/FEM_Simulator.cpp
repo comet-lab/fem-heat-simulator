@@ -330,6 +330,12 @@ void FEM_Simulator::createKMFelem()
 	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
+	
+	/*std::vector<Eigen::Triplet<float>> Ktriplets;
+	Ktriplets.reserve(numElems * Nne * Nne);
+	std::vector<Eigen::Triplet<float>> Mtriplets;
+	Mtriplets.reserve(numElems * Nne * Nne);*/
+
 
 	for (int e = 0; e < numElems; e++) {
 		this->currElement.elementNumber = e;
@@ -410,7 +416,8 @@ void FEM_Simulator::createKMFelem()
 			} // If our node is not a dirichlet node
 		} // For loop through Ai
 	}
-
+	//this->K.setFromTriplets(Ktriplets.begin(),Ktriplets.end());
+	//this->M.setFromTriplets(Mtriplets.begin(),Mtriplets.end());
 	this->K.makeCompressed();
 	this->M.makeCompressed();
 	auto stopTime = std::chrono::high_resolution_clock::now();
