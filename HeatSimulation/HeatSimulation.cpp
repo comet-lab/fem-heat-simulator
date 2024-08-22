@@ -9,7 +9,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-    int nodeSize[3] = {10,10,10};
+    int nodeSize[3] = {41,41,41};
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     srand(1);
@@ -21,7 +21,7 @@ int main()
             }
         }
     }
-    int Nn1d = 3;
+    int Nn1d = 2;
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
     FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1, Nn1d);
 
@@ -30,7 +30,7 @@ int main()
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;
-    simulator->tFinal = 1.0f;
+    simulator->tFinal = 0.1f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0);
