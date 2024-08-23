@@ -206,7 +206,7 @@ void FEM_Simulator::createKMF() {
 			eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
 			eOpts &= ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 0b00110011 : 0b11111111); // valid elements if we are at back wall: 0,1,4,5
 			eOpts &= ((nodeSub[0] == 0) ? 0b10101010 : 0b11111111); // valid elements if we are at left wall: 1,3,5,7
-			eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
+			eOpts &= ((nodeSub[0] == (this->nodeSize[0] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
 			for (int e = 0; e < 8; e++) { // iterate through possible elements
 				if ((eOpts >> e) & 1) {// if valid elements
 					int eSub[3] = { nodeSub[0],nodeSub[1],nodeSub[2] };
