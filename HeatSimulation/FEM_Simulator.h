@@ -72,7 +72,7 @@ public:
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
-	void setJ();
+	void setJ(int layer=1);
 	void setKe();
 	void setKn();
 	void setMe();

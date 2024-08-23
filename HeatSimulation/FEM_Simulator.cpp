@@ -9,6 +9,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->initializeElementNodeSurfaceMap();
 	this->setInitialTemperature(Temp);
 	this->setTissueSize(tissueSize);
+	this->setLayer(tissueSize[2], (Temp[0][0].size()-1) / (Nn1d-1));
 	this->setTC(TC);
 	this->setVHC(VHC);
 	this->setMUA(MUA);
@@ -336,14 +337,20 @@ void FEM_Simulator::createKMFelem()
 	std::vector<Eigen::Triplet<float>> Mtriplets;
 	Mtriplets.reserve(numElems * Nne * Nne);*/
 
-
+	bool layerFlag = false;
 	for (int e = 0; e < numElems; e++) {
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
 		this->currElement.elementNumber = e;
-
 		this->ind2sub(e, this->gridSize, eSub);
+		if ((eSub[2] > this->layerSize) && !layerFlag) {
+			// we currently assume there will only be one element height change and once the transition has happened, 
+			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
+			// matrices once and we are good to go. 
+			this->setJ(2);
+			layerFlag = true;
+		}
 
 		for (int Ai = 0; Ai < Nne; Ai++) {
 			this->ind2sub(Ai, elemNodeSize, AiSub);
@@ -1153,8 +1160,13 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
 		throw::std::exception("Invalid layer size");
 	}
+	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->gridSize[2])) {
+		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
+		throw::std::exception("Invalid layer size");
+	}
 	this->layerHeight = layerHeight;
 	this->layerSize = layerSize;
+	this->setJ(1);
 }
 
 void FEM_Simulator::setTC(float TC) {
@@ -1225,11 +1237,11 @@ void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSe
 	}
 }
 
-void FEM_Simulator::setJ() {
-	this->J = this->calculateJ();
-	this->Js1 = this->calculateJs(1);
-	this->Js2 = this->calculateJs(2);
-	this->Js3 = this->calculateJs(3);
+void FEM_Simulator::setJ(int layer) {
+	this->J = this->calculateJ(layer);
+	this->Js1 = this->calculateJs(1, layer);
+	this->Js2 = this->calculateJs(2, layer);
+	this->Js3 = this->calculateJs(3, layer);
 	this->setKe();
 	this->setMe();
 	this->setFeInt();
