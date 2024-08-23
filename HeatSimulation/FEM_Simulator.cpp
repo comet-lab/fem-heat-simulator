@@ -338,6 +338,9 @@ void FEM_Simulator::createKMFelem()
 
 
 	for (int e = 0; e < numElems; e++) {
+		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
+		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
+
 		this->currElement.elementNumber = e;
 
 		this->ind2sub(e, this->gridSize, eSub);
@@ -522,7 +525,7 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 	return NA_dot;
 }
 
-Eigen::Matrix3<float> FEM_Simulator::calculateJ()
+Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 {
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
@@ -542,10 +545,22 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ()
 	}*/
 
 	Eigen::Matrix3<float> J;
-	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	// we assume the z height can change once in the volume. 
 	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
 	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
-	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
+	float deltaZ = 0;
+	if (layer == 1) {
+		deltaZ = this->layerHeight / float(this->layerSize);
+	}
+	else if (layer == 2) {
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+	}
+	else {
+		std::cout << "layer must be 1 or 2" << std::endl;
+		throw std::invalid_argument("Invalid layer");
+	}
+	
 	J(0, 0) = deltaX / 2.0;
 	J(0, 1) = 0;
 	J(0, 2) = 0;
@@ -559,17 +574,28 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ()
 
 }
 
-Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim)
+Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 {
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
 	// We assume the values of xi correspond to the values of the remaining two axis in ascending order.
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
 
-	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	// we assume the z height can change once in the volume. 
 	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
 	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
-	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
+	float deltaZ = 0;
+	if (layer == 1) {
+		deltaZ = this->layerHeight / float(this->layerSize);
+	}
+	else if (layer == 2) {
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+	}
+	else {
+		std::cout << "layer must be 1 or 2" << std::endl;
+		throw std::invalid_argument("Invalid layer");
+	}
 	int direction = dim / abs(dim);
 	dim = abs(dim);
 	Eigen::Matrix2f Js;
@@ -1110,6 +1136,25 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 		this->tissueSize[i] = tissueSize[i];
 	}
 	this->setJ();
+}
+
+void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
+	if ((layerSize > this->gridSize[2])||(layerSize < 0)) {
+		std::cout << "Invalid layer size. The layer must be equal"
+			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
+		throw std::exception("Invalid layer size");
+	}
+	if ((layerHeight < 0) || (layerHeight > this->tissueSize[2])) {
+		std::cout << "Invalid layer height. The layer dimension must be less than or equal to the tissue size " 
+			<< "and greater than zero" << std::endl;
+		throw std::exception("Invalid layer height");
+	}
+	if ((layerHeight == 0) != (layerSize == 0)) {
+		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
+		throw::std::exception("Invalid layer size");
+	}
+	this->layerHeight = layerHeight;
+	this->layerSize = layerSize;
 }
 
 void FEM_Simulator::setTC(float TC) {

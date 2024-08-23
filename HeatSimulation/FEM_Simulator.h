@@ -31,8 +31,11 @@ public:
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
-	int gridSize[3] = { 1,1,1 }; // Number of voxels in x, y, and z [voxels]
+	int gridSize[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
+	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
+	float layerHeight = 1.0f; // the z-location where we change element height
+	float layerSize = 2; // The number of elements corresponding to the first layer height
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
@@ -59,6 +62,7 @@ public:
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setTissueSize(float tissueSize[3]);
+	void setLayer(float layerHeight, int layerSize);
 	void setTC(float TC);
 	void setVHC(float VHC);
 	void setMUA(float MUA);
@@ -101,7 +105,6 @@ public:
 	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
-	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
 	std::vector<std::vector<std::vector<float>>> NFR; 
@@ -115,8 +118,8 @@ public:
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
 	float calculateNABase(float xi, int Ai);
-	Eigen::Matrix3<float> calculateJ(); // function has test cases
-	Eigen::Matrix2<float> calculateJs(int dim);
+	Eigen::Matrix3<float> calculateJ(int layer=1); // function has test cases
+	Eigen::Matrix2<float> calculateJs(int dim,int layer=1);
 	float calculateNADotBase(float xi, int Ai);
 	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	// function has test cases
