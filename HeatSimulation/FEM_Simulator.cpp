@@ -63,7 +63,6 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
 	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->K;
 	solver.compute(LHS);
-	solver.setMaxIterations(500);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
