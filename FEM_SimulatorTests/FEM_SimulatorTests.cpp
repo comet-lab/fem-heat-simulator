@@ -480,9 +480,9 @@ namespace FEMSimulatorTests
 			int Ai = 0;
 			int Bi = 0;
 			float xi[3];
-			xi[0] = FEM_Simulator::A[Ai][0];
-			xi[1] = FEM_Simulator::A[Ai][1];
-			xi[2] = FEM_Simulator::A[Ai][2];
+			xi[0] = -1;
+			xi[1] = -1;
+			xi[2] = -1;
 			float output1 = simulator->createMABFunction(xi, Ai, Bi);
 			Eigen::MatrixXf Me(8, 8);
 			for (int Ai = 0; Ai < 8; Ai++) {
