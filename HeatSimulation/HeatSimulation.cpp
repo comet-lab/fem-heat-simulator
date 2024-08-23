@@ -34,7 +34,7 @@ int main()
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0);
-    simulator->setAmbientTemp(1);
+    simulator->setAmbientTemp(0);
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
