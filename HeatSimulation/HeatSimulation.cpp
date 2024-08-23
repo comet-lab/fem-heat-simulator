@@ -23,7 +23,7 @@ int main()
     }
     int Nn1d = 2;
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 1, 1, 1, 1, Nn1d);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1, Nn1d);
 
     std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
