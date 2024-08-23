@@ -6,13 +6,14 @@ const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
 {
 	this->Nn1d = Nn1d;
+	this->initializeElementNodeSurfaceMap();
 	this->setInitialTemperature(Temp);
 	this->setTissueSize(tissueSize);
 	this->setTC(TC);
 	this->setVHC(VHC);
 	this->setMUA(MUA);
 	this->setHTC(HTC);
-	this->initializeElementNodeSurfaceMap();
+	
 }
 
 void FEM_Simulator::performTimeStepping()
