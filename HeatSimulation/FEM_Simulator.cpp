@@ -883,7 +883,7 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	NAdotA = this->calculateNA_dot(xi, Ai);
 	NAdotB = this->calculateNA_dot(xi, Bi);
 	
-	KABfunc = (NAdotB.transpose()* Jinv * Jinv.transpose()*NAdotA); // matrix math
+	KABfunc = (NAdotA.transpose()* Jinv * Jinv.transpose()*NAdotB); // matrix math
 	KABfunc = float(J.determinant() * this->TC * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
 	return KABfunc;
 }
