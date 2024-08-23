@@ -343,7 +343,7 @@ void FEM_Simulator::createKMFelem()
 
 		this->currElement.elementNumber = e;
 		this->ind2sub(e, this->gridSize, eSub);
-		if ((eSub[2] > this->layerSize) && !layerFlag) {
+		if ((eSub[2] >= this->layerSize) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened, 
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
 			// matrices once and we are good to go. 
@@ -435,23 +435,31 @@ void FEM_Simulator::createKMFelem()
 }
 
 void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
+	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
+	/*TODO SENSORS IN LAYER 2 ALSO DON'T WORK. THEY MIGHT WORK IN LAYER 1*/
 	int nSensors = this->tempSensorLocations.size();
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
-	float spacing[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->tissueSize[2] / float(this->gridSize[2]) };
+	float spacingLayer1[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->layerHeight / float(this->layerSize) };
+	float spacingLayer2[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->gridSize[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
-		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0]),
-										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0])},
-			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1]),
-										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1])},
-			{floor(sensorLocation[2] / spacing[2]),
-										ceil(sensorLocation[2] / spacing[0])} };
+		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
+										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0])},
+			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
+										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1])},
+			{floor(sensorLocation[2] / spacingLayer1[2]),
+										ceil(sensorLocation[2] / spacingLayer1[0])} };
+		if (sensorLocation[2] > this->layerHeight) {
+			// This should compensate for the change in layer appropriately.
+			globalNodeOptions[2][0] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
+			globalNodeOptions[2][1] = this->layerSize + ceil((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
+		}
 		float tempValue = 0;
 		float xi[3];
-		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacing[0] - this->tissueSize[0] / 2.0f)) * 2 / spacing[0] - 1;
-		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacing[1] - this->tissueSize[1] / 2.0f)) * 2 / spacing[1] - 1;;
-		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacing[2] - this->tissueSize[2] / 2.0f)) * 2 / spacing[2] - 1;;
+		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacingLayer1[0] - this->tissueSize[0] / 2.0f)) * 2 / spacingLayer1[0] - 1;
+		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacingLayer1[1] - this->tissueSize[1] / 2.0f)) * 2 / spacingLayer1[1] - 1;;
+		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacingLayer1[2] - this->tissueSize[2] / 2.0f)) * 2 / spacingLayer1[2] - 1;;
 		for (int Ai = 0; Ai < Nne; Ai++) {
 			int globalNodeSub[3] = { globalNodeOptions[0][Ai & 1],globalNodeOptions[1][(Ai & 2) >> 1], globalNodeOptions[2][(Ai & 4) >> 2] };
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
