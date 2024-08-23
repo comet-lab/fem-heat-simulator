@@ -1059,7 +1059,13 @@ void FEM_Simulator::initializeElementNodeSurfaceMap()
 	int Nne = pow(this->Nn1d, 3);
 	int AiSub[3];
 	int elemNodeSize[3] = { this->Nn1d,this->Nn1d, this->Nn1d };
+	
 	for (int Ai = 0; Ai < Nne; Ai++) {
+		if (Ai == 0) {
+			for (int f = 0; f < 6; f++) {
+				this->elemNodeSurfaceMap[f].clear();
+			}
+		}
 		this->ind2sub(Ai, elemNodeSize, AiSub);
 		if (AiSub[2] == 0) { //top
 			this->elemNodeSurfaceMap[0].push_back(Ai);
