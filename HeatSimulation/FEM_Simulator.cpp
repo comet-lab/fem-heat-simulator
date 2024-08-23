@@ -320,7 +320,6 @@ void FEM_Simulator::createKMFelem()
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
-		throw std::exception("Number of Nodes does not match");
 	}
 	this->initializeBoundaryNodes();
 
@@ -1114,7 +1113,6 @@ void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<fl
 	int gridSize[3]; 
 	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
 		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
-		throw std::exception("Invalid number of nodes");
 	}
 	gridSize[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
 	gridSize[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
@@ -1149,20 +1147,16 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 	if ((layerSize > this->gridSize[2])||(layerSize < 0)) {
 		std::cout << "Invalid layer size. The layer must be equal"
 			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
-		throw std::exception("Invalid layer size");
 	}
 	if ((layerHeight < 0) || (layerHeight > this->tissueSize[2])) {
 		std::cout << "Invalid layer height. The layer dimension must be less than or equal to the tissue size " 
 			<< "and greater than zero" << std::endl;
-		throw std::exception("Invalid layer height");
 	}
 	if ((layerHeight == 0) != (layerSize == 0)) {
 		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
-		throw::std::exception("Invalid layer size");
 	}
 	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->gridSize[2])) {
 		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
-		throw::std::exception("Invalid layer size");
 	}
 	this->layerHeight = layerHeight;
 	this->layerSize = layerSize;
