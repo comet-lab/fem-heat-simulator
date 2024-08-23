@@ -199,6 +199,7 @@ public:
             stream << "Error in Setup: " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
 
         auto sensorTempsInput = inputs[9];
@@ -210,7 +211,10 @@ public:
             simulator->setSensorLocations(sensorTemps);
         }
         catch (const std::exception& e){
+            stream << "Error setting sensor locations " << std::endl;
+            displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
         
 
@@ -225,19 +229,25 @@ public:
         displayOnMATLAB(stream);
         try {
             simulator->createKMFelem();
+            stream << "Global matrices created" << std::endl;
+            displayOnMATLAB(stream);
         }
         catch (const std::exception& e) {
             stream << "Error in createKMF() " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
         try {
             simulator->performTimeStepping();
+            stream << "Time Stepping Complete" << std::endl;
+            displayOnMATLAB(stream);
         }
         catch (const std::exception& e) {
             stream << "Error in performTimeStepping() " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
 
 
@@ -262,24 +272,6 @@ public:
         if (inputs.size() < 10) {
             displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal,"
                 "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (layers), (Nn1d) (silentMode)");
-        }
-        if (inputs.size() > 10) {
-            useAllCPUs = inputs[10][0];
-        }
-        if (inputs.size() > 11) {
-            layerHeight = inputs[11][0];
-            layerSize = int(inputs[11][1]);
-        }
-        if (inputs.size() > 12) {
-            Nn1d = inputs[12][0];
-        }
-        if (inputs.size() > 13) {
-            silentMode = inputs[13][0];
-            simulator->silentMode = silentMode;
-        }
-        if (inputs.size() > 13) {
-            silentMode = inputs[13][0];
-            simulator->silentMode = silentMode;
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -319,6 +311,24 @@ public:
         }
         if ((inputs[9].getDimensions()[1] != 3)) {
             displayError("Sensor Locations must be n x 3");
+        }
+        if (inputs.size() > 10) {
+            useAllCPUs = inputs[10][0];
+        }
+        if (inputs.size() > 11) {
+            silentMode = inputs[11][0];
+            simulator->silentMode = silentMode;
+        }
+        if (inputs.size() > 12) {
+            layerHeight = inputs[12][0];
+            layerSize = int(inputs[12][1]);
+        }
+        else {
+            layerSize = inputs[0].getDimensions()[2];
+            layerHeight = inputs[2][2];
+        }
+        if (inputs.size() > 13) {
+            Nn1d = inputs[13][0];
         }
     }
 };
