@@ -9,6 +9,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->initializeElementNodeSurfaceMap();
 	this->setInitialTemperature(Temp);
 	this->setTissueSize(tissueSize);
+	this->setLayer(tissueSize[2], (Temp[0][0].size()-1) / (Nn1d-1));
 	this->setTC(TC);
 	this->setVHC(VHC);
 	this->setMUA(MUA);
@@ -319,7 +320,6 @@ void FEM_Simulator::createKMFelem()
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
 	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
-		throw std::exception("Number of Nodes does not match");
 	}
 	this->initializeBoundaryNodes();
 
@@ -336,11 +336,20 @@ void FEM_Simulator::createKMFelem()
 	std::vector<Eigen::Triplet<float>> Mtriplets;
 	Mtriplets.reserve(numElems * Nne * Nne);*/
 
-
+	bool layerFlag = false;
 	for (int e = 0; e < numElems; e++) {
-		this->currElement.elementNumber = e;
+		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
+		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
+		this->currElement.elementNumber = e;
 		this->ind2sub(e, this->gridSize, eSub);
+		if ((eSub[2] >= this->layerSize) && !layerFlag) {
+			// we currently assume there will only be one element height change and once the transition has happened, 
+			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
+			// matrices once and we are good to go. 
+			this->setJ(2);
+			layerFlag = true;
+		}
 
 		for (int Ai = 0; Ai < Nne; Ai++) {
 			this->ind2sub(Ai, elemNodeSize, AiSub);
@@ -426,23 +435,31 @@ void FEM_Simulator::createKMFelem()
 }
 
 void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
+	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
+	/*TODO SENSORS IN LAYER 2 ALSO DON'T WORK. THEY MIGHT WORK IN LAYER 1*/
 	int nSensors = this->tempSensorLocations.size();
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
-	float spacing[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->tissueSize[2] / float(this->gridSize[2]) };
+	float spacingLayer1[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->layerHeight / float(this->layerSize) };
+	float spacingLayer2[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->gridSize[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
-		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0]),
-										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacing[0])},
-			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1]),
-										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacing[1])},
-			{floor(sensorLocation[2] / spacing[2]),
-										ceil(sensorLocation[2] / spacing[0])} };
+		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
+										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0])},
+			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
+										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1])},
+			{floor(sensorLocation[2] / spacingLayer1[2]),
+										ceil(sensorLocation[2] / spacingLayer1[0])} };
+		if (sensorLocation[2] > this->layerHeight) {
+			// This should compensate for the change in layer appropriately.
+			globalNodeOptions[2][0] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
+			globalNodeOptions[2][1] = this->layerSize + ceil((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
+		}
 		float tempValue = 0;
 		float xi[3];
-		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacing[0] - this->tissueSize[0] / 2.0f)) * 2 / spacing[0] - 1;
-		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacing[1] - this->tissueSize[1] / 2.0f)) * 2 / spacing[1] - 1;;
-		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacing[2] - this->tissueSize[2] / 2.0f)) * 2 / spacing[2] - 1;;
+		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacingLayer1[0] - this->tissueSize[0] / 2.0f)) * 2 / spacingLayer1[0] - 1;
+		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacingLayer1[1] - this->tissueSize[1] / 2.0f)) * 2 / spacingLayer1[1] - 1;;
+		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacingLayer1[2] - this->tissueSize[2] / 2.0f)) * 2 / spacingLayer1[2] - 1;;
 		for (int Ai = 0; Ai < Nne; Ai++) {
 			int globalNodeSub[3] = { globalNodeOptions[0][Ai & 1],globalNodeOptions[1][(Ai & 2) >> 1], globalNodeOptions[2][(Ai & 4) >> 2] };
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
@@ -522,7 +539,7 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 	return NA_dot;
 }
 
-Eigen::Matrix3<float> FEM_Simulator::calculateJ()
+Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 {
 	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
 	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
@@ -542,10 +559,22 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ()
 	}*/
 
 	Eigen::Matrix3<float> J;
-	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	// we assume the z height can change once in the volume. 
 	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
 	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
-	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
+	float deltaZ = 0;
+	if (layer == 1) {
+		deltaZ = this->layerHeight / float(this->layerSize);
+	}
+	else if (layer == 2) {
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+	}
+	else {
+		std::cout << "layer must be 1 or 2" << std::endl;
+		throw std::invalid_argument("Invalid layer");
+	}
+	
 	J(0, 0) = deltaX / 2.0;
 	J(0, 1) = 0;
 	J(0, 2) = 0;
@@ -559,17 +588,28 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ()
 
 }
 
-Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim)
+Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 {
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
 	// We assume the values of xi correspond to the values of the remaining two axis in ascending order.
 	// If dim = 2, then xi[0] is for the x-axis and xi[1] is for the z axis. 
 
-	//**** ASSUMING VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
+	// we assume the z height can change once in the volume. 
 	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
 	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
-	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
+	float deltaZ = 0;
+	if (layer == 1) {
+		deltaZ = this->layerHeight / float(this->layerSize);
+	}
+	else if (layer == 2) {
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+	}
+	else {
+		std::cout << "layer must be 1 or 2" << std::endl;
+		throw std::invalid_argument("Invalid layer");
+	}
 	int direction = dim / abs(dim);
 	dim = abs(dim);
 	Eigen::Matrix2f Js;
@@ -1027,7 +1067,13 @@ void FEM_Simulator::initializeElementNodeSurfaceMap()
 	int Nne = pow(this->Nn1d, 3);
 	int AiSub[3];
 	int elemNodeSize[3] = { this->Nn1d,this->Nn1d, this->Nn1d };
+	
 	for (int Ai = 0; Ai < Nne; Ai++) {
+		if (Ai == 0) {
+			for (int f = 0; f < 6; f++) {
+				this->elemNodeSurfaceMap[f].clear();
+			}
+		}
 		this->ind2sub(Ai, elemNodeSize, AiSub);
 		if (AiSub[2] == 0) { //top
 			this->elemNodeSurfaceMap[0].push_back(Ai);
@@ -1081,7 +1127,6 @@ void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<fl
 	int gridSize[3]; 
 	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
 		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
-		throw std::exception("Invalid number of nodes");
 	}
 	gridSize[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
 	gridSize[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
@@ -1110,6 +1155,26 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 		this->tissueSize[i] = tissueSize[i];
 	}
 	this->setJ();
+}
+
+void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
+	if ((layerSize > this->gridSize[2])||(layerSize < 0)) {
+		std::cout << "Invalid layer size. The layer must be equal"
+			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
+	}
+	if ((layerHeight < 0) || (layerHeight > this->tissueSize[2])) {
+		std::cout << "Invalid layer height. The layer dimension must be less than or equal to the tissue size " 
+			<< "and greater than zero" << std::endl;
+	}
+	if ((layerHeight == 0) != (layerSize == 0)) {
+		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
+	}
+	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->gridSize[2])) {
+		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
+	}
+	this->layerHeight = layerHeight;
+	this->layerSize = layerSize;
+	this->setJ(1);
 }
 
 void FEM_Simulator::setTC(float TC) {
@@ -1180,11 +1245,11 @@ void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSe
 	}
 }
 
-void FEM_Simulator::setJ() {
-	this->J = this->calculateJ();
-	this->Js1 = this->calculateJs(1);
-	this->Js2 = this->calculateJs(2);
-	this->Js3 = this->calculateJs(3);
+void FEM_Simulator::setJ(int layer) {
+	this->J = this->calculateJ(layer);
+	this->Js1 = this->calculateJs(1, layer);
+	this->Js2 = this->calculateJs(2, layer);
+	this->Js3 = this->calculateJs(3, layer);
 	this->setKe();
 	this->setMe();
 	this->setFeInt();
