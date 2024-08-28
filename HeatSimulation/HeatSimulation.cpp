@@ -9,7 +9,9 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
+
     int nodeSize[3] = {35,35,101};
+
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     srand(1);
@@ -23,10 +25,12 @@ int main()
     }
     int Nn1d = 2;
     float tissueSize[3] = { 1.0f,1.0f,1.0f };
+
     FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 800, 0.075, Nn1d);
-    //simulator->setLayer(0.2f, 2);
+    simulator->setLayer(0.2f, 2);
     std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
+
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;

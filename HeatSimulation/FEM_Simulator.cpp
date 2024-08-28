@@ -144,6 +144,7 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 	} // end for each row
 } //reduceSparseMatrix
 
+
 //void FEM_Simulator::createKMF() {
 //	
 //	auto startTime = std::chrono::high_resolution_clock::now();
