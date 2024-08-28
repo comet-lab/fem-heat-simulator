@@ -19,6 +19,9 @@ private:
     std::ostringstream stream;
     bool silentMode = true;
     bool useAllCPUs = true;
+    float layerHeight = 1;
+    int layerSize = 1;
+    int Nn1d = 2;
 
 public:
     /* Constructor for the class. */
@@ -130,10 +133,14 @@ public:
         stream.str("");
         try {
             checkArguments(outputs, inputs);
+            simulator->initializeElementNodeSurfaceMap();
+
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
             simulator->setInitialTemperature(T0);
             //display3DVector(simulator->Temp,"Initial Temp: ");
+
+            simulator->Nn1d = Nn1d;
 
             // Set the NFR
             std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
@@ -145,6 +152,8 @@ public:
             tissueSize[1] = inputs[2][1];
             tissueSize[2] = inputs[2][2];
             simulator->setTissueSize(tissueSize);
+
+            simulator->setLayer(layerHeight, layerSize);
 
             // set time step and final time
             float tFinal = inputs[3][0];
@@ -190,6 +199,7 @@ public:
             stream << "Error in Setup: " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
 
         auto sensorTempsInput = inputs[9];
@@ -201,7 +211,10 @@ public:
             simulator->setSensorLocations(sensorTemps);
         }
         catch (const std::exception& e){
+            stream << "Error setting sensor locations " << std::endl;
+            displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
         
 
@@ -215,20 +228,26 @@ public:
         stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
         try {
-            simulator->createKMF();
+            simulator->createKMFelem();
+            stream << "Global matrices created" << std::endl;
+            displayOnMATLAB(stream);
         }
         catch (const std::exception& e) {
             stream << "Error in createKMF() " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
         try {
             simulator->performTimeStepping();
+            stream << "Time Stepping Complete" << std::endl;
+            displayOnMATLAB(stream);
         }
         catch (const std::exception& e) {
             stream << "Error in performTimeStepping() " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
+            return;
         }
 
 
@@ -251,14 +270,8 @@ public:
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
-            displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal, deltaT tissueProperties, BC, Jn, ambientTemp,sensorLocations, (useAllCPUs), (silentMode)");
-        }
-        if (inputs.size() > 10) {
-            useAllCPUs = inputs[10][0];
-        }
-        if (inputs.size() > 11) {
-            silentMode = inputs[11][0];
-            simulator->silentMode = silentMode;
+            displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal,"
+                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (layers), (Nn1d) (silentMode)");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -298,6 +311,24 @@ public:
         }
         if ((inputs[9].getDimensions()[1] != 3)) {
             displayError("Sensor Locations must be n x 3");
+        }
+        if (inputs.size() > 10) {
+            useAllCPUs = inputs[10][0];
+        }
+        if (inputs.size() > 11) {
+            silentMode = inputs[11][0];
+            simulator->silentMode = silentMode;
+        }
+        if (inputs.size() > 12) {
+            layerHeight = inputs[12][0];
+            layerSize = int(inputs[12][1]);
+        }
+        else {
+            layerSize = inputs[0].getDimensions()[2];
+            layerHeight = inputs[2][2];
+        }
+        if (inputs.size() > 13) {
+            Nn1d = inputs[13][0];
         }
     }
 };

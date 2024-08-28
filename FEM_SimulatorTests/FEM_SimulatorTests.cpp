@@ -13,28 +13,250 @@ namespace FEMSimulatorTests
 	{
 	public:
 		
+		TEST_METHOD(TestCalculateNABase1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+			float xi;
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+				xi = -1;
+				float output1 = simulator->calculateNABase(-1, Ai);
+				float output3 = simulator->calculateNABase(0, Ai);
+				float output2 = simulator->calculateNABase(1, Ai);
+				if (Ai == 0) {
+					Assert::AreEqual(1.0f, output1);
+					Assert::AreEqual(0.5f, output3);
+					Assert::AreEqual(0.0f, output2);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(0.0f, output1);
+					Assert::AreEqual(0.5f, output3);
+					Assert::AreEqual(1.0f, output2);
+				}
+			}
+		}
+
+		TEST_METHOD(TestCalculateNABase2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+			float xi;
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+				xi = -1;
+
+				float output1 = simulator->calculateNABase(-1, Ai);
+				float output2 = simulator->calculateNABase(0, Ai);
+				float output3 = simulator->calculateNABase(1, Ai);
+				float output4 = simulator->calculateNABase(-0.5f, Ai);
+				
+				if (Ai == 0) {
+					Assert::AreEqual(1.0f, output1);
+					Assert::AreEqual(0.375f, output4);
+					Assert::AreEqual(0.0f, output2);
+					Assert::AreEqual(0.0f, output3);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(0.0f, output1);
+					Assert::AreEqual(0.75f, output4);
+					Assert::AreEqual(1.0f, output2);
+					Assert::AreEqual(0.0f, output3);
+				}
+				else if (Ai == 2) {
+					Assert::AreEqual(0.0f, output1);
+					Assert::AreEqual(-0.125f, output4);
+					Assert::AreEqual(0.0f, output2);
+					Assert::AreEqual(1.0f, output3);
+				}
+			}
+		}
+
 		TEST_METHOD(TestCalculateNA1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int Nn1d = 2;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+			
+			int Nne = pow(Nn1d, 3);
 			float xi1[3], xi2[3];
-			for (int Ai = 0; Ai < 8; Ai++) {
-				xi1[0] = FEM_Simulator::A[Ai][0];
-				xi1[1] = FEM_Simulator::A[Ai][1];
-				xi1[2] = FEM_Simulator::A[Ai][2];
-				xi2[0] = FEM_Simulator::A[(Ai + 1) % 8][0];
-				xi2[1] = FEM_Simulator::A[(Ai + 1) % 8][1];
-				xi2[2] = FEM_Simulator::A[(Ai + 1) % 8][2];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] * 2 - 1;
+				xi1[1] = AiSub[1] * 2 - 1;
+				xi1[2] = AiSub[2] * 2 - 1;
+				xi2[0] = (((AiSub[0] + 1) % 2) * 2 - 1);
+				xi2[1] = (((AiSub[1] + 1) % 2) * 2 - 1);;
+				xi2[2] = (((AiSub[2] + 1) % 2) * 2 - 1);;
 				float output1 = simulator->calculateNA(xi1, Ai);
 				float output2 = simulator->calculateNA(xi2, Ai);
 
 				Assert::AreEqual(1.0f, output1);
 				Assert::AreEqual(0.0f, output2);				
 			}
-			
+		}
+
+		TEST_METHOD(TestCalculateNA2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			int Nne = pow(Nn1d, 3);
+			float xi1[3], xi2[3], xi3[3], xi4[3];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] - 1;
+				xi1[1] = AiSub[1] - 1;
+				xi1[2] = AiSub[2] - 1;
+
+				xi2[0] = (((AiSub[0] + 1) % Nn1d) - 1);
+				xi2[1] = AiSub[1] - 1;
+				xi2[2] = AiSub[2] - 1;
+
+				xi3[0] = AiSub[0] - 1;
+				xi3[1] = (((AiSub[1] + 1) % Nn1d) - 1);
+				xi3[2] = AiSub[2] - 1;
+
+				xi4[0] = AiSub[0] - 1;
+				xi4[1] = AiSub[1] - 1;
+				xi4[2] = (((AiSub[2] + 1) % Nn1d) - 1);
+
+				float output1 = simulator->calculateNA(xi1, Ai);
+				float output2 = simulator->calculateNA(xi2, Ai);
+				float output3 = simulator->calculateNA(xi3, Ai);
+				float output4 = simulator->calculateNA(xi4, Ai);
+
+				Assert::AreEqual(1.0f, output1);
+				Assert::AreEqual(0.0f, output2);
+				Assert::AreEqual(0.0f, output3);
+				Assert::AreEqual(0.0f, output4);
+			}
+		}
+
+		TEST_METHOD(TestcalculateNADotBase1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+
+				float output1 = simulator->calculateNADotBase(-1, Ai);
+				float output2 = simulator->calculateNADotBase(0, Ai);
+				float output3 = simulator->calculateNADotBase(1, Ai);
+				float output4 = simulator->calculateNADotBase(-0.5, Ai);
+
+				if (Ai == 0) {
+					Assert::AreEqual(-1 / 2.0f, output1);
+					Assert::AreEqual(-1 / 2.0f, output2);
+					Assert::AreEqual(-1 / 2.0f, output3);
+					Assert::AreEqual(-1 / 2.0f, output4);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(1 / 2.0f, output1);
+					Assert::AreEqual(1 / 2.0f, output2);
+					Assert::AreEqual(1 / 2.0f, output3);
+					Assert::AreEqual(1 / 2.0f, output4);
+				}
+			}
+		}
+
+		TEST_METHOD(TestcalculateNADotBase2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			for (int Ai = 0; Ai < Nn1d; Ai++) {
+
+				float output1 = simulator->calculateNADotBase(-1, Ai);
+				float output2 = simulator->calculateNADotBase(0, Ai);
+				float output3 = simulator->calculateNADotBase(1, Ai);
+				float output4 = simulator->calculateNADotBase(-0.5, Ai);
+
+				if (Ai == 0) {
+					Assert::AreEqual(-3/2.0f, output1);
+					Assert::AreEqual(-1/2.0f, output2);
+					Assert::AreEqual(1/2.0f, output3);
+					Assert::AreEqual(-1.0f, output4);
+				}
+				else if (Ai == 1) {
+					Assert::AreEqual(2.0f, output1);
+					Assert::AreEqual(0.0f, output2);
+					Assert::AreEqual(-2.0f, output3);
+					Assert::AreEqual(1.0f, output4);
+				}
+				else if (Ai == 2) {
+					Assert::AreEqual(-1 / 2.0f , output1);
+					Assert::AreEqual(1 / 2.0f, output2);
+					Assert::AreEqual(3 / 2.0f, output3);
+					Assert::AreEqual(0.0f, output4);
+				}
+			}
+		}
+
+		TEST_METHOD(TestCalculateNADot2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
+
+			int Nne = pow(Nn1d, 3);
+			float xi1[3], xi2[3], xi3[3], xi4[3];
+			int AiSub[3];
+			int size[3] = { Nn1d,Nn1d,Nn1d };
+			for (int Ai = 0; Ai < Nne; Ai++) {
+				simulator->ind2sub(Ai, size, AiSub);
+				xi1[0] = AiSub[0] - 1;
+				xi1[1] = AiSub[1] - 1;
+				xi1[2] = AiSub[2] - 1;
+
+				xi2[0] = (((AiSub[0] + 1) % Nn1d) - 1);
+				xi2[1] = (((AiSub[1] + 1) % Nn1d) - 1);
+				xi2[2] = (((AiSub[2] + 1) % Nn1d) - 1);
+
+				Eigen::Vector3f output1 = simulator->calculateNA_dot(xi1, Ai);
+				Eigen::Vector3f output2 = simulator->calculateNA_dot(xi2, Ai);
+
+				for (int i = 0; i < 3; i++) {
+					if (xi1[i] == -1) {
+						Assert::AreEqual(-1.5f, output1(i));
+					}
+					else if (xi1[i] == 0) {
+						Assert::AreEqual(0.0f, output1(i));
+					}
+					else if (xi1[i] == 1) {
+						Assert::AreEqual(1.5f, output1(i));
+					}
+					Assert::AreEqual(0.0f, output2(i));
+				}
+			}
 		}
 
 		TEST_METHOD(TestDetermineNodeFace1)
@@ -125,99 +347,17 @@ namespace FEMSimulatorTests
 			Assert::AreEqual(tissueSize[1] / 4, simulator->Js3(1, 1));
 		}
 
-		TEST_METHOD(TestCalculateNA_Xi1)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			float xi[3];
-			for (int Ai = 0; Ai < 1; Ai++) {
-				xi[0] = FEM_Simulator::A[Ai][0];
-				xi[1] = FEM_Simulator::A[Ai][1];
-				xi[2] = FEM_Simulator::A[Ai][2];
-				float output1 = simulator->calculateNA_xi(xi, Ai); // test at Ai
-				xi[0] = -xi[0];
-				float output2 = simulator->calculateNA_xi(xi, Ai); // test but flip x
-				xi[0] = -xi[0]; // flip x back
-				xi[1] = -xi[1];
-				float output3 = simulator->calculateNA_xi(xi, Ai); // test but flip y
-				xi[1] = -xi[1]; // flip y back
-				xi[2] = -xi[2]; 
-				float output4 = simulator->calculateNA_xi(xi, Ai); // test but flip z
-
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output2);
-				Assert::AreEqual(0.0f, output3);
-				Assert::AreEqual(0.0f, output4);
-			}
-		}
-
-		TEST_METHOD(TestCalculateNA_Eta1)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			float xi[3];
-			for (int Ai = 0; Ai < 1; Ai++) {
-				xi[0] = FEM_Simulator::A[Ai][0];
-				xi[1] = FEM_Simulator::A[Ai][1];
-				xi[2] = FEM_Simulator::A[Ai][2];
-				float output1 = simulator->calculateNA_eta(xi, Ai); // test at Ai
-				xi[0] = -xi[0];
-				float output2 = simulator->calculateNA_eta(xi, Ai); // test but flip x
-				xi[0] = -xi[0]; // flip x back
-				xi[1] = -xi[1];
-				float output3 = simulator->calculateNA_eta(xi, Ai); // test but flip y
-				xi[1] = -xi[1]; // flip y back
-				xi[2] = -xi[2];
-				float output4 = simulator->calculateNA_eta(xi, Ai); // test but flip z
-
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
-				Assert::AreEqual(0.0f, output2);
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output3);
-				Assert::AreEqual(0.0f, output4);
-			}
-		}
-
-		TEST_METHOD(TestCalculateNA_Zeta1)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			float xi[3];
-			for (int Ai = 0; Ai < 1; Ai++) {
-				xi[0] = FEM_Simulator::A[Ai][0];
-				xi[1] = FEM_Simulator::A[Ai][1];
-				xi[2] = FEM_Simulator::A[Ai][2];
-				float output1 = simulator->calculateNA_zeta(xi, Ai); // test at Ai
-				xi[0] = -xi[0];
-				float output2 = simulator->calculateNA_zeta(xi, Ai); // test but flip x
-				xi[0] = -xi[0]; // flip x back
-				xi[1] = -xi[1];
-				float output3 = simulator->calculateNA_zeta(xi, Ai); // test but flip y
-				xi[1] = -xi[1]; // flip y back
-				xi[2] = -xi[2];
-				float output4 = simulator->calculateNA_zeta(xi, Ai); // test but flip z
-
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output1);
-				Assert::AreEqual(0.0f, output2);
-				Assert::AreEqual(0.0f, output3);
-				Assert::AreEqual(float(1 / 2.0f * FEM_Simulator::A[Ai][0]), output4);
-			}
-		}
-
 		TEST_METHOD(TestInd2Sub1)
 		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int sub[3];
 			int index = 0;
 			int size[3] = { 10,10,10 };
-			FEM_Simulator::ind2sub(index, size, sub);
+			simulator->ind2sub(index, size, sub);
 			Assert::AreEqual(0, sub[0]);
 			Assert::AreEqual(0, sub[1]);
 			Assert::AreEqual(0, sub[2]);
@@ -225,10 +365,15 @@ namespace FEMSimulatorTests
 
 		TEST_METHOD(TestInd2Sub2)
 		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int sub[3];
 			int index = 10;
 			int size[3] = { 10,10,10 };
-			FEM_Simulator::ind2sub(index, size, sub);
+			simulator->ind2sub(index, size, sub);
 			Assert::AreEqual(0, sub[0]);
 			Assert::AreEqual(1, sub[1]);
 			Assert::AreEqual(0, sub[2]);
@@ -236,10 +381,15 @@ namespace FEMSimulatorTests
 
 		TEST_METHOD(TestInd2Sub3)
 		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int sub[3];
 			int index = 100;
 			int size[3] = { 10,10,10 };
-			FEM_Simulator::ind2sub(index, size, sub);
+			simulator->ind2sub(index, size, sub);
 			Assert::AreEqual(0, sub[0]);
 			Assert::AreEqual(0, sub[1]);
 			Assert::AreEqual(1, sub[2]);
@@ -247,79 +397,18 @@ namespace FEMSimulatorTests
 
 		TEST_METHOD(TestInd2Sub4)
 		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 2,1,0.5 };
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 			int sub[3];
 			int index = 521;
 			int size[3] = { 10,10,10 };
-			FEM_Simulator::ind2sub(index, size, sub);
+			simulator->ind2sub(index, size, sub);
 			Assert::AreEqual(1, sub[0]);
 			Assert::AreEqual(2, sub[1]);
 			Assert::AreEqual(5, sub[2]);
-		}
-
-		TEST_METHOD(TestGetGlobalNodes1)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			int e = 0;
-			int elementGlobalNodes[8]; //global nodes for element e
-			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
-			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
-			Assert::AreEqual(0,elementGlobalNodes[0]);
-			Assert::AreEqual(1, elementGlobalNodes[1]);
-			Assert::AreEqual(3, elementGlobalNodes[2]);
-			Assert::AreEqual(4, elementGlobalNodes[3]);
-			Assert::AreEqual(9, elementGlobalNodes[4]);
-			Assert::AreEqual(10, elementGlobalNodes[5]);
-			Assert::AreEqual(12, elementGlobalNodes[6]);
-			Assert::AreEqual(13, elementGlobalNodes[7]);
-
-		}
-
-		TEST_METHOD(TestGetGlobalNodes2)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			int e = 5;
-			int elementGlobalNodes[8]; //global nodes for element e
-			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
-			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
-			Assert::AreEqual(10, elementGlobalNodes[0]);
-			Assert::AreEqual(11, elementGlobalNodes[1]);
-			Assert::AreEqual(13, elementGlobalNodes[2]);
-			Assert::AreEqual(14, elementGlobalNodes[3]);
-			Assert::AreEqual(19, elementGlobalNodes[4]);
-			Assert::AreEqual(20, elementGlobalNodes[5]);
-			Assert::AreEqual(22, elementGlobalNodes[6]);
-			Assert::AreEqual(23, elementGlobalNodes[7]);
-
-		}
-
-		TEST_METHOD(TestGetGlobalNodes3)
-		{
-			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} },
-															   { {0,0,0}, {0,0,0}, {0,0,0} } };
-			float tissueSize[3] = { 2,1,0.5 };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-			int e = 7;
-			int elementGlobalNodes[8]; //global nodes for element e
-			simulator->getGlobalNodesFromElem(e, elementGlobalNodes);
-			// Note that these tests will be wrong if the order of A changes in the .cpp file. 
-			Assert::AreEqual(13, elementGlobalNodes[0]);
-			Assert::AreEqual(14, elementGlobalNodes[1]);
-			Assert::AreEqual(16, elementGlobalNodes[2]);
-			Assert::AreEqual(17, elementGlobalNodes[3]);
-			Assert::AreEqual(22, elementGlobalNodes[4]);
-			Assert::AreEqual(23, elementGlobalNodes[5]);
-			Assert::AreEqual(25, elementGlobalNodes[6]);
-			Assert::AreEqual(26, elementGlobalNodes[7]);
-
 		}
 
 		TEST_METHOD(TestCreateKABFunction1)
@@ -351,6 +440,34 @@ namespace FEMSimulatorTests
 			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
 		}
 
+		TEST_METHOD(TestCreateKABFunction2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			int Nn1d = 3;
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, Nn1d);
+			int Ai = 0;
+			int Bi = 0;
+			float xi[3];
+			xi[0] = -1;
+			xi[1] = -1;
+			xi[2] = -1;
+			float output1 = simulator->createKABFunction(xi, Ai, Bi);
+			simulator->setKe();
+			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 1.0
+			Assert::IsTrue(abs(3.375f - output1) < 0.0001);
+			Assert::IsTrue(abs(0.1244f - simulator->Ke(0, 0)) < 0.0001);
+			Assert::IsTrue(abs(0.4267f - simulator->Ke(1, 1)) < 0.0001);
+			Assert::IsTrue(abs(1.4222f - simulator->Ke(4, 4)) < 0.0001);
+			Assert::IsTrue(abs(4.5511f - simulator->Ke(13, 13)) < 0.0001);
+			Assert::IsTrue(abs(-0.0415f - simulator->Ke(9, 15)) < 0.0001);
+			Assert::IsTrue(abs(-0.0059f - simulator->Ke(21, 5)) < 0.0001);
+			Assert::IsTrue(abs(-0.0370f - simulator->Ke(21, 15)) < 0.0001);
+		}
+
 		TEST_METHOD(TestCreateMABFunction1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
@@ -363,9 +480,9 @@ namespace FEMSimulatorTests
 			int Ai = 0;
 			int Bi = 0;
 			float xi[3];
-			xi[0] = FEM_Simulator::A[Ai][0];
-			xi[1] = FEM_Simulator::A[Ai][1];
-			xi[2] = FEM_Simulator::A[Ai][2];
+			xi[0] = -1;
+			xi[1] = -1;
+			xi[2] = -1;
 			float output1 = simulator->createMABFunction(xi, Ai, Bi);
 			Eigen::MatrixXf Me(8, 8);
 			for (int Ai = 0; Ai < 8; Ai++) {
@@ -406,97 +523,146 @@ namespace FEMSimulatorTests
 			//Assert::IsTrue(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 		}
 
-		TEST_METHOD(TestCreateKMF1) {
-			//checking that createKMF and createKMFelem create the same matrices.
-			int nodeSize[3] = { 10,10,10 };
+		TEST_METHOD(CompareLinearAndQuadratic1) {
+
+			int nodeSize[3] = { 5,5,5 };
 			std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
 			std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+			srand(1);
 			for (int i = 0; i < nodeSize[0]; i++) {
 				for (int j = 0; j < nodeSize[1]; j++) {
 					for (int k = 0; k < nodeSize[2]; k++) {
-						Temp[i][j][k] = 0.0f;
-						NFR[i][j][k] = 1.5f;
+						Temp[i][j][k] = 0;
+						NFR[i][j][k] = 1;
 					}
 				}
 			}
-			float tissueSize[3] = { 1.0f,1.0f,1.0f };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
-			simulator->deltaT = 0.1f;
-			simulator->tFinal = 1.0f;
-			int BC[6] = { 1,0,1,0,2,2 };
-			simulator->setBoundaryConditions(BC);
-			simulator->setJn(1);
-			simulator->setAmbientTemp(0);
-			simulator->setNFR(NFR);
+			float tissueSize[3] = { 1,1,1 };
+			float TC = 1.0f;
+			int BC[6] = { 0,0,2,2,2,2 };
+			FEM_Simulator* simulatorLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
+			FEM_Simulator* simulatorQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
 
-			simulator->createKMFelem();
-			Eigen::VectorXf Felem = simulator->F;
-			Eigen::SparseMatrix<float> Kelem = simulator->K;
-			Eigen::SparseMatrix<float> Melem = simulator->M;
-			simulator->createKMF();
-			Eigen::VectorXf Fnode = simulator->F;
-			Eigen::SparseMatrix<float> Knode = simulator->K;
-			Eigen::SparseMatrix<float> Mnode = simulator->M;
-			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
-			for (int i = 0; i < totalNodes; i++) {
-				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
-				for (int j = 0; j < totalNodes; j++) {
-					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-				}
-			}
+			simulatorLin->deltaT = 0.05f;
+			simulatorLin->tFinal = 1.0f;
+			simulatorLin->setBoundaryConditions(BC);
+			simulatorLin->setJn(0);
+			simulatorLin->setAmbientTemp(0);
+			simulatorLin->setNFR(NFR);
 
-			simulator->performTimeStepping();
-		}
+			simulatorQuad->deltaT = 0.05f;
+			simulatorQuad->tFinal = 1.0f;
+			simulatorQuad->setBoundaryConditions(BC);
+			simulatorQuad->setJn(0);
+			simulatorQuad->setAmbientTemp(0);
+			simulatorQuad->setNFR(NFR);
 
-		TEST_METHOD(TestCreateKMF2) {
-			//checking that createKMF and createKMFelem create the same matrices for elemental NFR.
-			int nodeSize[3] = { 10,10,10 };
-			std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
-			std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0]-1, std::vector<std::vector<float>>(nodeSize[1]-1, std::vector<float>(nodeSize[2]-1)));
-			for (int i = 0; i < nodeSize[0]; i++) {
+			simulatorLin->createKMFelem();
+			simulatorLin->performTimeStepping();
+			simulatorQuad->createKMFelem();
+			simulatorQuad->performTimeStepping();
+
+			for (int k = 0; k < nodeSize[2]; k++) {
 				for (int j = 0; j < nodeSize[1]; j++) {
-					for (int k = 0; k < nodeSize[2]; k++) {
-						Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+					for (int i = 0; i < nodeSize[0]; i++) {
+						Assert::IsTrue(abs(simulatorQuad->Temp[i][j][k] - simulatorQuad->Temp[i][j][k]) < 0.001);
 					}
 				}
 			}
-			// setting up elemental NFR
-			for (int i = 0; i < nodeSize[0]-1; i++) {
-				for (int j = 0; j < nodeSize[1]-1; j++) {
-					for (int k = 0; k < nodeSize[2]-1; k++) {
-						NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
-					}
-				}
-			}
-			float tissueSize[3] = { 1.0f,1.0f,1.0f };
-			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
-			simulator->deltaT = 0.1f;
-			simulator->tFinal = 1.0f;
-			int BC[6] = { 1,0,1,0,2,2 };
-			simulator->setBoundaryConditions(BC);
-			simulator->setJn(1);
-			simulator->setAmbientTemp(0);
-			simulator->setNFR(NFR);
 
-			simulator->createKMFelem();
-			Eigen::VectorXf Felem = simulator->F;
-			Eigen::SparseMatrix<float> Kelem = simulator->K;
-			Eigen::SparseMatrix<float> Melem = simulator->M;
-			simulator->createKMF();
-			Eigen::VectorXf Fnode = simulator->F;
-			Eigen::SparseMatrix<float> Knode = simulator->K;
-			Eigen::SparseMatrix<float> Mnode = simulator->M;
-			int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
-			for (int i = 0; i < totalNodes; i++) {
-				Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
-				for (int j = 0; j < totalNodes; j++) {
-					Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-					Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-				}
-			}
-
-			simulator->performTimeStepping();
 		}
+
+		//TEST_METHOD(TestCreateKMF1) {
+		//	//checking that createKMF and createKMFelem create the same matrices.
+		//	int nodeSize[3] = { 10,10,10 };
+		//	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+		//	std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+		//	for (int i = 0; i < nodeSize[0]; i++) {
+		//		for (int j = 0; j < nodeSize[1]; j++) {
+		//			for (int k = 0; k < nodeSize[2]; k++) {
+		//				Temp[i][j][k] = 0.0f;
+		//				NFR[i][j][k] = 1.5f;
+		//			}
+		//		}
+		//	}
+		//	float tissueSize[3] = { 1.0f,1.0f,1.0f };
+		//	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+		//	simulator->deltaT = 0.1f;
+		//	simulator->tFinal = 1.0f;
+		//	int BC[6] = { 1,0,1,0,2,2 };
+		//	simulator->setBoundaryConditions(BC);
+		//	simulator->setJn(1);
+		//	simulator->setAmbientTemp(0);
+		//	simulator->setNFR(NFR);
+
+		//	simulator->createKMFelem();
+		//	Eigen::VectorXf Felem = simulator->F;
+		//	Eigen::SparseMatrix<float> Kelem = simulator->K;
+		//	Eigen::SparseMatrix<float> Melem = simulator->M;
+		//	simulator->createKMF();
+		//	Eigen::VectorXf Fnode = simulator->F;
+		//	Eigen::SparseMatrix<float> Knode = simulator->K;
+		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
+		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
+		//	for (int i = 0; i < totalNodes; i++) {
+		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
+		//		for (int j = 0; j < totalNodes; j++) {
+		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//		}
+		//	}
+
+		//	simulator->performTimeStepping();
+		//}
+
+		//TEST_METHOD(TestCreateKMF2) {
+		//	//checking that createKMF and createKMFelem create the same matrices for elemental NFR.
+		//	int nodeSize[3] = { 10,10,10 };
+		//	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+		//	std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0]-1, std::vector<std::vector<float>>(nodeSize[1]-1, std::vector<float>(nodeSize[2]-1)));
+		//	for (int i = 0; i < nodeSize[0]; i++) {
+		//		for (int j = 0; j < nodeSize[1]; j++) {
+		//			for (int k = 0; k < nodeSize[2]; k++) {
+		//				Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+		//			}
+		//		}
+		//	}
+		//	// setting up elemental NFR
+		//	for (int i = 0; i < nodeSize[0]-1; i++) {
+		//		for (int j = 0; j < nodeSize[1]-1; j++) {
+		//			for (int k = 0; k < nodeSize[2]-1; k++) {
+		//				NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
+		//			}
+		//		}
+		//	}
+		//	float tissueSize[3] = { 1.0f,1.0f,1.0f };
+		//	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
+		//	simulator->deltaT = 0.1f;
+		//	simulator->tFinal = 1.0f;
+		//	int BC[6] = { 1,0,1,0,2,2 };
+		//	simulator->setBoundaryConditions(BC);
+		//	simulator->setJn(1);
+		//	simulator->setAmbientTemp(0);
+		//	simulator->setNFR(NFR);
+
+		//	simulator->createKMFelem();
+		//	Eigen::VectorXf Felem = simulator->F;
+		//	Eigen::SparseMatrix<float> Kelem = simulator->K;
+		//	Eigen::SparseMatrix<float> Melem = simulator->M;
+		//	simulator->createKMF();
+		//	Eigen::VectorXf Fnode = simulator->F;
+		//	Eigen::SparseMatrix<float> Knode = simulator->K;
+		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
+		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
+		//	for (int i = 0; i < totalNodes; i++) {
+		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
+		//		for (int j = 0; j < totalNodes; j++) {
+		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//		}
+		//	}
+
+		//	simulator->performTimeStepping();
+		//}
 	};
 }

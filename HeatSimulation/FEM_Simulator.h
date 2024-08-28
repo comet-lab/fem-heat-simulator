@@ -7,6 +7,7 @@
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>
 #include <chrono>
+#include <stdexcept>
 
 class FEM_Simulator
 {
@@ -26,12 +27,15 @@ public:
 	const int dimMap[6] = { -3, 3, -2, 1, 2, -1 }; // top is actually negative z axis... a bit confusing
 
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
-	const int elemNodeSurfaceMap[6][4] = { {0,1,2,3},{4,5,6,7},{0,1,4,5},{1,3,5,7},{2,3,6,7},{0,2,4,6} };
+	std::array<std::vector<int>,6> elemNodeSurfaceMap;
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
-	int gridSize[3] = { 1,1,1 }; // Number of voxels in x, y, and z [voxels]
+	int gridSize[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
+	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
+	float layerHeight = 1.0f; // the z-location where we change element height
+	float layerSize = 2; // The number of elements corresponding to the first layer height
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
@@ -43,13 +47,14 @@ public:
 	float tFinal = 1; // total duration of simulation [s]
 	float Jn = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	int Nn1d = 2;
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	std::vector< std::array<float, 3 >> tempSensorLocations;
 	std::vector<std::vector<float>> sensorTemps;
 
 	FEM_Simulator() = default;
-	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC);
+	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	void performTimeStepping();
 	void createKMF();
 	void createKMFelem();
@@ -57,6 +62,7 @@ public:
 	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setTissueSize(float tissueSize[3]);
+	void setLayer(float layerHeight, int layerSize);
 	void setTC(float TC);
 	void setVHC(float VHC);
 	void setMUA(float MUA);
@@ -66,7 +72,7 @@ public:
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
-	void setJ();
+	void setJ(int layer=1);
 	void setKe();
 	void setKn();
 	void setMe();
@@ -87,22 +93,18 @@ public:
 	Eigen::VectorXf F;
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::Matrix<float,8,8> Ke = Eigen::Matrix<float,8,8>::Constant(0.0f); // Elemental Construction of K
-	Eigen::Matrix<float, 1, 27> Kn = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // Nodal Construction of K
-	Eigen::Matrix<float,8,8> Me = Eigen::Matrix<float, 8, 8>::Constant(0.0f); // Elemental construction of M
-	Eigen::Matrix<float, 1, 27> Mn = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of M
-	Eigen::Matrix<float, 8, 8> FeInt = Eigen::Matrix<float, 8, 8>::Constant(0.0f); // Elemental Construction of F_int
-	Eigen::Matrix<float, 1, 27> FnInt = Eigen::Matrix<float, 1, 27>::Constant(0.0f); // Nodal Construction of F_int
+	Eigen::MatrixXf Ke; // Elemental Construction of K
+	Eigen::MatrixXf Me; // Elemental construction of M
+	Eigen::MatrixXf FeInt; // Elemental Construction of F_int
 	// Fje is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::Matrix<float, 8, 6> Fje = Eigen::Matrix<float, 8, 6>::Constant(0.0f); 
+	Eigen::MatrixXf Fje; 
 	// Fve is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::Matrix<float, 8, 6> Fve = Eigen::Matrix<float, 8, 6>::Constant(0.0f);
-	std::vector<Eigen::Matrix<float, 8, 8>> Kje{ 6, Eigen::Matrix<float, 8, 8>::Constant(0.0f) }; // Kje is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	Eigen::MatrixXf Fve;
+	std::array<Eigen::MatrixXf,6> Kje; // Kje is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
 	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
-	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
 	std::vector<std::vector<std::vector<float>>> NFR; 
@@ -112,16 +114,17 @@ public:
 	element currElement;
 
 	void initializeBoundaryNodes();
+	void initializeElementNodeSurfaceMap();
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
-	Eigen::Matrix3<float> calculateJ(); // function has test cases
-	Eigen::Matrix2<float> calculateJs(int dim); // function has test cases
-	static Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
-	static float calculateNA_xi(float xi[3], int Ai); // function has test cases
-	static float calculateNA_eta(float xi[3], int Ai); // function has test cases
-	static float calculateNA_zeta(float xi[3], int Ai); // function has test cases
+	float calculateNABase(float xi, int Ai);
+	Eigen::Matrix3<float> calculateJ(int layer=1); // function has test cases
+	Eigen::Matrix2<float> calculateJs(int dim,int layer=1);
+	float calculateNADotBase(float xi, int Ai);
+	void getGlobalNodesFromElem(int elem, int nodes[8]);
+	// function has test cases
+	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
-	void getGlobalNodesFromElem(int elem, int nodes[8]); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
 	Eigen::Vector<int,27> getNodeNeighbors(int globalNode);
 	std::vector<int> convertToLocalNode(int globalNode,int f);
@@ -134,7 +137,7 @@ public:
 	float createFvFunction(float xi[3], int Ai, int dim);
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
-	static void ind2sub(int index, int size[3], int sub[3]); // function has test cases
+	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float>* newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes);
 	
 
