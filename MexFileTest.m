@@ -27,7 +27,7 @@ zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspa
 NFRLayer = single(I(X,Y,Z));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
-BC = int32(2*ones(6,1)); %0: HeatSink, 1: Flux, 2: Convection
+BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Jn = 0;
 %% 
 tic
