@@ -10,7 +10,7 @@ int main()
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
 
-    int nodeSize[3] = {35,35,101};
+    int nodeSize[3] = {35,35,51};
 
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
@@ -24,21 +24,21 @@ int main()
         }
     }
     int Nn1d = 2;
-    float tissueSize[3] = { 1.0f,1.0f,1.0f };
+    float tissueSize[3] = { 2.0f,2.0f,0.5f };
 
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 800, 0.075, Nn1d);
-    simulator->setLayer(0.2f, 2);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, Nn1d);
+    simulator->setLayer(0.5f, 50);
     std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
 
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;
-    simulator->tFinal = 0.1f;
+    simulator->tFinal = 15.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0);
-    simulator->setAmbientTemp(20);
+    simulator->setAmbientTemp(24);
     simulator->setNFR(NFR);
 
     std::cout << "Running FEA" << std::endl;
@@ -48,10 +48,17 @@ int main()
 #else
     Eigen::setNbThreads(1);
 #endif
-    
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
+
+    float totalTime = 15.0f;
     simulator->createKMFelem();
-    simulator->performTimeStepping();
+    for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
+        
+        simulator->performTimeStepping();
+    }
+    
+    
+    
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);

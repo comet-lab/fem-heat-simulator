@@ -43,14 +43,19 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
 	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
 	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 	int counter = 0;
 	for (int n : validNodes) {
 			int nodeSub[3];
 			ind2sub(n, this->nodeSize, nodeSub);
 			dVec(counter) = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]];
-			vVec(counter) = 0;
+			/*vVec(counter) = 0;*/
 			counter++;
 	}
+	Eigen::SparseMatrix<float> LHSinit = this->M;
+	initSolver.compute(LHSinit);
+	Eigen::VectorXf RHSinit = this->F - this->K*dVec;
+	vVec = initSolver.solveWithGuess(RHSinit, vVec);
 
 	this->updateTemperatureSensors(0, dVec);
 	if (!this->silentMode) {
@@ -75,12 +80,13 @@ void FEM_Simulator::performTimeStepping()
 		startTime = stopTime;
 	}
 
+	Eigen::VectorXf RHS;
 	for (float t = 1; t <= round(this->tFinal/this->deltaT); t ++) { 
 		/*std::stringstream msg;
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		Eigen::VectorXf RHS = this->F - this->K * dTilde;
+		RHS = this->F - this->K * dTilde;
 		vVec = solver.solveWithGuess(RHS,vVec);
 		//vVec = solver.solve(RHS);
 		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
