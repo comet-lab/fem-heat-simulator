@@ -387,7 +387,7 @@ void FEM_Simulator::createKMFelem()
 										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kje[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi);
+										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi) * this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
 									}
 								}
 							}
