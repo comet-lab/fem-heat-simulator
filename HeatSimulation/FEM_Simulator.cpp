@@ -55,7 +55,7 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::SparseMatrix<float> LHSinit = this->M;
 	initSolver.compute(LHSinit);
 	Eigen::VectorXf RHSinit = this->F - this->K*dVec;
-	vVec = initSolver.solveWithGuess(RHSinit, vVec);
+	vVec = initSolver.solve(RHSinit);
 
 	this->updateTemperatureSensors(0, dVec);
 	if (!this->silentMode) {
