@@ -169,10 +169,12 @@ public:
             float TC = inputs[5][1];
             float VHC = inputs[5][2];
             float HTC = inputs[5][3];
+            float BOLTZ = inputs[5][4];
             simulator->setMUA(MUA);
             simulator->setTC(TC);
             simulator->setVHC(VHC);
             simulator->setHTC(HTC);
+            simulator->setBOLTZ(BOLTZ);
             stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
             displayOnMATLAB(stream);
 
@@ -300,8 +302,8 @@ public:
             displayError("deltaT must be less than the final time");
         }
         */
-        if ((inputs[5].getDimensions()[0] != 4) || (inputs[5].getDimensions()[1] != 1)) {
-            displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
+        if ((inputs[5].getDimensions()[0] != 5) || (inputs[5].getDimensions()[1] != 1)) {
+            displayError("Tissue Properties must be 5 x 1: MUA, TC, VHC, HTC, BOLTZ");
         }
         if ((inputs[6].getDimensions()[0] != 6) || (inputs[6].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
