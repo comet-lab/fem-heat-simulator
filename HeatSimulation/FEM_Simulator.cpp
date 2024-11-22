@@ -3,7 +3,7 @@
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
 
-FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
+FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, float BOLTZ, int Nn1d)
 {
 	this->Nn1d = Nn1d;
 	this->initializeElementNodeSurfaceMap();
@@ -14,6 +14,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setVHC(VHC);
 	this->setMUA(MUA);
 	this->setHTC(HTC);
+	this->setBOLTZ(BOLTZ);
 	
 }
 
@@ -54,7 +55,8 @@ void FEM_Simulator::performTimeStepping()
 	}
 	Eigen::SparseMatrix<float> LHSinit = this->M;
 	initSolver.compute(LHSinit);
-	Eigen::VectorXf RHSinit = this->F - this->K*dVec;
+	Eigen::VectorXf d4 = dVec.array().pow(4);
+	Eigen::VectorXf RHSinit = this->F - this->K*dVec - this->R*d4;
 	vVec = initSolver.solve(RHSinit);
 
 	this->updateTemperatureSensors(0, dVec);
@@ -68,7 +70,7 @@ void FEM_Simulator::performTimeStepping()
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->K;
+	Eigen::SparseMatrix<float> LHS = this->M;
 	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
@@ -82,11 +84,9 @@ void FEM_Simulator::performTimeStepping()
 
 	Eigen::VectorXf RHS;
 	for (float t = 1; t <= round(this->tFinal/this->deltaT); t ++) { 
-		/*std::stringstream msg;
-		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
-		std::cout << msg.str();*/
-		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		RHS = this->F - this->K * dTilde;
+		/*Have to perform forward Euler here because of the fourth power on the dvector*/
+		d4 = dVec.array().pow(4);
+		RHS = this->F - this->K * dVec - this->R * d4;
 		vVec = solver.solveWithGuess(RHS,vVec);
 		//vVec = solver.solve(RHS);
 		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
@@ -94,7 +94,7 @@ void FEM_Simulator::performTimeStepping()
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
-		dVec = dTilde + this->alpha * this->deltaT * vVec;
+		dVec = dVec + this->deltaT * vVec;
 
 		this->updateTemperatureSensors(t, dVec);
 	}
@@ -194,12 +194,12 @@ void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::v
 //								int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai); // Need some conversion from Ai,Bi,n to global position of Bi
 //								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
 //								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
-//									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Kje[f](Ai, Bi);
+//									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Kve[f](Ai, Bi);
 //								}
 //								else { // Bi is a dirichlet node
 //									int BiSub[3];
 //									ind2sub(BiGlobal, this->nodeSize, BiSub);
-//									this->F(row) += -this->Kje[f](Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
+//									this->F(row) += -this->Kve[f](Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
 //								}
 //							}
 //						} // ENDIf Convection Boundary
@@ -336,6 +336,8 @@ void FEM_Simulator::createKMFelem()
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
 	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
+	this->R = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->R.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -379,7 +381,9 @@ void FEM_Simulator::createKMFelem()
 								this->F(matrixInd[0]) += this->Fje(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								this->F(matrixInd[0]) += this->Fve(Ai, f);
+								this->F(matrixInd[0]) += this->Fve(Ai, f); // convection effect
+								this->F(matrixInd[0]) += this->Fre(Ai, f); // radiative effect
+
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
@@ -389,11 +393,15 @@ void FEM_Simulator::createKMFelem()
 									if (matrixInd[1] >= 0) {
 										//int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base Nne. 
 										//// If we say Nne = 8, if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Kje[f](Ai, Bi);
-										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kje[f](Ai, Bi)));
+										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Kve[f](Ai, Bi); // update convection - conductive effect
+										this->R.coeffRef(matrixInd[0], matrixInd[1]) += this->Kre[f](Ai, Bi); // update radiative - conductive effect
+										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kve[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi) * this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
+										// Cooling from convection that gets dissipated because of a dirichlet node
+										this->F(matrixInd[0]) += -this->Kve[f](Ai, Bi) * this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]]; 
+										// Cooling from radiation that gets dissipated because of a dirichlet node
+										this->F(matrixInd[0]) += -this->Kre[f](Ai, Bi) * pow(this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]],4); 
 									}
 								}
 							}
@@ -980,7 +988,7 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 	}
 
 	NAa = this->calculateNA(xi, Ai);
-	FjFunc = (NAa * this->Jn) * Js.determinant();
+	FjFunc = (NAa * this->Qn) * Js.determinant();
 	return FjFunc;
 }
 
@@ -1005,10 +1013,33 @@ float FEM_Simulator::createFvFunction(float xi[3], int Ai, int dim)
 	return FvFunc;
 }
 
-float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
-{
+float FEM_Simulator::createFrFunction(float xi[3], int Ai, int dim)
+{	// Creating the element (Ai) in the Force vector that results from radiative heating. 
+	float FrFunc = 0;
+	float NAa;
+	Eigen::Matrix2f Js;
+	dim = abs(dim);
+	if (dim == 1) {
+		Js = this->Js1;
+	}
+	else if (dim == 2) {
+		Js = this->Js2;
+	}
+	else if (dim == 3) {
+		Js = this->Js3;
+	}
+
+	NAa = this->calculateNA(xi, Ai);
+	FrFunc = (NAa * this->BOLTZ) * pow(this->ambientTemp,4) * Js.determinant(); // in radiative cooling, temperature is to the fourth power
+	// Ambient temp could be replaced with 'mean temperature of the sources of thermal radiation in the environment' but we are assuming
+	// the ambient temperature represents that mean. 
+	return FrFunc;
+}
+
+float FEM_Simulator::createKvFunction(float xi[3], int AiBi, int dim)
+{ // Creates the element (Ai,Bi) in the matrix Kve which is a (Nne x Nne) matrix representing heat lost due to convection
 	int Nne = pow(this->Nn1d, 3);
-	float FvuFunc = 0;
+	float KvFunc = 0;
 	int Ai = AiBi % Nne; // AiBi is passed in in base 8. the ones digit is Ai, the 8s digit is Bi.
 	int Bi = AiBi / Nne;
 	float NAa;
@@ -1028,9 +1059,37 @@ float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
 
-	FvuFunc += (NAa * NAb * this->HTC) * Js.determinant();
+	KvFunc += (NAa * NAb * this->HTC) * Js.determinant();
 	
-	return FvuFunc;
+	return KvFunc;
+}
+
+float FEM_Simulator::createKrFunction(float xi[3], int AiBi, int dim)
+{ // Creates the element (Ai,Bi) in the matrix Kre which is a (Nne x Nne) matrix representing heat lost due to radiation
+	int Nne = pow(this->Nn1d, 3);
+	float KrFunc = 0;
+	int Ai = AiBi % Nne; // AiBi is passed in in base 8. the ones digit is Ai, the 8s digit is Bi.
+	int Bi = AiBi / Nne;
+	float NAa;
+	float NAb;
+	int dir = dim / abs(dim);
+	dim = abs(dim);
+	Eigen::Matrix2f Js;
+	if (dim == 1) { // y-z plane
+		Js = this->Js1;
+	}
+	else if (dim == 2) { // x-z plane
+		Js = this->Js2;
+	}
+	else if (dim == 3) { // x-y plane
+		Js = this->Js3;
+	}
+	NAa = this->calculateNA(xi, Ai);
+	NAb = this->calculateNA(xi, Bi);
+
+	KrFunc += (NAa * NAb * this->BOLTZ) * Js.determinant();
+
+	return KrFunc;
 }
 
 void FEM_Simulator::initializeBoundaryNodes()
@@ -1205,12 +1264,18 @@ void FEM_Simulator::setMUA(float MUA) {
 void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
 	this->setFv();
-	this->setFvu();
+	this->setKve();
 }
 
-void FEM_Simulator::setJn(float Jn)
+void FEM_Simulator::setBOLTZ(float BOLTZ) {
+	this->BOLTZ = BOLTZ;
+	this->setFr();
+	this->setKre();
+}
+
+void FEM_Simulator::setQn(float Qn)
 {
-	this->Jn = Jn;
+	this->Qn = Qn;
 	this->setFj();
 }
 
@@ -1260,6 +1325,11 @@ void FEM_Simulator::setJ(int layer) {
 	this->setKe();
 	this->setMe();
 	this->setFeInt();
+	this->setFj();
+	this->setFr();
+	this->setFv();
+	this->setKre();
+	this->setKve();
 	//this->setKn();
 	//this->setMn();
 	//this->setFnInt();
@@ -1399,15 +1469,39 @@ void FEM_Simulator::setFv() {
 	} // iterate through faces
 }
 
-void FEM_Simulator::setFvu() {
+void FEM_Simulator::setFr() {
+	int Nne = pow(this->Nn1d, 3);
+	this->Fre = Eigen::MatrixXf::Zero(Nne, 6);
+	for (int f = 0; f < 6; f++) { // iterate through each face
+		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
+			this->Fre(Ai, f) = this->integrate(&FEM_Simulator::createFvFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+		}
+	} // iterate through faces
+}
+
+void FEM_Simulator::setKve() {
 	int Nne = pow(this->Nn1d, 3);
 	for (int f = 0; f < 6; f++) {
-		this->Kje[f] = Eigen::MatrixXf::Zero(Nne, Nne);
+		this->Kve[f] = Eigen::MatrixXf::Zero(Nne, Nne);
 		for (int Ai : this->elemNodeSurfaceMap[f]) {
 			for (int Bi : this->elemNodeSurfaceMap[f]) {
 				int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-				this->Kje[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 3, this->dimMap[f], AiBi, this->dimMap[f]);
+				this->Kve[f](Ai,Bi) = this->integrate(&FEM_Simulator::createKvFunction, 3, this->dimMap[f], AiBi, this->dimMap[f]);
+			}
+		}
+	}
+}
+
+void FEM_Simulator::setKre() {
+	int Nne = pow(this->Nn1d, 3);
+	for (int f = 0; f < 6; f++) {
+		this->Kre[f] = Eigen::MatrixXf::Zero(Nne, Nne);
+		for (int Ai : this->elemNodeSurfaceMap[f]) {
+			for (int Bi : this->elemNodeSurfaceMap[f]) {
+				int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
+				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
+				this->Kre[f](Ai, Bi) = this->integrate(&FEM_Simulator::createKrFunction, 3, this->dimMap[f], AiBi, this->dimMap[f]);
 			}
 		}
 	}

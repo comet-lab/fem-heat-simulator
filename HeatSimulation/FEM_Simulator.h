@@ -40,13 +40,14 @@ public:
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
+	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	float BOLTZ = 0; //steffan boltzman constant
 	std::vector<std::vector<std::vector<float>>> Temp; // Our values for temperature at the nodes of the elements
 	//std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tFinal = 1; // total duration of simulation [s]
-	float Jn = 0; // heat escaping the Neumann Boundary
-	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	float Qn = 0; // heat escaping the Neumann Boundary
 	int Nn1d = 2;
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
@@ -54,7 +55,7 @@ public:
 	std::vector<std::vector<float>> sensorTemps;
 
 	FEM_Simulator() = default;
-	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
+	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, float BOLTZ, int Nn1d=2);
 	void performTimeStepping();
 	void createKMF();
 	void createKMFelem();
@@ -67,7 +68,8 @@ public:
 	void setVHC(float VHC);
 	void setMUA(float MUA);
 	void setHTC(float HTC);
-	void setJn(float Jn);
+	void setBOLTZ(float BOLTZ);
+	void setQn(float Qn);
 	void setAmbientTemp(float ambientTemp);
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
@@ -81,7 +83,9 @@ public:
 	void setFnInt();
 	void setFj();
 	void setFv();
-	void setFvu();
+	void setFr();
+	void setKve();
+	void setKre();
 	void setBoundaryConditions(int BC[6]);
 
 	/**********************************************************************************************************************/
@@ -89,18 +93,22 @@ public:
 
 	// The K, M, and F matrices for the entire domain
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
+	Eigen::SparseMatrix<float, Eigen::RowMajor> R; // This is the matrix handling the radiative cooling
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	Eigen::VectorXf F;
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::MatrixXf Ke; // Elemental Construction of K
-	Eigen::MatrixXf Me; // Elemental construction of M
-	Eigen::MatrixXf FeInt; // Elemental Construction of F_int
+	Eigen::MatrixXf Ke; // Elemental Construction of K - created from conduction
+	Eigen::MatrixXf Me; // Elemental construction of M - created from thermal mass
+	Eigen::MatrixXf FeInt; // Elemental Construction of F_int - based on fluence rate applied to tissue
 	// Fje is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf Fje; 
+	Eigen::MatrixXf Fje; // Force vector resulting from flux boundary
 	// Fve is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf Fve;
-	std::array<Eigen::MatrixXf,6> Kje; // Kje is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	Eigen::MatrixXf Fve; // Force vector resulting from convection boundary
+	Eigen::MatrixXf Fre; // Force vector resulting from radiative boundary
+	// Kve is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	std::array<Eigen::MatrixXf, 6> Kve; // Matrix generated from the effect of convection
+	std::array<Eigen::MatrixXf, 6> Kre; // Matrix generated from the effect of radiation 
 	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
 	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
@@ -135,7 +143,9 @@ public:
 	float createFintFunction(float xi[3], int Ai, int Bi);
 	float createFjFunction(float xi[3], int Ai, int dim);
 	float createFvFunction(float xi[3], int Ai, int dim);
-	float createFvuFunction(float xi[3], int Ai, int dim);
+	float createFrFunction(float xi[3], int Ai, int dim);
+	float createKvFunction(float xi[3], int Ai, int dim);
+	float createKrFunction(float xi[3], int Ai, int dim);
 
 	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float>* newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes);

@@ -26,18 +26,18 @@ int main()
     int Nn1d = 2;
     float tissueSize[3] = { 2.0f,2.0f,0.5f };
 
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, Nn1d);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, 0.000000001, Nn1d);
     simulator->setLayer(0.5f, 50);
     std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
 
     std::cout << "Object Created " << std::endl;
 
-    simulator->deltaT = 0.05f;
-    simulator->tFinal = 15.0f;
+    simulator->deltaT = 0.005f;
+    simulator->tFinal = 1.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(0);
+    simulator->setQn(0);
     simulator->setAmbientTemp(24);
     simulator->setNFR(NFR);
 
@@ -50,7 +50,7 @@ int main()
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
 
-    float totalTime = 15.0f;
+    float totalTime = 1.0f;
     simulator->createKMFelem();
     for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
         

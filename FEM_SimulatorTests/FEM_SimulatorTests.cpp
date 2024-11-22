@@ -546,14 +546,14 @@ namespace FEMSimulatorTests
 			simulatorLin->deltaT = 0.05f;
 			simulatorLin->tFinal = 1.0f;
 			simulatorLin->setBoundaryConditions(BC);
-			simulatorLin->setJn(0);
+			simulatorLin->setQn(0);
 			simulatorLin->setAmbientTemp(0);
 			simulatorLin->setNFR(NFR);
 
 			simulatorQuad->deltaT = 0.05f;
 			simulatorQuad->tFinal = 1.0f;
 			simulatorQuad->setBoundaryConditions(BC);
-			simulatorQuad->setJn(0);
+			simulatorQuad->setQn(0);
 			simulatorQuad->setAmbientTemp(0);
 			simulatorQuad->setNFR(NFR);
 
@@ -591,7 +591,7 @@ namespace FEMSimulatorTests
 		//	simulator->tFinal = 1.0f;
 		//	int BC[6] = { 1,0,1,0,2,2 };
 		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setJn(1);
+		//	simulator->setQn(1);
 		//	simulator->setAmbientTemp(0);
 		//	simulator->setNFR(NFR);
 
@@ -641,7 +641,7 @@ namespace FEMSimulatorTests
 		//	simulator->tFinal = 1.0f;
 		//	int BC[6] = { 1,0,1,0,2,2 };
 		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setJn(1);
+		//	simulator->setQn(1);
 		//	simulator->setAmbientTemp(0);
 		//	simulator->setNFR(NFR);
 
