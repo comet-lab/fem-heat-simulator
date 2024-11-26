@@ -1168,16 +1168,20 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 	if ((layerSize > this->gridSize[2])||(layerSize < 0)) {
 		std::cout << "Invalid layer size. The layer must be equal"
 			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
+		throw std::runtime_error("Layer Size must be equal to or less than the toal number of elements in the z direction and greater than 0");
 	}
 	if ((layerHeight < 0) || (layerHeight > this->tissueSize[2])) {
 		std::cout << "Invalid layer height. The layer dimension must be less than or equal to the tissue size " 
 			<< "and greater than zero" << std::endl;
+		throw std::runtime_error("Invalid layer height. The layer dimension must be less than or equal to the tissue size and greater than zero");
 	}
 	if ((layerHeight == 0) != (layerSize == 0)) {
 		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
+		throw std::runtime_error("Layer Height must be 0 if layer size is 0 and vice versa");
 	}
 	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->gridSize[2])) {
 		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
+		throw std::runtime_error("Layer Height must be the tissue height if layer size is the grid size and vice versa");
 	}
 	this->layerHeight = layerHeight;
 	this->layerSize = layerSize;
