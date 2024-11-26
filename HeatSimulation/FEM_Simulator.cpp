@@ -321,7 +321,9 @@ void FEM_Simulator::createKMFelem()
 	bool fluxFlag = false;
 	auto startTime = std::chrono::high_resolution_clock::now();
 
-	std::cout << "Creating Global Matrices" << std::endl;
+	if (!this->silentMode) {
+		std::cout << "Creating Global Matrices" << std::endl;
+	}
 
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
@@ -444,9 +446,13 @@ void FEM_Simulator::createKMFelem()
 	//this->M.setFromTriplets(Mtriplets.begin(),Mtriplets.end());
 	this->K.makeCompressed();
 	this->M.makeCompressed();
-	auto stopTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+	
+	if (!this->silentMode) {
+		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+	}
+	
 }
 
 void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
