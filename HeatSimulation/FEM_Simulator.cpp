@@ -1484,7 +1484,7 @@ void FEM_Simulator::setFr() {
 	this->Fre = Eigen::MatrixXf::Zero(Nne, 6);
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fre(Ai, f) = this->integrate(&FEM_Simulator::createFvFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->Fre(Ai, f) = this->integrate(&FEM_Simulator::createFrFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
