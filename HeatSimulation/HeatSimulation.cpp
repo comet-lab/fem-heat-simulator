@@ -10,7 +10,7 @@ int main()
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
 
-    int nodeSize[3] = {35,35,51};
+    int nodeSize[3] = { 35,35,51 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
@@ -27,9 +27,9 @@ int main()
     float tissueSize[3] = { 2.0f,2.0f,0.5f };
 
     FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, Nn1d);
-    simulator->setLayer(0.5f, 50);
-    std::cout << "Number of nodes: " << simulator->nodeSize[0]*simulator->nodeSize[1]*simulator->nodeSize[2] << std::endl;
-    std::cout << "Number of elems: " << simulator->gridSize[0]* simulator->gridSize[1]*simulator->gridSize[2] << std::endl;
+    simulator->setLayer(0.1f, 20);
+    std::cout << "Number of nodes: " << simulator->nodeSize[0] * simulator->nodeSize[1] * simulator->nodeSize[2] << std::endl;
+    std::cout << "Number of elems: " << simulator->gridSize[0] * simulator->gridSize[1] * simulator->gridSize[2] << std::endl;
 
     std::cout << "Object Created " << std::endl;
 
@@ -40,6 +40,9 @@ int main()
     simulator->setJn(0);
     simulator->setAmbientTemp(24);
     simulator->setNFR(NFR);
+
+    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.4} };
+    simulator->setSensorLocations(tempSensorLocations);
 
     std::cout << "Running FEA" << std::endl;
 
@@ -55,10 +58,7 @@ int main()
     for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
         
         simulator->performTimeStepping();
-    }
-    
-    
-    
+    }    
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -79,6 +79,8 @@ int main()
     else {
         std::cout << "Center Temp: " << simulator->Temp[nodeSize[0]/2][nodeSize[1]/2][0] << std::endl;
     }
+
+    std::cout << "Sensor Temp: " << simulator->sensorTemps[0][300] << std::endl;
     
     
 

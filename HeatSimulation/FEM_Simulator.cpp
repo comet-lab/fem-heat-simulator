@@ -472,7 +472,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 		xi[1] = -1 + ((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1] - globalNodeStart[1]) * 2;
 		xi[2] = -1 + ((sensorLocation[2]) / spacingLayer1[2] - globalNodeStart[2]) * 2;
 		if (sensorLocation[2] > this->layerHeight) {
-			xi[2] = -1 + (this->layerSize + (sensorLocation[2] - this->layerHeight) / spacingLayer2[2]) * 2;
+			xi[2] = -1 + (this->layerSize + (sensorLocation[2] - this->layerHeight) / spacingLayer2[2] - globalNodeStart[2]) * 2;
 		}
 		for (int Ai = 0; Ai < Nne; Ai++) { // iterate through each node in the element
 			// adjust the global starting node based on the current node we should be visiting
