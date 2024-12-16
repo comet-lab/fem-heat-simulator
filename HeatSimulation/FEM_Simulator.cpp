@@ -452,29 +452,34 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 	int nSensors = this->tempSensorLocations.size();
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
+	//spacingLayer contains the distance between nodes in eacy layer.
 	float spacingLayer1[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->layerHeight / float(this->layerSize) };
 	float spacingLayer2[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->gridSize[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
-		int globalNodeOptions[3][2] = { {floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
-										ceil((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0])},
-			{floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
-										ceil((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1])},
-			{floor(sensorLocation[2] / spacingLayer1[2]),
-										ceil(sensorLocation[2] / spacingLayer1[2])} };
+		//globalNodeStart holds the global node subscript of the first node in the element that contains this sensor
+		int globalNodeStart[3] = { floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
+			floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
+			floor(sensorLocation[2] / spacingLayer1[2]) };
 		if (sensorLocation[2] > this->layerHeight) {
 			// This should compensate for the change in layer appropriately.
-			globalNodeOptions[2][0] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
-			globalNodeOptions[2][1] = this->layerSize + ceil((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
+			globalNodeStart[2] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
 		}
 		float tempValue = 0;
 		float xi[3];
-		xi[0] = (sensorLocation[0] - (globalNodeOptions[0][0] * spacingLayer1[0] - this->tissueSize[0] / 2.0f)) * 2 / spacingLayer1[0] - 1;
-		xi[1] = (sensorLocation[1] - (globalNodeOptions[1][0] * spacingLayer1[1] - this->tissueSize[1] / 2.0f)) * 2 / spacingLayer1[1] - 1;
-		xi[2] = (sensorLocation[2] - (globalNodeOptions[2][0] * spacingLayer1[2] - this->tissueSize[2] / 2.0f)) * 2 / spacingLayer1[2] - 1;
-		for (int Ai = 0; Ai < Nne; Ai++) {
-			int globalNodeSub[3] = { globalNodeOptions[0][Ai & 1],globalNodeOptions[1][(Ai & 2) >> 1], globalNodeOptions[2][(Ai & 4) >> 2] };
+		// Xi should be  avalue between -1 and 1 along each axis relating the placement of the sensor in that element.
+		xi[0] = -1 + ((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0] - globalNodeStart[0]) * 2;
+		xi[1] = -1 + ((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1] - globalNodeStart[1]) * 2;
+		xi[2] = -1 + ((sensorLocation[2]) / spacingLayer1[2] - globalNodeStart[2]) * 2;
+		if (sensorLocation[2] > this->layerHeight) {
+			xi[2] = -1 + (this->layerSize + (sensorLocation[2] - this->layerHeight) / spacingLayer2[2]) * 2;
+		}
+		for (int Ai = 0; Ai < Nne; Ai++) { // iterate through each node in the element
+			// adjust the global starting node based on the current node we should be visiting
+			int globalNodeSub[3] = { globalNodeStart[0] + (Ai&1),globalNodeStart[1]+((Ai & 2) >> 1), globalNodeStart[2]+ ((Ai & 4) >> 2) };
+			// convert subscript to index
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			// add temperature contribution of node
 			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
 				tempValue += this->calculateNA(xi, Ai) * dVec(this->nodeMap[globalNode]);
 			}
