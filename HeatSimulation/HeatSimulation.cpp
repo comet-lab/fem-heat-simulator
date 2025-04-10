@@ -10,7 +10,7 @@ int main()
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
 
-    int nodeSize[3] = { 35,35,51 };
+    int nodeSize[3] = { 41,41,41 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
@@ -23,10 +23,10 @@ int main()
         }
     }
     int Nn1d = 2;
-    float tissueSize[3] = { 2.0f,2.0f,0.5f };
+    float tissueSize[3] = { 0.5f,0.5f,0.5f };
 
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.015, Nn1d);
-    simulator->setLayer(0.05f, 30);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
+    simulator->setLayer(0.5f, 40);
     std::cout << "Number of nodes: " << simulator->nodeSize[0] * simulator->nodeSize[1] * simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0] * simulator->gridSize[1] * simulator->gridSize[2] << std::endl;
     float laserPose[6] = { 0.0f,0,-35,0,0,0 };
@@ -77,12 +77,12 @@ int main()
         std::cout << std::endl;
     }
     else {
-        std::cout << "Top Face Temp: " <<   simulator->Temp(nodeSize[0] / 2 + nodeSize[1] / 2 * nodeSize[0]) << std::endl;
-        std::cout << "Bottom Face Temp: " << simulator->Temp(nodeSize[0] / 2 + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0]*nodeSize[1]*nodeSize[2]) << std::endl;
-        std::cout << "Front Face Temp: " << simulator->Temp(nodeSize[0] + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
-        std::cout << "Right Face Temp: " << simulator->Temp(nodeSize[0] / 2 + nodeSize[1] * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
-        std::cout << "Back Face Temp: " << simulator->Temp(nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
-        std::cout << "Left Face Temp: " <<  simulator->Temp(nodeSize[0] / 2 + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
+        std::cout << "Top Face Temp: " <<   simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) / 2 * nodeSize[0]) << std::endl;
+        std::cout << "Bottom Face Temp: " << simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) / 2 * nodeSize[0] + nodeSize[0]*nodeSize[1]*(nodeSize[2]-1)) << std::endl;
+        std::cout << "Front Face Temp: " << simulator->Temp(nodeSize[0] + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Right Face Temp: " << simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Back Face Temp: " << simulator->Temp((nodeSize[1]-1) / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Left Face Temp: " <<  simulator->Temp((nodeSize[0]-1) / 2 + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
     }
 
     std::cout << "Sensor Temp: " << simulator->sensorTemps[0][300] << std::endl;
