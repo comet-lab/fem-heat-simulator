@@ -493,10 +493,12 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
 	float output = 1.0f;
-	int AiVec[3];
+	int AiVec[3]; 
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
-	ind2sub(Ai, size, AiVec);
+	//2-node ex: 0-(0,0,0), 1-(1,0,0), 2-(0,1,0), 3-(1,1,0), 4-(0,0,1), 5-(1,0,1), 6-(0,1,1), 7-(1,1,1)
+	ind2sub(Ai, size, AiVec); // convert element node A to a subscript (xi,eta,zeta)
 	for (int i = 0; i < 3; i++) {
+		// multiply each polynomial shape function in 1D across all 3 dimensions
 		output *= this->calculateNABase(xi[i], AiVec[i]);
 	}
 	return output;
@@ -507,10 +509,12 @@ float FEM_Simulator::calculateNABase(float xi, int Ai) {
 	* It uses the equation \prod^Nn1d_{B = 1; B != A} (xi - xi^B)/(xi^A - xi^B)
 	*/
 	float output = 1.0f;
+	// This will produce a value of -1,1 for 2-node elements, and -1,0,1 for 3-node elements
 	float xiA = -1 + Ai * (2 / float(this->Nn1d - 1));
-	for (int i = 0; i < this->Nn1d; i++) {
+	// Get the product of the linear functions to build polynomial shape function in 1D
+	for (int i = 0; i < this->Nn1d; i++) { // for 2-node elements its a single product.
 		if (i != Ai) {
-			float xiB = -1 + i * (2 / float(this->Nn1d - 1));
+			float xiB = -1 + i * (2 / float(this->Nn1d - 1)); //same as above
 			output *= (xi - xiB) / (xiA - xiB);
 		}
 	}
@@ -1078,6 +1082,11 @@ void FEM_Simulator::initializeBoundaryNodes()
 
 void FEM_Simulator::initializeElementNodeSurfaceMap()
 {
+	// This function is tightly linked with @determineNodeFace to determine the ordering of the nodes
+	// Again we define the origin on the top tissue surface, centered -- This is a left handed coordinate frame
+	// The z-axis points into the tissue
+	// The x-axis points towards the front face of the tissue
+	// The y-axis points towards the right face of the tissue 
 	int Nne = pow(this->Nn1d, 3);
 	int AiSub[3];
 	int elemNodeSize[3] = { this->Nn1d,this->Nn1d, this->Nn1d };
@@ -1095,42 +1104,55 @@ void FEM_Simulator::initializeElementNodeSurfaceMap()
 		if (AiSub[2] == (this->Nn1d - 1)) { //bottom
 			this->elemNodeSurfaceMap[1].push_back(Ai);
 		}
-		if (AiSub[1] == 0) { // front
+		if (AiSub[0] == (this->Nn1d - 1)) { //Front
 			this->elemNodeSurfaceMap[2].push_back(Ai);
 		}
-		if (AiSub[0] == (this->Nn1d - 1)) { //right
+		if (AiSub[1] == (this->Nn1d - 1)) { //Right
 			this->elemNodeSurfaceMap[3].push_back(Ai);
 		}
-		if (AiSub[1] == (this->Nn1d - 1)) {//back
+		if (AiSub[0] == 0) { //Back
 			this->elemNodeSurfaceMap[4].push_back(Ai);
 		}
-		if (AiSub[0] == 0) {//left
+		if (AiSub[1] == 0) { // Left
 			this->elemNodeSurfaceMap[5].push_back(Ai);
 		}
 	}
 }
 
 int FEM_Simulator::determineNodeFace(int globalNode)
-{
+{	// This function implicitly determines the position of our reference frame on the surface of the tissue
+	// and how that reference frame relates to the index of the matrix. This function is
+	// linked with @initializeElementNodeSurfMap(). Changing one requires a change in the other.
+
+	// We define the origin on the top tissue surface, centered -- This is a left handed coordinate frame
+	// The z-axis points into the tissue
+	// The x-axis points towards the front face of the tissue
+	// The y-axis points towards the right face of the tissue 
 	int output = INTERNAL;
 	int nodeSub[3];
 	this->ind2sub(globalNode, this->nodeSize, nodeSub);
-	if (nodeSub[2] == 0) {
+	if (nodeSub[2] == 0) { 
+		// Nodes on the top of the tissue have z-element = 0
 		output += TOP;
 	}
 	if (nodeSub[2] == (this->nodeSize[2] - 1)) {
+		// Nodes on the bottom of the tissue have z-element = nodeSize[2]-1
 		output += BOTTOM;
 	}
-	if (nodeSub[1] == 0) {
+	if (nodeSub[0] == (this->nodeSize[0] - 1)) {
+		// Nodes on the front of the tissue have x-element = nodeSize[0] - 1
 		output += FRONT;
 	}
-	if (nodeSub[0] == (this->nodeSize[0] - 1)) {
+	if (nodeSub[1] == (this->nodeSize[0] - 1)) {
+		// Nodes on the right of the tissue have y-element = nodeSize[1] - 1
 		output += RIGHT;
 	}
-	if (nodeSub[1] == (this->nodeSize[1] - 1)) {
+	if (nodeSub[0] == 0) {
+		// Nodes on the back of the the tissue have x-element = 0
 		output += BACK;
 	}
-	if (nodeSub[0] == 0) {
+	if (nodeSub[1] == 0) {
+		// Nodes on the left of the tissue have y-element = 0
 		output += LEFT;
 	}
 	return output;

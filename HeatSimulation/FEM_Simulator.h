@@ -24,7 +24,14 @@ public:
 	// 0 - internal node, 1 - top face, 2 - bottom face, 4 - front face, 8 - right fce, 16 - back face, 32 - left face
 	enum tissueFace { INTERNAL = 0, TOP = 1, BOTTOM = 2, FRONT = 4, RIGHT = 8, BACK = 16, LEFT = 32 };
 	// This maps the face to the axis number and direction of the face: top, bottom, front, right, back, left
-	const int dimMap[6] = { -3, 3, -2, 1, 2, -1 }; // top is actually negative z axis... a bit confusing
+	// The values listed here are heavily tied to our reference frame decisions and the function @determineNodeFace
+	const int dimMap[6] = { -3, 3, 1, 2, -1, -2 };
+	// -3: We are on the top face    - surface normal is in -z direction
+	//  3: We are on the bottom face - surface normal is in +z direction
+	//  1: We are on the front face  - surface normal is +x direction
+	//  2: We are on the right face  - surface normal is +y direction
+	// -1: We are on the back face   - surface normal is -x direction
+	// -2: We are on the left face   - surface normal is -y direction
 
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
 	std::array<std::vector<int>,6> elemNodeSurfaceMap;

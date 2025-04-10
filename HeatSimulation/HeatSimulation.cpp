@@ -77,7 +77,12 @@ int main()
         std::cout << std::endl;
     }
     else {
-        std::cout << "Center Temp: " << simulator->Temp(20) << std::endl;
+        std::cout << "Top Face Temp: " <<   simulator->Temp(nodeSize[0] / 2 + nodeSize[1] / 2 * nodeSize[0]) << std::endl;
+        std::cout << "Bottom Face Temp: " << simulator->Temp(nodeSize[0] / 2 + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0]*nodeSize[1]*nodeSize[2]) << std::endl;
+        std::cout << "Front Face Temp: " << simulator->Temp(nodeSize[0] + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
+        std::cout << "Right Face Temp: " << simulator->Temp(nodeSize[0] / 2 + nodeSize[1] * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
+        std::cout << "Back Face Temp: " << simulator->Temp(nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
+        std::cout << "Left Face Temp: " <<  simulator->Temp(nodeSize[0] / 2 + nodeSize[0] * nodeSize[1] * nodeSize[2] / 2) << std::endl;
     }
 
     std::cout << "Sensor Temp: " << simulator->sensorTemps[0][300] << std::endl;
