@@ -37,7 +37,7 @@ int main()
     simulator->tFinal = 15.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(0);
+    simulator->setJn(0.0f);
     simulator->setAmbientTemp(24);
     simulator->setNFR(NFR);
 
@@ -68,7 +68,7 @@ int main()
         for (int k = 0; k < nodeSize[2]; k++) {
             for (int j = 0; j < nodeSize[1]; j++) {
                 for (int i = 0; i < nodeSize[0]; i++) {
-                    std::cout << simulator->Temp[i][j][k] << ", ";
+                    std::cout << simulator->Temp(i + j*nodeSize[0] + k*nodeSize[0]*nodeSize[1]) << ", ";
                 }
                 std::cout << std::endl;
             }
@@ -77,7 +77,7 @@ int main()
         std::cout << std::endl;
     }
     else {
-        std::cout << "Center Temp: " << simulator->Temp[nodeSize[0]/2][nodeSize[1]/2][0] << std::endl;
+        std::cout << "Center Temp: " << simulator->Temp(20) << std::endl;
     }
 
     std::cout << "Sensor Temp: " << simulator->sensorTemps[0][300] << std::endl;

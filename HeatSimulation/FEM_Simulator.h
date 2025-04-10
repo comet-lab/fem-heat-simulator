@@ -1,6 +1,5 @@
 #pragma once
 #include <vector> 
-#include <cmath>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Dense>

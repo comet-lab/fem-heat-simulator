@@ -1140,6 +1140,7 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 
 void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 	
+	this->Temp = Eigen::VectorXf::Zero(Temp.size() * Temp[0].size() * Temp[0][0].size());
 	// Convert nested vectors into a single column Eigen Vector. 
 	for (int i = 0; i < Temp.size(); i++) // associated with x and is columns of matlab matrix
 	{
@@ -1172,6 +1173,7 @@ void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 
 void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 {
+	this->NFR = Eigen::VectorXf::Zero(NFR.size() * NFR[0].size() * NFR[0][0].size());
 	// Convert nested vectors into a single column Eigen Vector. 
 	for (int i = 0; i < NFR.size(); i++) // associated with x and is columns of matlab matrix
 	{
