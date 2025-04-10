@@ -19,17 +19,18 @@ int main()
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
                 Temp[i][j][k] = 20;
-                NFR[i][j][k] = 1;
             }
         }
     }
     int Nn1d = 2;
     float tissueSize[3] = { 2.0f,2.0f,0.5f };
 
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, Nn1d);
-    simulator->setLayer(0.1f, 20);
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.015, Nn1d);
+    simulator->setLayer(0.05f, 30);
     std::cout << "Number of nodes: " << simulator->nodeSize[0] * simulator->nodeSize[1] * simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0] * simulator->gridSize[1] * simulator->gridSize[2] << std::endl;
+    float laserPose[6] = { 0.0f,0,-35,0,0,0 };
+    simulator->setNFR(laserPose, 1, 0.0168);
 
     std::cout << "Object Created " << std::endl;
 
@@ -39,9 +40,8 @@ int main()
     simulator->setBoundaryConditions(BC);
     simulator->setJn(0.0f);
     simulator->setAmbientTemp(24);
-    simulator->setNFR(NFR);
 
-    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.4} };
+    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0} };
     simulator->setSensorLocations(tempSensorLocations);
 
     std::cout << "Running FEA" << std::endl;

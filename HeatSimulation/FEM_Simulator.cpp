@@ -46,10 +46,8 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 	int counter = 0;
 	for (int n : validNodes) {
-			//int nodeSub[3];
-			//ind2sub(n, this->nodeSize, nodeSub);
 		dVec(counter) = this->Temp(n);
-			counter++;
+		counter++;
 	}
 	Eigen::SparseMatrix<float> LHSinit = this->M;
 	initSolver.compute(LHSinit);
@@ -1207,6 +1205,7 @@ void FEM_Simulator::setNFR(Eigen::VectorXf& NFR)
 
 void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist)
 {
+	this->NFR = Eigen::VectorXf::Zero(this->nodeSize[0]* this->nodeSize[1]* this->nodeSize[2]);
 	float lambda = 10.6 * pow(10, -4); // wavelength of laser in cm
 	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
 	//TODO: account for orientation shift on the laser
@@ -1222,16 +1221,19 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 	float zStep = this->layerHeight / this->layerSize;
 
 	for (int i = 0; i < this->nodeSize[0]; i++) {
+		yPos = -this->tissueSize[0] / 2;
 		for (int j = 0; j < this->nodeSize[1]; j++) {
+			zPos = 0;
+			zStep = this->layerHeight / this->layerSize;
 			for (int k = 0; k < this->nodeSize[2]; k++) {
-				if (k > this->layerSize) {
+				if (k >= this->layerSize) {
 					// if we have passed the layer size
 					zStep = (tissueSize[2] - this->layerHeight) / (this->gridSize[2] - this->layerSize);
 				}
 				// calculate beam width at depth
 				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
 				// calculate laser irradiance
-				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::expf(-2 * (pow((xPos - laserPose[1]), 2) + pow((yPos - laserPose[1]), 2)) / width - this->MUA * zPos);
+				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::expf(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
 				// set laser irradiane
 				this->NFR(i + j * this->nodeSize[0] + k * this->nodeSize[0] * this->nodeSize[1]) = irr;
 				// increase z pos
