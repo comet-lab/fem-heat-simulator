@@ -1161,11 +1161,13 @@ void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 	this->setGridSize(gridSize);
 }
 
-void FEM_Simulator::setTemp(Eigen::VectorXf &Temp, int gridSize[3])
+void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 {	
 	//TODO make sure Temp is the correct size
+	if (this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2] != Temp.size()) {
+		throw std::runtime_error("Total number of elements in Temp does not match current Node size.");
+	}
 	this->Temp = Temp;
-	this->setGridSize(gridSize);
 }
 
 void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)

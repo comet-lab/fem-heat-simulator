@@ -60,7 +60,7 @@ public:
 	void createKMFelem();
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
-	void setTemp(Eigen::VectorXf& Temp, int gridSize[3]);
+	void setTemp(Eigen::VectorXf& Temp);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setNFR(Eigen::VectorXf& NFR);
 	void setTissueSize(float tissueSize[3]);
