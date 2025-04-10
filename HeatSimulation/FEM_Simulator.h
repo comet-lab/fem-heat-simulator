@@ -40,8 +40,8 @@ public:
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
-	std::vector<std::vector<std::vector<float>>> Temp; // Our values for temperature at the nodes of the elements
-	//std::vector<std::vector<std::vector<float>>> NFR; // Our values for Heat addition
+	Eigen::VectorXf Temp; // Our values for temperature at the nodes of the elements
+	Eigen::VectorXf NFR; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tFinal = 1; // total duration of simulation [s]
@@ -59,8 +59,10 @@ public:
 	void createKMF();
 	void createKMFelem();
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
-	void setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp);
+	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
+	void setTemp(Eigen::VectorXf& Temp, int gridSize[3]);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
+	void setNFR(Eigen::VectorXf& NFR);
 	void setTissueSize(float tissueSize[3]);
 	void setLayer(float layerHeight, int layerSize);
 	void setTC(float TC);
@@ -107,7 +109,6 @@ public:
 	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
-	std::vector<std::vector<std::vector<float>>> NFR; 
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 

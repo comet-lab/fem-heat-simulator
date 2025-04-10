@@ -7,7 +7,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 {
 	this->Nn1d = Nn1d;
 	this->initializeElementNodeSurfaceMap();
-	this->setInitialTemperature(Temp);
+	this->setTemp(Temp);
 	this->setTissueSize(tissueSize);
 	this->setLayer(tissueSize[2], (Temp[0][0].size()-1) / (Nn1d-1));
 	this->setTC(TC);
@@ -46,10 +46,9 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 	int counter = 0;
 	for (int n : validNodes) {
-			int nodeSub[3];
-			ind2sub(n, this->nodeSize, nodeSub);
-			dVec(counter) = this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]];
-			/*vVec(counter) = 0;*/
+			//int nodeSub[3];
+			//ind2sub(n, this->nodeSize, nodeSub);
+		dVec(counter) = this->Temp(n);
 			counter++;
 	}
 	Eigen::SparseMatrix<float> LHSinit = this->M;
@@ -108,9 +107,9 @@ void FEM_Simulator::performTimeStepping()
 	// Adjust our Temp with new d vector
 	counter = 0;
 	for (int n : validNodes) {
-			int nodeSub[3];
-			ind2sub(n, this->nodeSize, nodeSub);
-			this->Temp[nodeSub[0]][nodeSub[1]][nodeSub[2]] = dVec(counter);
+			//int nodeSub[3];
+			//ind2sub(n, this->nodeSize, nodeSub);
+			this->Temp(n) = dVec(counter);
 			counter++;
 	}
 
@@ -395,10 +394,10 @@ void FEM_Simulator::createKMFelem()
 										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kje[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi) * this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
+										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
 									}
 								}
-							}
+							} 
 						} // if Node is face f
 					} // iterate through faces
 				} // if node is a face
@@ -415,19 +414,19 @@ void FEM_Simulator::createKMFelem()
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
 						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
 						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					}
 					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
-						this->F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
+						this->F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp(BglobalNodeIdx);
 						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR[BglobalNodeSub[0]][BglobalNodeSub[1]][BglobalNodeSub[2]];
+							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
@@ -484,7 +483,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 				tempValue += this->calculateNA(xi, Ai) * dVec(this->nodeMap[globalNode]);
 			}
 			else { // dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * this->Temp[globalNodeSub[0]][globalNodeSub[1]][globalNodeSub[2]];
+				tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);
 			}
 			
 		}
@@ -1139,8 +1138,19 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 	return output;
 }
 
-void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<float>>> Temp) {
-	this->Temp = Temp;
+void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
+	
+	// Convert nested vectors into a single column Eigen Vector. 
+	for (int i = 0; i < Temp.size(); i++) // associated with x and is columns of matlab matrix
+	{
+		for (int j = 0; j < Temp[0].size(); j++) // associated with y and is rows of matlab matrix
+		{
+			for (int k = 0; k < Temp[0][0].size(); k++) // associated with z and is depth of matlab matrix
+			{
+				this->Temp(i + j*Temp.size() + k*Temp.size()*Temp[0].size()) = Temp[i][j][k];
+			}
+		}
+	}
 	int gridSize[3]; 
 	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
 		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
@@ -1151,9 +1161,26 @@ void FEM_Simulator::setInitialTemperature(std::vector<std::vector<std::vector<fl
 	this->setGridSize(gridSize);
 }
 
+void FEM_Simulator::setTemp(Eigen::VectorXf &Temp, int gridSize[3])
+{	
+	//TODO make sure Temp is the correct size
+	this->Temp = Temp;
+	this->setGridSize(gridSize);
+}
+
 void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 {
-	this->NFR = NFR;
+	// Convert nested vectors into a single column Eigen Vector. 
+	for (int i = 0; i < NFR.size(); i++) // associated with x and is columns of matlab matrix
+	{
+		for (int j = 0; j < NFR[0].size(); j++) // associated with y and is rows of matlab matrix
+		{
+			for (int k = 0; k < NFR[0][0].size(); k++) // associated with z and is depth of matlab matrix
+			{
+				this->NFR(i + j * NFR.size() + k * NFR.size() * NFR[0].size()) = NFR[i][j][k];
+			}
+		}
+	}
 
 	if ((NFR.size() == this->gridSize[0]) && (NFR[0].size() == this->gridSize[1]) && (NFR[0][0].size() == this->gridSize[2])) {
 		this->elemNFR = true;
@@ -1165,6 +1192,13 @@ void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
+}
+
+void FEM_Simulator::setNFR(Eigen::VectorXf& NFR)
+{
+	this->NFR = NFR;
+	//TODO Check for element or nodal NFR;
+	this->elemNFR = false;
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {
