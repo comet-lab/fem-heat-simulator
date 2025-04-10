@@ -1363,6 +1363,16 @@ void FEM_Simulator::setBoundaryConditions(int BC[6])
 	this->initializeBoundaryNodes();
 }
 
+Eigen::VectorXf FEM_Simulator::getSensorTemps()
+{
+	this->sensorTemps;
+	Eigen::VectorXf sensorVector(sensorTemps.size());
+	for (int s = 0; s < sensorTemps.size(); s++) {
+		sensorVector(s) = this->sensorTemps[s][sensorTemps[s].size()-1];
+	}
+	return sensorVector;
+}
+
 void FEM_Simulator::setKe() {
 	// Taking advantage of the fact that J is costant across element and TC is constant across elements
 	int Nne = pow(this->Nn1d, 3);

@@ -87,6 +87,7 @@ public:
 	void setFv();
 	void setFvu();
 	void setBoundaryConditions(int BC[6]);
+	Eigen::VectorXf getSensorTemps();
 
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
