@@ -1,5 +1,6 @@
 #pragma once
 #include <vector> 
+#include <cmath>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Dense>
@@ -63,6 +64,7 @@ public:
 	void setTemp(Eigen::VectorXf& Temp);
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setNFR(Eigen::VectorXf& NFR);
+	void setNFR(float laserPose[6], float laserPower, float beamWaist);
 	void setTissueSize(float tissueSize[3]);
 	void setLayer(float layerHeight, int layerSize);
 	void setTC(float TC);

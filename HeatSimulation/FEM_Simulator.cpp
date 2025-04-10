@@ -1203,6 +1203,46 @@ void FEM_Simulator::setNFR(Eigen::VectorXf& NFR)
 	this->elemNFR = false;
 }
 
+void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist)
+{
+	float lambda = 10.6 * pow(10, -4); // wavelength of laser in cm
+	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
+	//TODO: account for orientation shift on the laser
+	// I(x,y,z) = 2*P/(pi*w^2) * exp(-2*(x^2 + y^2)/w^2 - mua*z)
+
+	float irr = 0;
+	float width = 0; 
+	float xPos = -this->tissueSize[0] / 2;
+	float xStep = this->tissueSize[0] / this->gridSize[0];
+	float yPos = -this->tissueSize[0] / 2;
+	float yStep = this->tissueSize[0] / this->gridSize[0];
+	float zPos = 0;
+	float zStep = this->layerHeight / this->layerSize;
+
+	for (int i = 0; i < this->nodeSize[0]; i++) {
+		for (int j = 0; j < this->nodeSize[1]; j++) {
+			for (int k = 0; k < this->nodeSize[2]; k++) {
+				if (k > this->layerSize) {
+					// if we have passed the layer size
+					zStep = (tissueSize[2] - this->layerHeight) / (this->gridSize[2] - this->layerSize);
+				}
+				// calculate beam width at depth
+				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
+				// calculate laser irradiance
+				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::expf(-2 * (pow((xPos - laserPose[1]), 2) + pow((yPos - laserPose[1]), 2)) / width - this->MUA * zPos);
+				// set laser irradiane
+				this->NFR(i + j * this->nodeSize[0] + k * this->nodeSize[0] * this->nodeSize[1]) = irr;
+				// increase z pos
+				zPos = zPos + zStep;
+			}
+			// increase y pos
+			yPos = yPos + yStep;
+		}
+		// increase x pos 
+		xPos = xPos + xStep;
+	}
+}
+
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 	for (int i = 0; i < 3; i++) {
 		this->tissueSize[i] = tissueSize[i];
