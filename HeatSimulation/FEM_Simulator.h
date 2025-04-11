@@ -63,7 +63,6 @@ public:
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	void performTimeStepping();
-	void createKMF();
 	void createKMFelem();
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
@@ -84,11 +83,8 @@ public:
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
 	void setJ(int layer=1);
 	void setKe();
-	void setKn();
 	void setMe();
-	void setMn();
 	void setFeInt();
-	void setFnInt();
 	void setFj();
 	void setFv();
 	void setFvu();
@@ -131,15 +127,10 @@ public:
 	Eigen::Matrix3<float> calculateJ(int layer=1); // function has test cases
 	Eigen::Matrix2<float> calculateJs(int dim,int layer=1);
 	float calculateNADotBase(float xi, int Ai);
-	void getGlobalNodesFromElem(int elem, int nodes[8]);
 	// function has test cases
 	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
-	Eigen::Vector<int,27> getNodeNeighbors(int globalNode);
-	std::vector<int> convertToLocalNode(int globalNode,int f);
-	int convertToGlobalNode(int localNode,int globalReference,int localReference);
-	int convertToNeighborIdx(int globalNode, int globalReference);
 	float createKABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createMABFunction(float xi[3], int Ai, int Bi); // function has test cases
 	float createFintFunction(float xi[3], int Ai, int Bi);
@@ -148,9 +139,6 @@ public:
 	float createFvuFunction(float xi[3], int Ai, int dim);
 
 	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
-	static void reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float>* newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes);
-	
-
 };
 
 
