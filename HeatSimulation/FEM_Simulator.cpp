@@ -119,190 +119,6 @@ void FEM_Simulator::performTimeStepping()
 	}
 }
 
-void FEM_Simulator::reduceSparseMatrix(Eigen::SparseMatrix<float> oldMat, std::vector<int> rowsToRemove, Eigen::SparseMatrix<float> *newMat, Eigen::SparseMatrix<float> *suppMat, int nNodes) {
-	// Assuming the newMat is already the appropriate size, and has had its elements reserved. 
-	int rowCounter = 0;
-	for (int row = 0; row < nNodes; row++) {
-		int validColCounter = 0;
-		int invalidColCounter = 0;
-		if (std::find(rowsToRemove.begin(), rowsToRemove.end(), row) == rowsToRemove.end()) {// if row is NOT in our rows to remove, iterate over the columns
-			for (int col = 0; col < nNodes; col++) {
-				if (std::find(rowsToRemove.begin(), rowsToRemove.end(), col) == rowsToRemove.end()) { // the col is a valid entry
-					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
-						// We add the value from old matrix to new matrix
-						newMat->insert(rowCounter, validColCounter) = oldMat.coeff(row, col);
-					} 
-					// else is just do nothing
-					validColCounter++; // have to increment column counter so we maintain correct position in new matrix. 
-				} // end if col is valid
-				else { // the col is not a valid entry, but the row is so fill the support matrix
-					if (oldMat.coeff(row, col) != 0) { // The location in the sparse matrix is NOT a zero
-						suppMat->insert(rowCounter, invalidColCounter) = oldMat.coeff(row, col);
-					}
-					invalidColCounter++;
-				}
-			} // end for each column
-			rowCounter++; // increment row counter in our new matrix
-		} // end if row is not in our rows to remove
-	} // end for each row
-} //reduceSparseMatrix
-
-
-//void FEM_Simulator::createKMF() {
-//	
-//	auto startTime = std::chrono::high_resolution_clock::now();
-//
-//	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
-//	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-//
-//	this->initializeBoundaryNodes();
-//
-//	// Initialize matrices so that we don't have to resize them later
-//	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
-//	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-//	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column/row
-//	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-//	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), 27)); // at most 27 non-zero entries per column/row
-//
-//	// iterate through the non-dirichlet nodes. Any dirichlet nodes don't get a row entry in the matrices/vectors
-//#ifdef _OPENMP
-//#pragma omp parallel for schedule(dynamic)
-//#endif
-//	for (int row = 0; row < this->validNodes.size(); row++) {
-//		int nodeSub[3];
-//		int globalNode = this->validNodes[row]; // get our global node
-//		int nodeFace = this->determineNodeFace(globalNode); // determine what faces our node is on
-//		this->ind2sub(globalNode, this->nodeSize, nodeSub);
-//
-//		Eigen::Matrix<float, 1, 27> Kconv = Eigen::Matrix<float, 27, 1>::Constant(0.0f); // The result the convection boundary has on K(row,col)
-//		// Handle Flux and Convection Boundaries 
-//		if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
-//			for (int f = 0; f < 6; f++) { // Iterate through each face of the element
-//				if ((nodeFace >> f) & 1) { // Node lies on face f
-//					std::vector<int> localNodes = this->convertToLocalNode(globalNode, f);
-//					for (int Ai : localNodes) { // iterate through the localNodes associated with the current global node
-//						if ((this->boundaryType[f] == FLUX)) { // flux boundary
-//							this->F(row) += this->Fje(Ai, f);
-//						}
-//						else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-//							this->F(row) += this->Fve(Ai, f);
-//							for (int Bi : elemNodeSurfaceMap[f]) {
-//
-//								int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai); // Need some conversion from Ai,Bi,n to global position of Bi
-//								int BiNeighbor = this->convertToNeighborIdx(BiGlobal, globalNode); // Need some conversion from Ai, Bi to neighbor of n
-//								if (this->nodeMap[BiGlobal] >= 0) { // Bi is not a dirichlet node
-//									this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Kje[f](Ai, Bi);
-//								}
-//								else { // Bi is a dirichlet node
-//									int BiSub[3];
-//									ind2sub(BiGlobal, this->nodeSize, BiSub);
-//									this->F(row) += -this->Kje[f](Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
-//								}
-//							}
-//						} // ENDIf Convection Boundary
-//					} // END iterate through the elements that contain our global node
-//				} // ENDIF Node is face f
-//			} // iterate through faces
-//
-//
-//			// Handle special cases of K, M, and F;
-//			// determine which elements in a 8 element box exist if we assume our node is position 13 in the 8 element box
-//
-//			int eOpts = 0b11111111; //binary number where a 1 indicates a valid element, LSB order
-//			eOpts &= ((nodeSub[2] == 0) ? 0b11110000 : 0b11111111); // valid elements if we are at top layer: 4,5,6,7
-//			eOpts &= ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 0b00001111 : 0b11111111); // valid elements if we are at bottom layer: 0,1,2,3
-//			eOpts &= ((nodeSub[1] == 0) ? 0b11001100 : 0b11111111); // valid elements if we are at front wall: 2,3,6,7
-//			eOpts &= ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 0b00110011 : 0b11111111); // valid elements if we are at back wall: 0,1,4,5
-//			eOpts &= ((nodeSub[0] == 0) ? 0b10101010 : 0b11111111); // valid elements if we are at left wall: 1,3,5,7
-//			eOpts &= ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 0b01010101 : 0b11111111); // valid elements if we are at right wall: 0,2,4,6
-//			for (int e = 0; e < 8; e++) { // iterate through possible elements
-//				if ((eOpts >> e) & 1) {// if valid elements
-//					int eSub[3] = { nodeSub[0],nodeSub[1],nodeSub[2] };
-//					eSub[0] = (((e % 2) == 0) ? nodeSub[0] - 1 : nodeSub[0]); // local element 0,2,4,6 requires we shift the x
-//					eSub[1] = ((((e / 2) % 2) == 0) ? nodeSub[1] - 1 : nodeSub[1]); // local element 0,1,4,5 requires we shift the y
-//					eSub[2] = (((e / 4) == 0) ? nodeSub[2] - 1 : nodeSub[2]); // local element 0,1,2,3 requires we shift the z
-//
-//					int Ai = 7 - e; // Our current node's local index is just 7-e -- assuming our current node is node 13 (0-26) in an 8 element box
-//					for (int Bi = 0; Bi < 8; Bi++) {
-//						int BiGlobal = this->convertToGlobalNode(Bi, globalNode, Ai);
-//						int BiSub[3];
-//						ind2sub(BiGlobal, this->nodeSize, BiSub);
-//						if (this->nodeMap[BiGlobal] >= 0) {
-//							this->K.coeffRef(row, this->nodeMap[BiGlobal]) += this->Ke(Ai, Bi);
-//							this->M.coeffRef(row, this->nodeMap[BiGlobal]) += this->Me(Ai, Bi);
-//						}
-//						else
-//						{
-//							this->F(row) += this->Ke(Ai, Bi) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
-//						}
-//						if (this->elemNFR) {
-//							this->F(row) += this->FeInt(Ai, Bi) * this->NFR[eSub[0]][eSub[1]][eSub[2]];
-//						}
-//						else {
-//							this->F(row) += this->FeInt(Ai, Bi) * this->NFR[BiSub[0]][BiSub[1]][BiSub[2]];
-//						}
-//					}
-//				}
-//			}
-//		}
-//		else
-//		{// we know the node does not lie on a face so we can assume it is surrounded by 26 other nodes
-//			int idx = 0;
-//			int neighbor = 0;
-//			int BiSub[3];
-//			for (int k = 0; k < 3; k++) {
-//				for (int j = 0; j < 3; j++) {
-//					for (int i = 0; i < 3; i++) {
-//						idx = i + 3 * j + 9 * k;
-//						neighbor = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
-//						ind2sub(neighbor, this->nodeSize, BiSub);
-//						if (this->nodeMap[neighbor] >= 0) { // - check if any of the neighbors are dirichlet still
-//							this->K.insert(row, this->nodeMap[neighbor]) = this->Kn(idx);
-//							this->M.insert(row, this->nodeMap[neighbor]) = this->Mn(idx);
-//						}
-//						else { // if dirichlet we add K to the force vector 
-//							this->F(row) += this->Kn(idx) * this->Temp[BiSub[0]][BiSub[1]][BiSub[2]];
-//						}
-//						if (this->elemNFR) {
-//							// for elemental NFR we need to average the elementNFR's that the neighbor
-//							// and global node are both in. It will either be 1 element, 2 elements, 4 elements, or 8 elements
-//							// We are assuming that the elemental NFR is the average/center NFR experienced by the element.
-//							float interpNFR = 0;
-//							int biShift = nodeSub[0] - BiSub[0]; // 0: same index, 1: BiSub is left, -1: BiSub is right
-//							int bjShift = nodeSub[1] - BiSub[1]; // 0: same index, 1: BiSub is forward, -1: BiSub is back
-//							int bkShift = nodeSub[2] - BiSub[2]; // 0: smae index, 1: BiSub is up, -1: Bi Sub is down
-//							int eShift[3] = { 1 - abs(biShift), 1 - abs(bjShift), 1 - abs(bkShift) };
-//							for (int ei = 0; ei <= eShift[0]; ei++) {
-//								for (int ej = 0; ej <= eShift[1]; ej++) {
-//									for (int ek = 0; ek <= eShift[2]; ek++) {
-//										// the division is for the linear interpolation, we can just divide because we know each elemental NFR will contribute
-//										// equally to the node in question and we know that each voxel has the same width/length/height.
-//										// Because of uniform voxel sizes, the Jacobian is the same regardless of the element, meaning we don't have to 
-//										// worry about additional weights on the terms
-//										int eSub[3] = { BiSub[0] - ei - (biShift < 0), BiSub[1] - ej - (bjShift < 0), BiSub[2] - ek - (bkShift < 0) };
-//										interpNFR += NFR[eSub[0]][eSub[1]][eSub[2]] * 1 / float(pow(2, eShift[0] + eShift[1] + eShift[2]));
-//									}
-//								}
-//							}
-//							// Remember that FnInt contains the contributions the node 'neighbor' in each element shared with our global node
-//							// if we were using nodal NFR, then the NFR at node neighbor is constant. With elemental NFR we calculate the NFR
-//							// at the neighbor by averaging the NFRs of the shared nodes. 
-//							this->F(row) += this->FnInt(idx) * interpNFR;
-//						}
-//						else {
-//							this->F(row) += this->FnInt(idx) * NFR[BiSub[0]][BiSub[1]][BiSub[2]];
-//						}
-//					}
-//				}
-//			}
-//		}
-//	}
-//
-//	auto stopTime = std::chrono::high_resolution_clock::now();
-//	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-//	std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
-//}
-
 void FEM_Simulator::createKMFelem()
 {
 	int nodeFace;
@@ -774,36 +590,6 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 	return output;
 }
 
-void FEM_Simulator::getGlobalNodesFromElem(int elem, int nodes[8])
-{
-	int Nne = pow(this->Nn1d, 3);
-	int sub[3];
-	this->ind2sub(elem, this->gridSize, sub);
-	// This order is defined by the pattern of A in the .h file. 
-	
-	int xShift = 0;
-	int yShift = 0;
-	int zShift = 0;
-	for (int Ai = 0; Ai < Nne; Ai++ ){
-		// This makes the order of the nodes based on A, so if we change A the node order should change
-		xShift = (FEM_Simulator::A[Ai][0] + 1) / 2;
-		yShift = (FEM_Simulator::A[Ai][1] + 1) / 2;
-		zShift = (FEM_Simulator::A[Ai][2] + 1) / 2;
-		nodes[Ai] = (sub[2] + zShift) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + yShift) * this->nodeSize[0] + (sub[0] + xShift);
-	}
-	/*
-	nodes[0] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0];
-	nodes[1] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0] + 1;
-	nodes[2] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0] + 1;
-	nodes[3] = sub[2] * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0];
-	nodes[4] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0];
-	nodes[5] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + sub[1] * this->nodeSize[0] + sub[0] + 1;
-	nodes[6] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0] + 1;
-	nodes[7] = (sub[2] + 1) * (this->nodeSize[0] * this->nodeSize[1]) + (sub[1] + 1) * this->nodeSize[0] + sub[0];
-	return;
-	*/
-}
-
 void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 {
 	// This function is only needed if we are using a non-uniform cuboid. Since we are assuming a uniform cuboid
@@ -818,115 +604,6 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 	position[0] = sub[0] * deltaX;
 	position[1] = sub[1] * deltaY;
 	position[2] = sub[2] * deltaZ;
-}
-
-Eigen::Vector<int,27> FEM_Simulator::getNodeNeighbors(int globalNode)
-{
-	//returns a 27 element vector, idicating the 27 neighbors of our node (including the node itself). 
-	// if a node does not exist in that neighbor idx, there will be a -1 in its place. For example, if our node is global node 0
-	// then the first 13 elements would be -1, and so on.  
-	
-	// if the order changes here, need to change convertToNeighborIdx()
-	Eigen::Vector<int,27> neighbors = Eigen::Vector<int,27>::Constant(-1);
-	int nodeSub[3];
-	this->ind2sub(globalNode, this->nodeSize, nodeSub);
-	// I feel there is a more efficient way to do these checks
-	int kStart = ((nodeSub[2] == 0) ? 1 : 0); // start at 0 if we are not on top layer, else start at 1
-	int kEnd = ((nodeSub[2] == (this->nodeSize[2] - 1)) ? 2 : 3); // end at 1 if we are on bottom layer, else end at 2.
-	int jStart = ((nodeSub[1] == 0) ? 1 : 0);
-	int jEnd = ((nodeSub[1] == (this->nodeSize[1] - 1)) ? 2 : 3);
-	int iStart = ((nodeSub[0] == 0) ? 1 : 0);
-	int iEnd = ((nodeSub[0] == (this->nodeSize[1] - 1)) ? 2 : 3);
-	for (int k = kStart; k < kEnd; k++) {
-		for (int j = jStart; j < jEnd; j++) {
-			for (int i = iStart; i < iEnd; i++) {
-				int idx = i + 3 * j + 9 * k;
-				neighbors(idx) = globalNode + (k - 1) * this->nodeSize[0] * this->nodeSize[1] + (j - 1) * this->nodeSize[0] + (i - 1);
-			}
-		}
-	}
-	return neighbors;
-}
-
-std::vector<int> FEM_Simulator::convertToLocalNode(int globalNode, int f)
-{
-	// TO DO, make this function look at this->A for its boundary checking. 
-	std::vector<int> localIndices;
-	int nodeSub[3];
-	this->ind2sub(globalNode, this->nodeSize, nodeSub);
-	bool validFlag = false;
-	for (int nodeOption : elemNodeSurfaceMap[f]) { // go through each option based on the current face
-		switch (nodeOption) {
-		case 0: // for 0 to be an option, the global node cant be on the positive x y or z boundary
-			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == this->nodeSize[2] - 1))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 1:// for 1 to be an option, the global node can't be on the negative x or positive y/z boundary
-			if (!((nodeSub[0] == 0) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == this->nodeSize[2] - 1))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 2:// for 2 to be an option, the global node can't be on the negative y or positive x/z boundary
-			if (!((nodeSub[0] == this->nodeSize[1] - 1) || (nodeSub[1] == 0) || (nodeSub[2] == this->nodeSize[2] - 1))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 3:// for 3 to be an option, the global node can't be on the negative x/y or positive z boundary
-			if (!((nodeSub[0] == 0) || (nodeSub[1] == 0) || (nodeSub[2] == this->nodeSize[2] - 1))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 4:// for 4 to be an option, the global node can't be on the negative z or positive x/y boundary
-			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == 0))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 5:// for 5 to be an option, the global node can't be on the negative z/x or positive y boundary
-			if (!((nodeSub[0] == 0) || (nodeSub[1] == this->nodeSize[1] - 1) || (nodeSub[2] == 0))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 6:// for 6 to be an option, the global node can't be on the negative y/z or positive x boundary
-			if (!((nodeSub[0] == this->nodeSize[0] - 1) || (nodeSub[1] == 0) || (nodeSub[2] == 0))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		case 7:// for 7 to be an option, the global node can't be on the negative x/y/z boundary
-			if (!((nodeSub[0] == 0) || (nodeSub[1] == 0) || (nodeSub[2] == 0))) {
-				localIndices.push_back(nodeOption);
-			}
-			break;
-		}
-	}
-
-	return localIndices;
-}
-
-int FEM_Simulator::convertToGlobalNode(int localNode, int globalReference, int localReference)
-{
-	// if structure of this->A changes, this function will be wrong. 
-	int nodeSub[3];
-	int refSub[3];
-	int tempSize[3] = { 2,2,2 };
-	ind2sub(localNode, tempSize, nodeSub);
-	ind2sub(localReference, tempSize, refSub);
-	int xShift = nodeSub[0] - refSub[0];
-	int yShift = nodeSub[1] - refSub[1];
-	int zShift = nodeSub[2] - refSub[2];
-	int globalNode = globalReference + xShift + yShift * this->nodeSize[0] + zShift * this->nodeSize[1] * this->nodeSize[0];
-	return globalNode;
-}
-
-int FEM_Simulator::convertToNeighborIdx(int globalNode, int globalReference)
-{
-	// getNodeNeighbors is used as reference to create this mapping. 
-	int difference = globalNode - globalReference; // the addition keeps the value positive and lets us use modulos
-	int kShift = (difference / (this->nodeSize[0]*this->nodeSize[1])); // provides a value between -1 and 1
-	int jShift = (difference % (this->nodeSize[0] * this->nodeSize[1])) / this->nodeSize[0]; // provides a value between -1 and 1
-	int iShift = (difference % this->nodeSize[0]); // provides a value between -1 and 1
-	int neighborIdx = kShift*9 + jShift*3 + iShift + 13; // if globalNode == globalReference, that is idx 13. 
-	return neighborIdx;
 }
 
 float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
@@ -1303,7 +980,6 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
 	this->setKe();
-	//this->setKn();
 }
 
 void FEM_Simulator::setVHC(float VHC) {
@@ -1315,7 +991,6 @@ void FEM_Simulator::setVHC(float VHC) {
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
 	setFeInt();
-	//this->setFnInt();
 }
 
 void FEM_Simulator::setHTC(float HTC) {
@@ -1411,30 +1086,6 @@ void FEM_Simulator::setKe() {
 
 }
 
-//void FEM_Simulator::setKn()
-//{
-//	this->Kn.setZero();
-//	for (int i = 0; i < 27; i++) {
-//		int nodeSub[3];
-//		int tempNodeSize[3] = { 3,3,3 };
-//		this->ind2sub(i, tempNodeSize, nodeSub);
-//		for (int e = 0; e < 8; e++) {
-//			int tempElemSize[3] = { 2,2,2 };
-//			int eSub[3];
-//			this->ind2sub(e, tempElemSize, eSub);
-//			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
-//			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
-//			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
-//			if (firstCond && secondCond && thirdCond) {
-//				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1])*2 + (nodeSub[2] - 1 == eSub[2])*4;
-//				int Bi = 7-e;
-//				this->Kn(i) += this->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
-//			}
-//		}
-//		
-//	}
-//}
-
 void FEM_Simulator::setMe() {
 	// Taking advantage of the fact that J is costant across element and VHC is constant across elements
 	int Nne = pow(this->Nn1d, 3);
@@ -1446,30 +1097,6 @@ void FEM_Simulator::setMe() {
 	}
 }
 
-//void FEM_Simulator::setMn()
-//{
-//	this->Mn.setZero();
-//	for (int i = 0; i < 27; i++) {
-//		int nodeSub[3];
-//		int tempNodeSize[3] = { 3,3,3 };
-//		this->ind2sub(i, tempNodeSize, nodeSub);
-//		for (int e = 0; e < 8; e++) {
-//			int size[3] = { 2,2,2 };
-//			int eSub[3];
-//			this->ind2sub(e, size, eSub);
-//			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
-//			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
-//			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
-//			if (firstCond && secondCond && thirdCond) {
-//				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1])*2 + (nodeSub[2] - 1 == eSub[2])*4;
-//				int Bi = 7-e;
-//				this->Mn(i) += this->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);;
-//			}
-//		}
-//		
-//	}
-//}
-
 void FEM_Simulator::setFeInt()
 {
 	int Nne = pow(this->Nn1d, 3);
@@ -1480,30 +1107,6 @@ void FEM_Simulator::setFeInt()
 		}
 	}
 }
-
-//void FEM_Simulator::setFnInt()
-//{
-//	this->FnInt.setZero();
-//	for (int i = 0; i < 27; i++) {
-//		int nodeSub[3];
-//		int tempNodeSize[3] = { 3,3,3 };
-//		this->ind2sub(i, tempNodeSize, nodeSub);
-//		for (int e = 0; e < 8; e++) {
-//			int size[3] = { 2,2,2 };
-//			int eSub[3];
-//			this->ind2sub(e, size, eSub);
-//			bool firstCond = (nodeSub[0] == eSub[0]) || (nodeSub[0] - 1 == eSub[0]);
-//			bool secondCond = (nodeSub[1] == eSub[1]) || (nodeSub[1] - 1 == eSub[1]);
-//			bool thirdCond = (nodeSub[2] == eSub[2]) || (nodeSub[2] - 1 == eSub[2]);
-//			if (firstCond && secondCond && thirdCond) {
-//				int Ai = (nodeSub[0] - 1 == eSub[0]) + (nodeSub[1] - 1 == eSub[1]) * 2 + (nodeSub[2] - 1 == eSub[2]) * 4;
-//				int Bi = 7 - e;
-//				this->FnInt(i) += this->integrate(&FEM_Simulator::createFintFunction, 2, 0, Ai, Bi);;
-//			}
-//		}
-//
-//	}
-//}
 
 void FEM_Simulator::setFj() {
 	int Nne = pow(this->Nn1d, 3);
