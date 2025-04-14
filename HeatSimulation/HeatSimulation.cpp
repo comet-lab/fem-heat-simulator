@@ -38,7 +38,7 @@ int main()
     simulator->tFinal = 15.0f;
     int BC[6] = { 2,2,2,2,2,2 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(0.0f);
+    simulator->setFlux(0.0f);
     simulator->setAmbientTemp(24);
 
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0} };

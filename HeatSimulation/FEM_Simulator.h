@@ -52,7 +52,7 @@ public:
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tFinal = 1; // total duration of simulation [s]
-	float Jn = 0; // heat escaping the Neumann Boundary
+	float Qn = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	int Nn1d = 2;
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
@@ -76,18 +76,18 @@ public:
 	void setVHC(float VHC);
 	void setMUA(float MUA);
 	void setHTC(float HTC);
-	void setJn(float Jn);
+	void setFlux(float Qn);
 	void setAmbientTemp(float ambientTemp);
 	void setGridSize(int gridSize[3]);
 	void setNodeSize(int nodeSize[3]);
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
 	void setJ(int layer=1);
-	void setKe();
+	void setKeInt();
 	void setMe();
-	void setFeInt();
-	void setFj();
-	void setFv();
-	void setFvu();
+	void setFeIrr();
+	void setFeQ();
+	void setFeConv();
+	void setKeConv();
 	void setBoundaryConditions(int BC[6]);
 	Eigen::VectorXf getSensorTemps();
 
@@ -95,19 +95,26 @@ public:
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
 	// The K, M, and F matrices for the entire domain
-	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
+	// K = Kint*kappa + Kconv*h
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
-	Eigen::VectorXf F;
+	// F = Firr*muA + Fconv*h + Fk*kappa + Fq
+	Eigen::VectorXf Firr; // forcing function due to irradiance
+	Eigen::VectorXf Fconv; // forcing functino due to convection
+	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes
+	Eigen::VectorXf Fq; // forcing function due to constant flux boundary
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::MatrixXf Ke; // Elemental Construction of K
+	Eigen::MatrixXf KeInt; // Elemental Construction of Kint
 	Eigen::MatrixXf Me; // Elemental construction of M
-	Eigen::MatrixXf FeInt; // Elemental Construction of F_int
-	// Fje is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf Fje; 
-	// Fve is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf Fve;
-	std::array<Eigen::MatrixXf,6> Kje; // Kje is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	Eigen::MatrixXf FeIrr; // Elemental Construction of Firr
+	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::MatrixXf FeQ; // Element Construction of Fq
+	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	Eigen::MatrixXf FeConv; // Elemental Construction of FConv
+	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	std::array<Eigen::MatrixXf,6> KeConv; // Elemental construction of KConv
 	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
 	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
 	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
@@ -132,12 +139,12 @@ public:
 	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
-	float createKABFunction(float xi[3], int Ai, int Bi); // function has test cases
-	float createMABFunction(float xi[3], int Ai, int Bi); // function has test cases
-	float createFintFunction(float xi[3], int Ai, int Bi);
-	float createFjFunction(float xi[3], int Ai, int dim);
-	float createFvFunction(float xi[3], int Ai, int dim);
-	float createFvuFunction(float xi[3], int Ai, int dim);
+	float calcKintAB(float xi[3], int Ai, int Bi); // function has test cases
+	float calcMAB(float xi[3], int Ai, int Bi); // function has test cases
+	float calcFintAB(float xi[3], int Ai, int Bi);
+	float calcFqA(float xi[3], int Ai, int dim);
+	float calcFconvA(float xi[3], int Ai, int dim);
+	float calcKconvAB(float xi[3], int Ai, int dim);
 
 	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
 };

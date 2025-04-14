@@ -425,19 +425,19 @@ namespace FEMSimulatorTests
 			xi[0] = FEM_Simulator::A[Ai][0];
 			xi[1] = FEM_Simulator::A[Ai][1];
 			xi[2] = FEM_Simulator::A[Ai][2];
-			float output1 = simulator->createKABFunction(xi, Ai, Bi);
-			Eigen::MatrixXf Ke(8, 8);
+			float output1 = simulator->calcKintAB(xi, Ai, Bi);
+			Eigen::MatrixXf KeInt(8, 8);
 			for (int Ai = 0; Ai < 8; Ai++) {
 				for (int Bi = 0; Bi < 8; Bi++) {
-					Ke(Ai, Bi) = simulator->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
+					KeInt(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcKintAB, 2, 0, Ai, Bi);
 				}
 			}
 			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
 			Assert::IsTrue((abs(3 * TC / 16.0f) - output1) < 0.0001);
 			for (int Ai = 0; Ai < 8; Ai++) {
-				Assert::IsTrue(((1 / 6.0f * TC) - Ke(Ai, Ai)) < 0.0001);
+				Assert::IsTrue(((1 / 6.0f * TC) - KeInt(Ai, Ai)) < 0.0001);
 			}
-			Assert::IsTrue(((-1 / 24.0f * TC) - Ke(2, 0)) < 0.0001);
+			Assert::IsTrue(((-1 / 24.0f * TC) - KeInt(2, 0)) < 0.0001);
 		}
 
 		TEST_METHOD(TestCreateKABFunction2)
@@ -455,17 +455,17 @@ namespace FEMSimulatorTests
 			xi[0] = -1;
 			xi[1] = -1;
 			xi[2] = -1;
-			float output1 = simulator->createKABFunction(xi, Ai, Bi);
-			simulator->setKe();
+			float output1 = simulator->calcKintAB(xi, Ai, Bi);
+			simulator->setKeInt();
 			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 1.0
 			Assert::IsTrue(abs(3.375f - output1) < 0.0001);
-			Assert::IsTrue(abs(0.1244f - simulator->Ke(0, 0)) < 0.0001);
-			Assert::IsTrue(abs(0.4267f - simulator->Ke(1, 1)) < 0.0001);
-			Assert::IsTrue(abs(1.4222f - simulator->Ke(4, 4)) < 0.0001);
-			Assert::IsTrue(abs(4.5511f - simulator->Ke(13, 13)) < 0.0001);
-			Assert::IsTrue(abs(-0.0415f - simulator->Ke(9, 15)) < 0.0001);
-			Assert::IsTrue(abs(-0.0059f - simulator->Ke(21, 5)) < 0.0001);
-			Assert::IsTrue(abs(-0.0370f - simulator->Ke(21, 15)) < 0.0001);
+			Assert::IsTrue(abs(0.1244f - simulator->KeInt(0, 0)) < 0.0001);
+			Assert::IsTrue(abs(0.4267f - simulator->KeInt(1, 1)) < 0.0001);
+			Assert::IsTrue(abs(1.4222f - simulator->KeInt(4, 4)) < 0.0001);
+			Assert::IsTrue(abs(4.5511f - simulator->KeInt(13, 13)) < 0.0001);
+			Assert::IsTrue(abs(-0.0415f - simulator->KeInt(9, 15)) < 0.0001);
+			Assert::IsTrue(abs(-0.0059f - simulator->KeInt(21, 5)) < 0.0001);
+			Assert::IsTrue(abs(-0.0370f - simulator->KeInt(21, 15)) < 0.0001);
 		}
 
 		TEST_METHOD(TestCreateMABFunction1)
@@ -483,11 +483,11 @@ namespace FEMSimulatorTests
 			xi[0] = -1;
 			xi[1] = -1;
 			xi[2] = -1;
-			float output1 = simulator->createMABFunction(xi, Ai, Bi);
+			float output1 = simulator->calcMAB(xi, Ai, Bi);
 			Eigen::MatrixXf Me(8, 8);
 			for (int Ai = 0; Ai < 8; Ai++) {
 				for (int Bi = 0; Bi < 8; Bi++) {
-					Me(Ai, Bi) = simulator->integrate(&FEM_Simulator::createMABFunction, 2, 0, Ai, Bi);
+					Me(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcMAB, 2, 0, Ai, Bi);
 				}
 			}
 			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
@@ -513,8 +513,8 @@ namespace FEMSimulatorTests
 			xi[0] = FEM_Simulator::A[Ai][0];
 			xi[1] = FEM_Simulator::A[Ai][1];
 			xi[2] = FEM_Simulator::A[Ai][2];
-			float output1 = simulator->createFjFunction(xi, Ai, 1);
-			simulator->setFj();
+			float output1 = simulator->calcFqA(xi, Ai, 1);
+			simulator->setFeQ();
 			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
 			//Assert::IsTrue((abs(1 / 64.0f) - output1) < 0.0001);
 			//for (int Ai = 0; Ai < 8; Ai++) {
@@ -546,14 +546,14 @@ namespace FEMSimulatorTests
 			simulatorLin->deltaT = 0.05f;
 			simulatorLin->tFinal = 1.0f;
 			simulatorLin->setBoundaryConditions(BC);
-			simulatorLin->setJn(0);
+			simulatorLin->setFlux(0);
 			simulatorLin->setAmbientTemp(0);
 			simulatorLin->setNFR(NFR);
 
 			simulatorQuad->deltaT = 0.05f;
 			simulatorQuad->tFinal = 1.0f;
 			simulatorQuad->setBoundaryConditions(BC);
-			simulatorQuad->setJn(0);
+			simulatorQuad->setFlux(0);
 			simulatorQuad->setAmbientTemp(0);
 			simulatorQuad->setNFR(NFR);
 
@@ -591,7 +591,7 @@ namespace FEMSimulatorTests
 		//	simulator->tFinal = 1.0f;
 		//	int BC[6] = { 1,0,1,0,2,2 };
 		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setJn(1);
+		//	simulator->setFlux(1);
 		//	simulator->setAmbientTemp(0);
 		//	simulator->setNFR(NFR);
 
@@ -641,7 +641,7 @@ namespace FEMSimulatorTests
 		//	simulator->tFinal = 1.0f;
 		//	int BC[6] = { 1,0,1,0,2,2 };
 		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setJn(1);
+		//	simulator->setFlux(1);
 		//	simulator->setAmbientTemp(0);
 		//	simulator->setNFR(NFR);
 

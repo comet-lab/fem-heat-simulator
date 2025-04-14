@@ -188,8 +188,8 @@ public:
             simulator->setBoundaryConditions(boundaryType);
 
             // set flux condition
-            float Jn = inputs[7][0];
-            simulator->setJn(Jn);
+            float Qn = inputs[7][0];
+            simulator->setFlux(Qn);
 
             // set ambient temperature
             float ambientTemp = inputs[8][0];

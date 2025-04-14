@@ -193,10 +193,10 @@ void FEM_Simulator::createKMFelem()
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
 							if ((this->boundaryType[f] == FLUX)) { // flux boundary
-								this->F(matrixInd[0]) += this->Fje(Ai, f);
+								this->F(matrixInd[0]) += this->FeQ(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								this->F(matrixInd[0]) += this->Fve(Ai, f);
+								this->F(matrixInd[0]) += this->FeConv(Ai, f);
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
@@ -206,11 +206,11 @@ void FEM_Simulator::createKMFelem()
 									if (matrixInd[1] >= 0) {
 										//int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base Nne. 
 										//// If we say Nne = 8, if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Kje[f](Ai, Bi);
-										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Kje[f](Ai, Bi)));
+										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
+										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeConv[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->Kje[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
+										this->F(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
 									}
 								}
 							} 
@@ -225,24 +225,24 @@ void FEM_Simulator::createKMFelem()
 
 					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
-						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->Ke(Ai, Bi);
-						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Ke(Ai, Bi)));
+						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->KeInt(Ai, Bi);
+						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeInt(Ai, Bi)));
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
 						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
 						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(e);
+							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(BglobalNodeIdx);
+							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					}
 					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
-						this->F(matrixInd[0]) += -this->Ke(Ai, Bi) * this->Temp(BglobalNodeIdx);
+						this->F(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
 						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(e);
+							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeInt(Ai, Bi) * this->NFR(BglobalNodeIdx);
+							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
@@ -608,7 +608,7 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 	position[2] = sub[2] * deltaZ;
 }
 
-float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
+float FEM_Simulator::calcKintAB(float xi[3], int Ai, int Bi)
 {
 	float KABfunc = 0;
 	Eigen::Vector3<float> NAdotA;
@@ -625,7 +625,7 @@ float FEM_Simulator::createKABFunction(float xi[3], int Ai, int Bi)
 	return KABfunc;
 }
 
-float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
+float FEM_Simulator::calcMAB(float xi[3], int Ai, int Bi)
 {
 	float MABfunc = 0;
 	float NAa;
@@ -639,7 +639,7 @@ float FEM_Simulator::createMABFunction(float xi[3], int Ai, int Bi)
 	return MABfunc;
 }
 
-float FEM_Simulator::createFintFunction(float xi[3], int Ai, int Bi)
+float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 {
 	float FintFunc = 0;
 	float NAa;
@@ -653,7 +653,7 @@ float FEM_Simulator::createFintFunction(float xi[3], int Ai, int Bi)
 	return FintFunc;
 }
 
-float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
+float FEM_Simulator::calcFqA(float xi[3], int Ai, int dim)
 {
 	float FjFunc = 0;
 	float NAa;
@@ -670,11 +670,11 @@ float FEM_Simulator::createFjFunction(float xi[3], int Ai, int dim)
 	}
 
 	NAa = this->calculateNA(xi, Ai);
-	FjFunc = (NAa * this->Jn) * Js.determinant();
+	FjFunc = (NAa * this->Qn) * Js.determinant();
 	return FjFunc;
 }
 
-float FEM_Simulator::createFvFunction(float xi[3], int Ai, int dim)
+float FEM_Simulator::calcFconvA(float xi[3], int Ai, int dim)
 {
 	float FvFunc = 0;
 	float NAa;
@@ -695,7 +695,7 @@ float FEM_Simulator::createFvFunction(float xi[3], int Ai, int dim)
 	return FvFunc;
 }
 
-float FEM_Simulator::createFvuFunction(float xi[3], int AiBi, int dim)
+float FEM_Simulator::calcKconvAB(float xi[3], int AiBi, int dim)
 {
 	int Nne = pow(this->Nn1d, 3);
 	float FvuFunc = 0;
@@ -803,12 +803,12 @@ void FEM_Simulator::initializeElementMatrices(int layer)
 	//This function will initialize the elemental matrices of a node
 	// It starts with the jacobian because the Jacobian is used in every integration. 
 	this->setJ(layer);
-	this->setKe();
-	this->setFeInt();
+	this->setKeInt();
+	this->setFeIrr();
 	this->setMe();
-	this->setFj();
-	this->setFv();
-	this->setFvu();
+	this->setFeQ();
+	this->setFeConv();
+	this->setKeConv();
 }
 
 int FEM_Simulator::determineNodeFace(int globalNode)
@@ -1008,9 +1008,9 @@ void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
 }
 
-void FEM_Simulator::setJn(float Jn)
+void FEM_Simulator::setFlux(float Qn)
 {
-	this->Jn = Jn;
+	this->Qn = Qn;
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
@@ -1053,7 +1053,7 @@ void FEM_Simulator::setJ(int layer) {
 	this->Js1 = this->calculateJs(1, layer);
 	this->Js2 = this->calculateJs(2, layer);
 	this->Js3 = this->calculateJs(3, layer);
-	// The jacobian influences all of the other elemental matrices (Ke, Me, Fe, etc)
+	// The jacobian influences all of the other elemental matrices (KeInt, Me, Fe, etc)
 	// Should setting the Jacobian automatically recompute the other matrices?
 }
 
@@ -1075,13 +1075,13 @@ Eigen::VectorXf FEM_Simulator::getSensorTemps()
 	return sensorVector;
 }
 
-void FEM_Simulator::setKe() {
+void FEM_Simulator::setKeInt() {
 	// Taking advantage of the fact that J is costant across element and TC is constant across elements
 	int Nne = pow(this->Nn1d, 3);
-	this->Ke = Eigen::MatrixXf::Zero(Nne, Nne);
+	this->KeInt = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->Ke(Ai, Bi) = this->integrate(&FEM_Simulator::createKABFunction, 3, 0, Ai, Bi);
+			this->KeInt(Ai, Bi) = this->integrate(&FEM_Simulator::calcKintAB, 3, 0, Ai, Bi);
 		}
 	}
 
@@ -1093,51 +1093,51 @@ void FEM_Simulator::setMe() {
 	this->Me = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::createMABFunction, 3, 0, Ai, Bi);
+			this->Me(Ai, Bi) = this->integrate(&FEM_Simulator::calcMAB, 3, 0, Ai, Bi);
 		}
 	}
 }
 
-void FEM_Simulator::setFeInt()
+void FEM_Simulator::setFeIrr()
 {
 	int Nne = pow(this->Nn1d, 3);
-	this->FeInt = Eigen::MatrixXf::Zero(Nne, Nne);
+	this->FeIrr = Eigen::MatrixXf::Zero(Nne, Nne);
 	for (int Ai = 0; Ai < Nne; Ai++) {
 		for (int Bi = 0; Bi < Nne; Bi++) {
-			this->FeInt(Ai, Bi) = this->integrate(&FEM_Simulator::createFintFunction, 3, 0, Ai, Bi);
+			this->FeIrr(Ai, Bi) = this->integrate(&FEM_Simulator::calcFintAB, 3, 0, Ai, Bi);
 		}
 	}
 }
 
-void FEM_Simulator::setFj() {
+void FEM_Simulator::setFeQ() {
 	int Nne = pow(this->Nn1d, 3);
-	this->Fje = Eigen::MatrixXf::Zero(Nne, 6);
+	this->FeQ = Eigen::MatrixXf::Zero(Nne, 6);
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fje(Ai,f) = this->integrate(&FEM_Simulator::createFjFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->FeQ(Ai,f) = this->integrate(&FEM_Simulator::calcFqA, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
 
-void FEM_Simulator::setFv() {
+void FEM_Simulator::setFeConv() {
 	int Nne = pow(this->Nn1d, 3);
-	this->Fve = Eigen::MatrixXf::Zero(Nne, 6);
+	this->FeConv = Eigen::MatrixXf::Zero(Nne, 6);
 	for (int f = 0; f < 6; f++) { // iterate through each face
 		for (int Ai : this->elemNodeSurfaceMap[f]) { // Go through nodes on face surface 
-			this->Fve(Ai,f) = this->integrate(&FEM_Simulator::createFvFunction, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
+			this->FeConv(Ai,f) = this->integrate(&FEM_Simulator::calcFconvA, 3, this->dimMap[f], Ai, this->dimMap[f]); // calculate FjA
 		}
 	} // iterate through faces
 }
 
-void FEM_Simulator::setFvu() {
+void FEM_Simulator::setKeConv() {
 	int Nne = pow(this->Nn1d, 3);
 	for (int f = 0; f < 6; f++) {
-		this->Kje[f] = Eigen::MatrixXf::Zero(Nne, Nne);
+		this->KeConv[f] = Eigen::MatrixXf::Zero(Nne, Nne);
 		for (int Ai : this->elemNodeSurfaceMap[f]) {
 			for (int Bi : this->elemNodeSurfaceMap[f]) {
 				int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base 8. 
 				// So if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-				this->Kje[f](Ai,Bi) = this->integrate(&FEM_Simulator::createFvuFunction, 3, this->dimMap[f], AiBi, this->dimMap[f]);
+				this->KeConv[f](Ai,Bi) = this->integrate(&FEM_Simulator::calcKconvAB, 3, this->dimMap[f], AiBi, this->dimMap[f]);
 			}
 		}
 	}
