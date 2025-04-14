@@ -19,7 +19,8 @@ private:
     std::ostringstream stream;
     bool silentMode = true;
     bool useAllCPUs = true;
-    bool createMatrices = true;
+    bool createAllMatrices = true;
+    bool createFirrMatrix = true;
     float layerHeight = 1;
     int layerSize = 1;
     int Nn1d = 2;
@@ -132,7 +133,7 @@ public:
     void
         operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         stream.str("");
-        stream << "First Call: " << this->createMatrices << std::endl;
+        stream << "First Call: " << this->createAllMatrices << std::endl;
         displayOnMATLAB(stream);
         try {
             checkArguments(outputs, inputs);
@@ -177,8 +178,8 @@ public:
 
             /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
             // First check to see if certain variables have changed which would require us to reconstruct elements
-            if (!this->createMatrices) {
-                this->createMatrices = checkForMatrixReset(Nn1d, T0, NFR, tissueSize, layerHeight, layerSize, boundaryType);
+            if (!this->createAllMatrices) {
+                this->createAllMatrices = checkForMatrixReset(Nn1d, T0, NFR, tissueSize, layerHeight, layerSize, boundaryType);
             }
             // Set the type of basis functions we are using by setting nodes per dimension of an 
             this->simulator->Nn1d = Nn1d;
@@ -246,7 +247,9 @@ public:
         displayOnMATLAB(stream);
 
         // Create global K M and F 
-        if (this->createMatrices) { // only need to create the KMF matrices the first time
+        if (this->createAllMatrices) { // only need to create the KMF matrices the first time
+            this->createAllMatrices = false;
+            this->createFirrMatrix = false;
             try {
                 this->simulator->createKMFelem();
                 stream << "Global matrices created" << std::endl;
@@ -258,6 +261,12 @@ public:
                 displayError(e.what());
                 return;
             }
+        }
+        else if (this->createFirrMatrix) {
+            this->createFirrMatrix = false;
+            this->simulator->createFirr();
+            stream << "Firr Matrix created" << std::endl;
+            displayOnMATLAB(stream);
         }
 
         // Perform time stepping
@@ -288,7 +297,7 @@ public:
         }
         outputs[1] = sensorTempsOutput;
 
-        this->createMatrices = false;
+        
     }
 
     /* This function makes sure that user has provided the proper inputs
@@ -361,26 +370,26 @@ public:
     bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& NFR,
         float tissueSize[3],float layerHeight, int layerSize,int boundaryType[6]) {
         // this function checks to see if we need to recreate the global element matrices
-        this->createMatrices = false;
+        this->createAllMatrices = false;
 
         // if the number of nodes in 1 dimension for an element changes, we need to reconstruct the matrices
         if (this->simulator->Nn1d != Nn1d) {
-            this->createMatrices = true;
+            this->createAllMatrices = true;
         }
         // if the size of our temperature vector changes, we need to reconstruct the matrices
-        if (T0.size() != this->simulator->nodeSize[0]) this->createMatrices = true; 
-        if (T0[0].size() != this->simulator->nodeSize[1]) this->createMatrices = true;
-        if (T0[0][0].size() != this->simulator->nodeSize[2]) this->createMatrices = true;
+        if (T0.size() != this->simulator->nodeSize[0]) this->createAllMatrices = true; 
+        if (T0[0].size() != this->simulator->nodeSize[1]) this->createAllMatrices = true;
+        if (T0[0][0].size() != this->simulator->nodeSize[2]) this->createAllMatrices = true;
 
         // if our NFR has changed, we need to reconstruct at least Firr
         // TODO make it so that we only reconstruct Firr instead of all of them
         for (int k = 0; k < NFR[0][0].size(); k++) {
-            if (this->createMatrices) break; // flag for breaking out of nested loop
+            if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
             for (int j = 0; j < NFR[0].size(); j++) {
-                if (this->createMatrices) break; // flags for breaking out of nested loop
+                if (this->createFirrMatrix) break; // flags for breaking out of nested loop
                 for (int i = 0; i < NFR.size(); i++) {
                     if (abs(this->simulator->NFR(i + j*NFR.size() + k*NFR.size()*NFR[0].size()) - NFR[i][j][k]) > 0.0001) { // check if difference is greater than 1e-4
-                        this->createMatrices = true;
+                        this->createFirrMatrix = true;
                         break;
                     }
                 }
@@ -388,27 +397,31 @@ public:
         }
 
         // if our tissue size has changed we need to reconstruct all matrices because our jacobian has changed
-        if (tissueSize[0] != this->simulator->tissueSize[0]) this->createMatrices = true;
-        if (tissueSize[1] != this->simulator->tissueSize[1]) this->createMatrices = true;
-        if (tissueSize[2] != this->simulator->tissueSize[2]) this->createMatrices = true;
+        if (tissueSize[0] != this->simulator->tissueSize[0]) this->createAllMatrices = true;
+        if (tissueSize[1] != this->simulator->tissueSize[1]) this->createAllMatrices = true;
+        if (tissueSize[2] != this->simulator->tissueSize[2]) this->createAllMatrices = true;
 
         //if layer height or layer size changed then again we have a jacobian change
-        if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createMatrices = true;
-        if (layerSize != layerSize) this->createMatrices = true;
+        if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createAllMatrices = true;
+        if (layerSize != layerSize) this->createAllMatrices = true;
 
         // check if any boundaries have changed
         for (int b = 0; b < 6; b++) {
             if (boundaryType[b] != this->simulator->boundaryType[b]) {
-                this->createMatrices = true;
+                this->createAllMatrices = true;
                 break;
             }
         }
 
-        if (this->createMatrices) {
+        if (this->createAllMatrices) {
             stream << "Need to recreate Matrices" << std::endl;
             displayOnMATLAB(stream);
         }
+        else if (this->createFirrMatrix) {
+            stream << "Need to recreate Firr Matrix Only" << std::endl;
+            displayOnMATLAB(stream);
+        }
 
-        return this->createMatrices;
+        return this->createAllMatrices;
     }
 };

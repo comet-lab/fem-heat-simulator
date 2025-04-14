@@ -64,6 +64,7 @@ public:
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	void performTimeStepping();
 	void createKMFelem();
+	void createFirr();
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);

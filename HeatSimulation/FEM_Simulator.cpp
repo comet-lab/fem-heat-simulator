@@ -275,6 +275,85 @@ void FEM_Simulator::createKMFelem()
 	}
 }
 
+void FEM_Simulator::createFirr()
+{
+	int nodeFace;
+	int matrixInd[2];
+	int elemNodeSize[3] = { this->Nn1d, this->Nn1d, this->Nn1d };
+	int eSub[3];
+	int AiSub[3];
+	int BiSub[3];
+	int globalNodeSub[3];
+	int globalNodeIdx;
+	int BglobalNodeIdx;
+	bool dirichletFlag = false;
+	bool fluxFlag = false;
+	auto startTime = std::chrono::high_resolution_clock::now();
+
+	if (!this->silentMode) {
+		std::cout << "Creating Firr Matrices" << std::endl;
+	}
+
+	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
+	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	if (nNodes != (((this->Nn1d - 1) * gridSize[0] + 1) * ((this->Nn1d - 1) * gridSize[1] + 1) * ((this->Nn1d - 1) * gridSize[2] + 1))) {
+		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
+	}
+
+	this->initializeElementNodeSurfaceMap(); // link nodes of an element to face of the element
+	this->initializeBoundaryNodes(); // Create a mapping between global node number and index in global matrices and locating dirichlet nodes
+	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
+	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
+	// Initialize matrices so that we don't have to resize them later
+	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	
+	bool layerFlag = false;
+	for (int e = 0; e < numElems; e++) {
+		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
+		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
+
+		this->currElement.elementNumber = e;
+		this->ind2sub(e, this->gridSize, eSub);
+		if ((eSub[2] >= this->layerSize) && !layerFlag) {
+			// we currently assume there will only be one element height change and once the transition has happened, 
+			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
+			// matrices once and we are good to go. 
+			this->initializeElementMatrices(2);
+			layerFlag = true;
+		}
+
+		for (int Ai = 0; Ai < Nne; Ai++) {
+			this->ind2sub(Ai, elemNodeSize, AiSub);
+			for (int ii = 0; ii < 3; ii++) {
+				globalNodeSub[ii] = eSub[ii] * (this->Nn1d - 1) + AiSub[ii];
+			}
+			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+
+			nodeFace = this->determineNodeFace(globalNodeIdx);
+			matrixInd[0] = this->nodeMap[globalNodeIdx];
+			if (matrixInd[0] >= 0) { // Verify that the node we are working with is not a dirichlet node.
+				for (int Bi = 0; Bi < Nne; Bi++) {
+					this->ind2sub(Bi, elemNodeSize, BiSub);
+					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
+					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+
+					if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
+						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+					}
+					else {//nodal NFR so use as given
+						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+					}
+				} // For loop through Bi
+			} // If our node is not a dirichlet node
+		} // For loop through Ai
+	}
+	if (!this->silentMode) {
+		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << "Built the Firr Matrix: " << duration.count() / 1000000.0 << std::endl;
+	}
+}
+
 void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
 	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
 	int nSensors = this->tempSensorLocations.size();
