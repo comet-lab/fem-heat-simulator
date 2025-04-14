@@ -223,7 +223,7 @@ public:
         stream << "OPEMMP Enable" << std::endl;
         displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
-            Eigen::setNbThreads(omp_get_num_procs());
+            Eigen::setNbThreads(omp_get_num_procs()/2);
         }
 #endif
         
