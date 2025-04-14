@@ -94,12 +94,12 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 
-	// The K, M, and F matrices for the entire domain
-	// K = Kint*kappa + Kconv*h
+	// The Kint, M, and Firr matrices for the entire domain
+	// Kint = Kint*kappa + Kconv*h
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
-	// F = Firr*muA + Fconv*h + Fk*kappa + Fq
+	// Firr = Firr*muA + Fconv*h + Fk*kappa + Fq
 	Eigen::VectorXf Firr; // forcing function due to irradiance
 	Eigen::VectorXf Fconv; // forcing functino due to convection
 	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes

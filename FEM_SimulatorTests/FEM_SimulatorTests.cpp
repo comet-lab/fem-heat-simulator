@@ -432,7 +432,7 @@ namespace FEMSimulatorTests
 					KeInt(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcKintAB, 2, 0, Ai, Bi);
 				}
 			}
-			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
 			Assert::IsTrue((abs(3 * TC / 16.0f) - output1) < 0.0001);
 			for (int Ai = 0; Ai < 8; Ai++) {
 				Assert::IsTrue(((1 / 6.0f * TC) - KeInt(Ai, Ai)) < 0.0001);
@@ -457,7 +457,7 @@ namespace FEMSimulatorTests
 			xi[2] = -1;
 			float output1 = simulator->calcKintAB(xi, Ai, Bi);
 			simulator->setKeInt();
-			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 1.0
+			// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 1.0
 			Assert::IsTrue(abs(3.375f - output1) < 0.0001);
 			Assert::IsTrue(abs(0.1244f - simulator->KeInt(0, 0)) < 0.0001);
 			Assert::IsTrue(abs(0.4267f - simulator->KeInt(1, 1)) < 0.0001);
@@ -490,7 +490,7 @@ namespace FEMSimulatorTests
 					Me(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcMAB, 2, 0, Ai, Bi);
 				}
 			}
-			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
 			Assert::IsTrue((abs(1 / 64.0f) - output1) < 0.0001);
 			for (int Ai = 0; Ai < 8; Ai++) {
 				Assert::IsTrue(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
@@ -515,7 +515,7 @@ namespace FEMSimulatorTests
 			xi[2] = FEM_Simulator::A[Ai][2];
 			float output1 = simulator->calcFqA(xi, Ai, 1);
 			simulator->setFeQ();
-			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
+			// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
 			//Assert::IsTrue((abs(1 / 64.0f) - output1) < 0.0001);
 			//for (int Ai = 0; Ai < 8; Ai++) {
 			//	Assert::IsTrue(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
@@ -596,18 +596,18 @@ namespace FEMSimulatorTests
 		//	simulator->setNFR(NFR);
 
 		//	simulator->createKMFelem();
-		//	Eigen::VectorXf Felem = simulator->F;
-		//	Eigen::SparseMatrix<float> Kelem = simulator->K;
+		//	Eigen::VectorXf Felem = simulator->Firr;
+		//	Eigen::SparseMatrix<float> Kelem = simulator->Kint;
 		//	Eigen::SparseMatrix<float> Melem = simulator->M;
 		//	simulator->createKMF();
-		//	Eigen::VectorXf Fnode = simulator->F;
-		//	Eigen::SparseMatrix<float> Knode = simulator->K;
+		//	Eigen::VectorXf Fnode = simulator->Firr;
+		//	Eigen::SparseMatrix<float> Knode = simulator->Kint;
 		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
 		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
 		//	for (int i = 0; i < totalNodes; i++) {
-		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
+		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"Firr - Error on index i: ") + std::to_wstring(i)).c_str());
 		//		for (int j = 0; j < totalNodes; j++) {
-		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"Kint - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 		//		}
 		//	}
@@ -646,18 +646,18 @@ namespace FEMSimulatorTests
 		//	simulator->setNFR(NFR);
 
 		//	simulator->createKMFelem();
-		//	Eigen::VectorXf Felem = simulator->F;
-		//	Eigen::SparseMatrix<float> Kelem = simulator->K;
+		//	Eigen::VectorXf Felem = simulator->Firr;
+		//	Eigen::SparseMatrix<float> Kelem = simulator->Kint;
 		//	Eigen::SparseMatrix<float> Melem = simulator->M;
 		//	simulator->createKMF();
-		//	Eigen::VectorXf Fnode = simulator->F;
-		//	Eigen::SparseMatrix<float> Knode = simulator->K;
+		//	Eigen::VectorXf Fnode = simulator->Firr;
+		//	Eigen::SparseMatrix<float> Knode = simulator->Kint;
 		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
 		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
 		//	for (int i = 0; i < totalNodes; i++) {
-		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"F - Error on index i: ") + std::to_wstring(i)).c_str());
+		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"Firr - Error on index i: ") + std::to_wstring(i)).c_str());
 		//		for (int j = 0; j < totalNodes; j++) {
-		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"K - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
+		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"Kint - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
 		//		}
 		//	}

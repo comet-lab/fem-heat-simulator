@@ -50,7 +50,7 @@ void FEM_Simulator::performTimeStepping()
 	}
 	Eigen::SparseMatrix<float> LHSinit = this->M;
 	initSolver.compute(LHSinit);
-	Eigen::VectorXf RHSinit = this->F - this->K*dVec;
+	Eigen::VectorXf RHSinit = this->Firr - this->Kint*dVec;
 	vVec = initSolver.solve(RHSinit);
 
 	this->updateTemperatureSensors(0, dVec);
@@ -64,7 +64,7 @@ void FEM_Simulator::performTimeStepping()
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->K;
+	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->Kint;
 	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
@@ -82,7 +82,7 @@ void FEM_Simulator::performTimeStepping()
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		RHS = this->F - this->K * dTilde;
+		RHS = this->Firr - this->Kint * dTilde;
 		vVec = solver.solveWithGuess(RHS,vVec);
 		//vVec = solver.solve(RHS);
 		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
@@ -148,11 +148,11 @@ void FEM_Simulator::createKMFelem()
 	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
 
 	// Initialize matrices so that we don't have to resize them later
-	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
-	this->K = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
-	this->K.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
+	this->Kint = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->Kint.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -193,10 +193,10 @@ void FEM_Simulator::createKMFelem()
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
 							if ((this->boundaryType[f] == FLUX)) { // flux boundary
-								this->F(matrixInd[0]) += this->FeQ(Ai, f);
+								this->Firr(matrixInd[0]) += this->FeQ(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								this->F(matrixInd[0]) += this->FeConv(Ai, f);
+								this->Firr(matrixInd[0]) += this->FeConv(Ai, f);
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
@@ -206,11 +206,11 @@ void FEM_Simulator::createKMFelem()
 									if (matrixInd[1] >= 0) {
 										//int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base Nne. 
 										//// If we say Nne = 8, if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
+										this->Kint.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
 										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeConv[f](Ai, Bi)));
 									}
 									else {
-										this->F(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
+										this->Firr(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
 									}
 								}
 							} 
@@ -224,34 +224,34 @@ void FEM_Simulator::createKMFelem()
 					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
 
 					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
-					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to K and M and F
-						this->K.coeffRef(matrixInd[0], matrixInd[1]) += this->KeInt(Ai, Bi);
+					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to Kint and M and Firr
+						this->Kint.coeffRef(matrixInd[0], matrixInd[1]) += this->KeInt(Ai, Bi);
 						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeInt(Ai, Bi)));
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
 						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
 						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					}
-					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to F... could be an if - else
-						this->F(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
+					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to Firr... could be an if - else
+						this->Firr(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
 						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
-							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
 						}
 						else {//nodal NFR so use as given
-							this->F(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
 						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
 			} // If our node is not a dirichlet node
 		} // For loop through Ai
 	}
-	//this->K.setFromTriplets(Ktriplets.begin(),Ktriplets.end());
+	//this->Kint.setFromTriplets(Ktriplets.begin(),Ktriplets.end());
 	//this->M.setFromTriplets(Mtriplets.begin(),Mtriplets.end());
-	this->K.makeCompressed();
+	this->Kint.makeCompressed();
 	this->M.makeCompressed();
 
 	if (!this->silentMode) {
