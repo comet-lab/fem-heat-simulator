@@ -137,7 +137,7 @@ public:
 
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
-            simulator->setTemp(T0);
+            simulator->setInitialTemperature(T0);
             //display3DVector(simulator->Temp,"Initial Temp: ");
 
             simulator->Nn1d = Nn1d;
@@ -220,8 +220,10 @@ public:
 
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
+        stream << "OPEMMP Enable" << std::endl;
+        displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
-            Eigen::setNbThreads(omp_get_num_procs());
+            Eigen::setNbThreads(omp_get_num_procs()/2);
         }
 #endif
         
