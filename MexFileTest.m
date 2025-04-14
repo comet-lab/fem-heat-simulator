@@ -12,8 +12,8 @@ MUA = 25;
 TC = 0.0062;
 VHC = 4.3;
 HTC = 0.05;
-useAllCPUs = true;
-silentMode = false;
+useAllCPUs = false;
+silentMode = true;
 Nn1d = 2;
 layerInfo = [0.05,30];
 sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
@@ -30,12 +30,19 @@ tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Jn = 0;
-
-fprintf("\n\n");
 tic
-[TpredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
-    deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
+for j = 1:2
+parfor i = 1:6
+fprintf("\n\n");
+
+tempTP = tissueProperties
+tempTP(1) = i*10;
+[~,~] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
+    deltaT,tempTP,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
     silentMode,layerInfo);
+
+end
+end
 toc
 
 figure(1);

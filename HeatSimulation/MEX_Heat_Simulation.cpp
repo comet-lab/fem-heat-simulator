@@ -99,7 +99,7 @@ public:
     */
     void displayOnMATLAB(std::ostringstream& stream) {
         // Pass stream content to MATLAB fprintf function
-        if (!silentMode) {
+        if (!this->silentMode) {
             matlab::data::ArrayFactory factory;
             matlabPtr->feval(u"fprintf", 0,
                 std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
@@ -133,10 +133,10 @@ public:
     void
         operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         stream.str("");
-        stream << "First Call: " << this->createAllMatrices << std::endl;
-        displayOnMATLAB(stream);
         try {
             checkArguments(outputs, inputs);
+            stream << "First Call: " << this->createAllMatrices << std::endl;
+            displayOnMATLAB(stream);
 
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
@@ -351,8 +351,8 @@ public:
             useAllCPUs = inputs[10][0];
         }
         if (inputs.size() > 11) {
-            silentMode = inputs[11][0];
-            this->simulator->silentMode = silentMode;
+            this->silentMode = inputs[11][0];
+            this->simulator->silentMode = this->silentMode;
         }
         if (inputs.size() > 12) {
             layerHeight = inputs[12][0];
