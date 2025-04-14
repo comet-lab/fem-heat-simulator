@@ -1,21 +1,21 @@
 clear MEX_Heat_Simulation
-tissueSize = [1.0,1.0,0.5];
-nodeSize = [35,35,51];
-ambientTemp = 20;
-T0 = single(ambientTemp*ones(nodeSize));
+tissueSize = [2.0,2.0,1.0];
+nodeSize = [41,41,50];
+ambientTemp = 24;
+T0 = single(20*ones(nodeSize));
 deltaT = 0.05;
 tFinal = single(15.0);
-w0 = 0.021;
-focalPoint = 25;
-MUA = 800;
-TC = 0.006;
-VHC = 4.5;
-HTC = 0.075;
+w0 = 0.0168;
+focalPoint = 35;
+MUA = 0;
+TC = 0.0062;
+VHC = 4.3;
+HTC = 0.05;
 useAllCPUs = true;
 silentMode = false;
 Nn1d = 2;
-layerInfo = [0.025,30];
-sensorPositions = [0,0,0];
+layerInfo = [0.05,30];
+sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
 
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
@@ -29,47 +29,34 @@ tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Jn = 0;
-%% 
+fprintf("\n\n");
 tic
 [TpredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
     deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
     silentMode,layerInfo);
 toc
-%%
-nodeSize = [35,35,601];
-T0 = single(ambientTemp*ones(nodeSize));
-layerInfo = [tissueSize(3),nodeSize(3)-1];
-x = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodeSize(1));
-y = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodeSize(2));
-z = linspace(0,tissueSize(3),nodeSize(3));
-[X,Y,Z] = meshgrid(x,y,z);
-NFR = single(I(X,Y,Z));
-tic
-[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,NFR,tissueSize',tFinal,...
-    deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
-    silentMode,layerInfo);
-toc
 
-%%
 figure(1);
 clf;
 hold on;
-plot(0:deltaT:tFinal,sensorTempsLayer,'LineWidth',2,'DisplayName',"Two Layers");
-plot(0:deltaT:tFinal,sensorTemps,'LineWidth',2,'DisplayName',"One Layer");
+for ss = 1:size(sensorPositions,1)
+    plot(0:deltaT:tFinal,sensorTempsLayer(ss,:),'LineWidth',2,'DisplayName',...
+        sprintf("(%g,%g,%g)",sensorPositions(ss,:)));
+end
 hold off
 grid on;
 xlabel("Time (s)");
 ylabel("Temperature (deg C)");
 title("Sensor temperature over time");
 legend()
-
+%%
 figure(2);
 clf;
 tiledlayout('flow');
 nexttile()
 hold on
 plot(zLayer,reshape(NFRLayer(17,17,:),size(zLayer)),'LineWidth',2,'DisplayName',"Two Layers")
-plot(z,reshape(NFR(17,17,:),size(z)),'LineWidth',2,'DisplayName',"One Layers")
+% plot(z,reshape(NFR(17,17,:),size(z)),'LineWidth',2,'DisplayName',"One Layers")
 hold off
 grid on;
 legend()
@@ -79,7 +66,7 @@ title("Normalized Fluence Rate with 2 Layers");
 nexttile()
 hold on
 plot(zLayer(1:30),reshape(NFRLayer(17,17,1:30),size(zLayer(1:30))),'LineWidth',2,'DisplayName',"Two Layers")
-plot(z(1:30),reshape(NFR(17,17,1:30),size(z(1:30))),'LineWidth',2,'DisplayName',"One Layers")
+% plot(z(1:30),reshape(NFR(17,17,1:30),size(z(1:30))),'LineWidth',2,'DisplayName',"One Layers")
 hold off
 grid on;
 legend()
@@ -91,7 +78,7 @@ figure(3);
 clf;
 hold on
 plot(zLayer,reshape(TpredLayer(17,17,:),size(zLayer)),'LineWidth',2,'DisplayName',sprintf("Two Layers"))
-plot(z,reshape(Tpred(17,17,:),size(z)),'LineWidth',2,'DisplayName',sprintf("One Layer"))
+% plot(z,reshape(Tpred(17,17,:),size(z)),'LineWidth',2,'DisplayName',sprintf("One Layer"))
 hold off
 grid on;
 xlabel("Depth (cm)");

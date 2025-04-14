@@ -25,7 +25,7 @@ void FEM_Simulator::performTimeStepping()
 	// Apply parameter specific multiplication for each global matrix.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
 	this->M = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
-	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq;
+	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
 
 	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];

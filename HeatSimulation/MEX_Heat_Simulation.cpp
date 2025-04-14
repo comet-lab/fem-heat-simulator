@@ -181,7 +181,7 @@ public:
             stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
                boundaryType[i] = inputs[6][i];
-                 stream << boundaryType[0] << ", ";
+               stream << boundaryType[i] << ", ";
             }
             stream << std::endl;
             displayOnMATLAB(stream);
