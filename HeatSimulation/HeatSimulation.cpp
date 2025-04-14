@@ -55,6 +55,8 @@ int main()
 
     float totalTime = 15.0f;
     simulator->createKMFelem();
+
+    simulator->setMUA(0);
     for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
         
         simulator->performTimeStepping();

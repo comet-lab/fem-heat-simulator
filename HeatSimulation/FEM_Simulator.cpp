@@ -22,6 +22,11 @@ void FEM_Simulator::performTimeStepping()
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 
+	// Apply parameter specific multiplication for each global matrix.
+	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
+	this->M = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq;
+
 	//this->NFR = NFR;
 	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
 	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
@@ -50,7 +55,7 @@ void FEM_Simulator::performTimeStepping()
 	}
 	Eigen::SparseMatrix<float> LHSinit = this->M;
 	initSolver.compute(LHSinit);
-	Eigen::VectorXf RHSinit = this->Firr - this->Kint*dVec;
+	Eigen::VectorXf RHSinit = (globF) - globK*dVec;
 	vVec = initSolver.solve(RHSinit);
 
 	this->updateTemperatureSensors(0, dVec);
@@ -64,7 +69,7 @@ void FEM_Simulator::performTimeStepping()
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * this->Kint;
+	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * globK;
 	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
@@ -82,7 +87,7 @@ void FEM_Simulator::performTimeStepping()
 		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
 		std::cout << msg.str();*/
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
-		RHS = this->Firr - this->Kint * dTilde;
+		RHS = globF - globK * dTilde;
 		vVec = solver.solveWithGuess(RHS,vVec);
 		//vVec = solver.solve(RHS);
 		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
@@ -149,10 +154,18 @@ void FEM_Simulator::createKMFelem()
 
 	// Initialize matrices so that we don't have to resize them later
 	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	// TODO: make these three vectors sparse because they will only be non zero on the boundary nodes
+	this->Fconv = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->Fk = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->Fq = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+
 	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
 	this->Kint = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kint.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
+	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
+	this->Kconv = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->Kconv.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -193,10 +206,10 @@ void FEM_Simulator::createKMFelem()
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
 							if ((this->boundaryType[f] == FLUX)) { // flux boundary
-								this->Firr(matrixInd[0]) += this->FeQ(Ai, f);
+								this->Fq(matrixInd[0]) += this->FeQ(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
-								this->Firr(matrixInd[0]) += this->FeConv(Ai, f);
+								this->Fconv(matrixInd[0]) += this->FeConv(Ai, f);
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
@@ -206,11 +219,11 @@ void FEM_Simulator::createKMFelem()
 									if (matrixInd[1] >= 0) {
 										//int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base Nne. 
 										//// If we say Nne = 8, if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
-										this->Kint.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
+										this->Kconv.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
 										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeConv[f](Ai, Bi)));
 									}
 									else {
-										this->Firr(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
+										this->Fconv(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
 									}
 								}
 							} 
@@ -237,7 +250,7 @@ void FEM_Simulator::createKMFelem()
 						}
 					}
 					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to Firr... could be an if - else
-						this->Firr(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
+						this->Fk(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
 						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
 							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
 						}
@@ -251,6 +264,7 @@ void FEM_Simulator::createKMFelem()
 	}
 	//this->Kint.setFromTriplets(Ktriplets.begin(),Ktriplets.end());
 	//this->M.setFromTriplets(Mtriplets.begin(),Mtriplets.end());
+	this->Kconv.makeCompressed();
 	this->Kint.makeCompressed();
 	this->M.makeCompressed();
 
@@ -621,7 +635,9 @@ float FEM_Simulator::calcKintAB(float xi[3], int Ai, int Bi)
 	NAdotB = this->calculateNA_dot(xi, Bi);
 	
 	KABfunc = (NAdotA.transpose()* Jinv * Jinv.transpose()*NAdotB); // matrix math
-	KABfunc = float(J.determinant() * this->TC * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
+	// The 1 should be replaced with this->TC if we change how the elemental matrices are computed
+	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
+	KABfunc = float(J.determinant() * 1 * KABfunc); // Type issues if this multiplication is done with the matrix math so i am doing it on its own line
 	return KABfunc;
 }
 
@@ -634,8 +650,9 @@ float FEM_Simulator::calcMAB(float xi[3], int Ai, int Bi)
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
-
-	MABfunc = (NAa * NAb) * J.determinant() * this->VHC; // matrix math
+	// The 1 should be replaced with this->VHC if we change how the elemental matrices are computed
+	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
+	MABfunc = (NAa * NAb) * J.determinant() * 1; // matrix math
 	return MABfunc;
 }
 
@@ -648,7 +665,9 @@ float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
-	FintFunc = this->MUA * (NAa * NAb) * J.determinant();
+	// The 1 should be replaced with this->MUA if we change how the elemental matrices are computed
+	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
+	FintFunc = 1 * (NAa * NAb) * J.determinant();
 	// Output of this still needs to get multiplied by the NFR at node Bi
 	return FintFunc;
 }
@@ -691,7 +710,9 @@ float FEM_Simulator::calcFconvA(float xi[3], int Ai, int dim)
 	}
 
 	NAa = this->calculateNA(xi, Ai);
-	FvFunc = (NAa * this->HTC) * this->ambientTemp * Js.determinant();
+	// The 1 should be replaced with this->HTC if we change how the elemental matrices are computed
+	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
+	FvFunc = (NAa * 1) * this->ambientTemp * Js.determinant();
 	return FvFunc;
 }
 
@@ -717,8 +738,9 @@ float FEM_Simulator::calcKconvAB(float xi[3], int AiBi, int dim)
 	}
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
-
-	FvuFunc += (NAa * NAb * this->HTC) * Js.determinant();
+	// The 1 should be replaced with this->HTC if we change how the elemental matrices are computed
+	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
+	FvuFunc += (NAa * NAb * 1) * Js.determinant();
 	
 	return FvuFunc;
 }
