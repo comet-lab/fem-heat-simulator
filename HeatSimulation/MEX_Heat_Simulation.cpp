@@ -220,6 +220,8 @@ public:
 
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
+        stream << "OPEMMP Enable" << std::endl;
+        displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
             Eigen::setNbThreads(omp_get_num_procs());
         }
