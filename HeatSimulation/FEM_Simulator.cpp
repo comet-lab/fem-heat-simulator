@@ -1068,7 +1068,7 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 				// calculate beam width at depth
 				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
 				// calculate laser irradiance
-				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::expf(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
+				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::exp(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
 				// set laser irradiane
 				this->NFR(i + j * this->nodeSize[0] + k * this->nodeSize[0] * this->nodeSize[1]) = irr;
 				// increase z pos
