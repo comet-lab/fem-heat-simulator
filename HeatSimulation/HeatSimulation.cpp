@@ -10,7 +10,7 @@ int main()
     auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
 
-    int nodeSize[3] = { 41,41,41 };
+    int nodeSize[3] = { 41,41,50 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
@@ -23,7 +23,7 @@ int main()
         }
     }
     int Nn1d = 2;
-    float tissueSize[3] = { 0.5f,0.5f,0.5f };
+    float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
     FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
     simulator->setLayer(0.5f, 40);
@@ -36,12 +36,12 @@ int main()
 
     simulator->deltaT = 0.05f;
     simulator->tFinal = 15.0f;
-    int BC[6] = { 2,2,2,2,2,2 };
+    int BC[6] = { 2,0,0,0,0,0 };
     simulator->setBoundaryConditions(BC);
     simulator->setFlux(0.0f);
     simulator->setAmbientTemp(24);
 
-    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0} };
+    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.95f}, {1,0,0}, {0,1,0},{0,0,1} };
     simulator->setSensorLocations(tempSensorLocations);
 
     std::cout << "Running FEA" << std::endl;
@@ -56,7 +56,6 @@ int main()
     float totalTime = 15.0f;
     simulator->createKMFelem();
 
-    simulator->setMUA(0);
     for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
         
         simulator->performTimeStepping();

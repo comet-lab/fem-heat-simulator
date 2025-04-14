@@ -277,7 +277,6 @@ void FEM_Simulator::createKMFelem()
 
 void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
 	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
-	/*TODO SENSORS IN LAYER 2 ALSO DON'T WORK. THEY MIGHT WORK IN LAYER 1*/
 	int nSensors = this->tempSensorLocations.size();
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
@@ -294,6 +293,11 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 			// This should compensate for the change in layer appropriately.
 			globalNodeStart[2] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
 		}
+		// If the global node starting position of the element is the largest in a singular axis then we need to subtract one
+		// and use the previous node position
+		if (globalNodeStart[0] == this->gridSize[0]) globalNodeStart[0] -= 1;
+		if (globalNodeStart[1] == this->gridSize[1]) globalNodeStart[1] -= 1;
+		if (globalNodeStart[2] == this->gridSize[2]) globalNodeStart[2] -= 1;
 		float tempValue = 0;
 		float xi[3];
 		// Xi should be  avalue between -1 and 1 along each axis relating the placement of the sensor in that element.
