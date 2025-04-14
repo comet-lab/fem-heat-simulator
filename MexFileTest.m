@@ -1,13 +1,14 @@
 clear MEX_Heat_Simulation
+%%
 tissueSize = [2.0,2.0,1.0];
 nodeSize = [41,41,50];
 ambientTemp = 24;
 T0 = single(20*ones(nodeSize));
 deltaT = 0.05;
-tFinal = single(15.0);
+tFinal = single(1.0);
 w0 = 0.0168;
 focalPoint = 35;
-MUA = 0;
+MUA = 50;
 TC = 0.0062;
 VHC = 4.3;
 HTC = 0.05;
@@ -29,6 +30,7 @@ tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Jn = 0;
+
 fprintf("\n\n");
 tic
 [TpredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...

@@ -24,7 +24,7 @@ void FEM_Simulator::performTimeStepping()
 
 	// Apply parameter specific multiplication for each global matrix.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
-	this->M = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	Eigen::SparseMatrix<float, Eigen::RowMajor> globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
 	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
 
 	//this->NFR = NFR;
@@ -53,7 +53,7 @@ void FEM_Simulator::performTimeStepping()
 		dVec(counter) = this->Temp(n);
 		counter++;
 	}
-	Eigen::SparseMatrix<float> LHSinit = this->M;
+	Eigen::SparseMatrix<float> LHSinit = globM;
 	initSolver.compute(LHSinit);
 	Eigen::VectorXf RHSinit = (globF) - globK*dVec;
 	vVec = initSolver.solve(RHSinit);
@@ -69,7 +69,7 @@ void FEM_Simulator::performTimeStepping()
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
-	Eigen::SparseMatrix<float> LHS = this->M + this->alpha * this->deltaT * globK;
+	Eigen::SparseMatrix<float> LHS = globM + this->alpha * this->deltaT * globK;
 	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
