@@ -121,6 +121,7 @@ public:
 
 	void initializeBoundaryNodes();
 	void initializeElementNodeSurfaceMap();
+	void initializeElementMatrices(int layer);
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
 	float calculateNABase(float xi, int Ai);

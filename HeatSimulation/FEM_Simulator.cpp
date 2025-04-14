@@ -143,7 +143,8 @@ void FEM_Simulator::createKMFelem()
 	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
 	}
-	this->initializeBoundaryNodes();
+	this->initializeBoundaryNodes(); // Get a list of all the nodes that are in the boundary
+	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
 
 	// Initialize matrices so that we don't have to resize them later
 	this->F = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
@@ -169,7 +170,7 @@ void FEM_Simulator::createKMFelem()
 			// we currently assume there will only be one element height change and once the transition has happened, 
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
 			// matrices once and we are good to go. 
-			this->setJ(2);
+			this->initializeElementMatrices(2);
 			layerFlag = true;
 		}
 
@@ -796,6 +797,19 @@ void FEM_Simulator::initializeElementNodeSurfaceMap()
 	}
 }
 
+void FEM_Simulator::initializeElementMatrices(int layer)
+{	
+	//This function will initialize the elemental matrices of a node
+	// It starts with the jacobian because the Jacobian is used in every integration. 
+	this->setJ(layer);
+	this->setKe();
+	this->setFeInt();
+	this->setMe();
+	this->setFj();
+	this->setFv();
+	this->setFvu();
+}
+
 int FEM_Simulator::determineNodeFace(int globalNode)
 {	// This function implicitly determines the position of our reference frame on the surface of the tissue
 	// and how that reference frame relates to the index of the matrix. This function is
@@ -979,35 +993,27 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
-	this->setKe();
 }
 
 void FEM_Simulator::setVHC(float VHC) {
 	this->VHC = VHC;
-	this->setMe();
-	//this->setMn();
 }
 
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
-	setFeInt();
 }
 
 void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
-	this->setFv();
-	this->setFvu();
 }
 
 void FEM_Simulator::setJn(float Jn)
 {
 	this->Jn = Jn;
-	this->setFj();
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 	this->ambientTemp = ambientTemp;
-	this->setFv();
 }
 
 void FEM_Simulator::setGridSize(int gridSize[3]) {
@@ -1048,12 +1054,8 @@ void FEM_Simulator::setJ(int layer) {
 	this->Js1 = this->calculateJs(1, layer);
 	this->Js2 = this->calculateJs(2, layer);
 	this->Js3 = this->calculateJs(3, layer);
-	this->setKe();
-	this->setMe();
-	this->setFeInt();
-	//this->setKn();
-	//this->setMn();
-	//this->setFnInt();
+	// The jacobian influences all of the other elemental matrices (Ke, Me, Fe, etc)
+	// Should setting the Jacobian automatically recompute the other matrices?
 }
 
 void FEM_Simulator::setBoundaryConditions(int BC[6])
