@@ -1020,9 +1020,8 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 void FEM_Simulator::setGridSize(int gridSize[3]) {
 	for (int i = 0; i < 3; i++) {
 		this->gridSize[i] = gridSize[i];
-		this->nodeSize[i] = gridSize[i]*(this->Nn1d - 1) + 1;
+		this->nodeSize[i] = gridSize[i] * (this->Nn1d - 1) + 1;
 	}
-	this->setJ();
 }
 
 void FEM_Simulator::setNodeSize(int nodeSize[3]) {
@@ -1030,7 +1029,6 @@ void FEM_Simulator::setNodeSize(int nodeSize[3]) {
 		this->gridSize[i] = nodeSize[i] - 1;
 		this->nodeSize[i] = nodeSize[i];
 	}
-	setJ();
 }
 
 void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
