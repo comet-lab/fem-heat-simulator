@@ -6,7 +6,6 @@ const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
 {
 	this->Nn1d = Nn1d;
-	this->initializeElementNodeSurfaceMap();
 	this->setTemp(Temp);
 	this->setTissueSize(tissueSize);
 	this->setLayer(tissueSize[2], (Temp[0][0].size()-1) / (Nn1d-1));
@@ -143,7 +142,9 @@ void FEM_Simulator::createKMFelem()
 	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
 	}
-	this->initializeBoundaryNodes(); // Get a list of all the nodes that are in the boundary
+
+	this->initializeElementNodeSurfaceMap(); // link nodes of an element to face of the element
+	this->initializeBoundaryNodes(); // Create a mapping between global node number and index in global matrices and locating dirichlet nodes
 	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
 
 	// Initialize matrices so that we don't have to resize them later
