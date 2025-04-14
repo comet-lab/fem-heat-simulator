@@ -905,6 +905,22 @@ void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 	this->Temp = Temp;
 }
 
+std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
+{
+	std::vector<std::vector<std::vector<float>>> 
+		TempOut(this->nodeSize[0], std::vector<std::vector<float>>(this->nodeSize[1], std::vector<float>(this->nodeSize[2])));
+
+	for (int i = 0; i < this->nodeSize[0]; i++) {
+		for (int j = 0; j < this->nodeSize[1]; j++) {
+			for (int k = 0; k < this->nodeSize[2]; k++) {
+				TempOut[i][j][k] = Temp(i + j * (this->nodeSize[0]) + k * (this->nodeSize[0] * this->nodeSize[1]));
+			}
+		}
+	}
+
+	return TempOut;
+}
+
 void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 {
 	this->NFR = Eigen::VectorXf::Zero(NFR.size() * NFR[0].size() * NFR[0][0].size());

@@ -116,7 +116,7 @@ public:
         for (int k = 0; k < dim3; k++) {
             for (int j = 0; j < dim2; j++) {
                 for (int i = 0; i < dim1; i++) {
-                    stream << simulator->Temp[i][j][k] << ", ";
+                    stream << vec[i][j][k] << ", ";
                     displayOnMATLAB(stream);
                 }
                 stream << std::endl;
@@ -137,7 +137,7 @@ public:
 
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
-            simulator->setInitialTemperature(T0);
+            simulator->setTemp(T0);
             //display3DVector(simulator->Temp,"Initial Temp: ");
 
             simulator->Nn1d = Nn1d;
@@ -255,7 +255,8 @@ public:
 
         // Have to convert the std::vector to a matlab array for output
         //display3DVector(simulator->Temp, "Final Temp: ");
-        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
+        std::vector<std::vector<std::vector<float>>> TFinal = simulator->getTemp();
+        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
         matlab::data::ArrayFactory factory;
         matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ simulator->sensorTemps.size(), simulator->sensorTemps[0].size()});

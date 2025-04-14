@@ -67,6 +67,7 @@ public:
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
+	std::vector<std::vector<std::vector<float>>> getTemp();
 	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
 	void setNFR(Eigen::VectorXf& NFR);
 	void setNFR(float laserPose[6], float laserPower, float beamWaist);
