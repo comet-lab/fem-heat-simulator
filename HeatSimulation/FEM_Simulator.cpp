@@ -58,7 +58,7 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->FeQ = inputSim.FeQ; // Element Construction of Fq
 	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
 	this->FeConv = inputSim.FeConv; // Elemental Construction of FConv
-	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A
 	this->KeConv = inputSim.KeConv; // Elemental construction of KConv
 	this->J = inputSim.J;
 	this->Js1 = inputSim.Js1;
@@ -66,8 +66,8 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->Js3 = inputSim.Js3;
 	this->validNodes = inputSim.validNodes; // global indicies on non-dirichlet boundary nodes
 	this->dirichletNodes = inputSim.dirichletNodes;
-	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
-	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
+	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations.
+	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
 }
 
@@ -360,17 +360,17 @@ void FEM_Simulator::createFirr()
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	// Initialize matrices so that we don't have to resize them later
 	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
-	
+
 	bool layerFlag = false;
 	for (int e = 0; e < numElems; e++) {
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
-		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
+		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold.
 
 		this->ind2sub(e, this->gridSize, eSub);
 		if ((eSub[2] >= this->layerSize) && !layerFlag) {
-			// we currently assume there will only be one element height change and once the transition has happened, 
-			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
-			// matrices once and we are good to go. 
+			// we currently assume there will only be one element height change and once the transition has happened,
+			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental
+			// matrices once and we are good to go.
 			this->initializeElementMatrices(2);
 			layerFlag = true;
 		}
@@ -417,10 +417,15 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 	float spacingLayer2[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->gridSize[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
-		//globalNodeStart holds the global node subscript of the first node in the element that contains this sensor
-		int globalNodeStart[3] = { floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
-			floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
-			floor(sensorLocation[2] / spacingLayer1[2]) };
+		// TODO: Review Cal's Changes
+                //globalNodeStart holds the global node subscript of the first node in the element that contains this sensor
+//		int globalNodeStart[3] = { floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
+//			floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
+//			floor(sensorLocation[2] / spacingLayer1[2]) };
+		int globalNodeStart[3] = { static_cast<int>(floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0])),
+			static_cast<int>(floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1])),
+			static_cast<int>(floor(sensorLocation[2] / spacingLayer1[2])) };
+
 		if (sensorLocation[2] > this->layerHeight) {
 			// This should compensate for the change in layer appropriately.
 			globalNodeStart[2] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
@@ -726,15 +731,15 @@ float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int)
 					output += (this->*func)(xi, param1, param2) * weights[i] * weights[j] * weights[k];
 				}
 			} if (abs(dim) == 1) { // we are in the y-z plane
-				float xi[3] = { dim / abs(dim), zeros[i], zeros[j] };
+				float xi[3] = { static_cast<float>(dim / abs(dim)), zeros[i], zeros[j] };
 				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 2) { // we are in the x-z plane
-				float xi[3] = { zeros[i], dim / abs(dim), zeros[j] };
+				float xi[3] = { zeros[i], static_cast<float>(dim / abs(dim)), zeros[j] };
 				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 			else if (abs(dim) == 3) { // we are in the x-y plane
-				float xi[3] = { zeros[i], zeros[j], dim / abs(dim) };
+				float xi[3] = { zeros[i], zeros[j], static_cast<float>(dim / abs(dim)) };
 				output += (this->*func)(xi, param1, param2) * weights[i] * weights[j];
 			}
 		}
@@ -957,9 +962,9 @@ void FEM_Simulator::initializeElementNodeSurfaceMap()
 }
 
 void FEM_Simulator::initializeElementMatrices(int layer)
-{	
+{
 	//This function will initialize the elemental matrices of a node
-	// It starts with the jacobian because the Jacobian is used in every integration. 
+	// It starts with the jacobian because the Jacobian is used in every integration.
 	this->setJ(layer);
 	this->setKeInt();
 	this->setFeIrr();
@@ -1043,7 +1048,7 @@ void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 
 std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
 {
-	std::vector<std::vector<std::vector<float>>> 
+	std::vector<std::vector<std::vector<float>>>
 		TempOut(this->nodeSize[0], std::vector<std::vector<float>>(this->nodeSize[1], std::vector<float>(this->nodeSize[2])));
 
 	for (int i = 0; i < this->nodeSize[0]; i++) {
