@@ -7,7 +7,7 @@ nodeSize = [41,41,71];
 ambientTemp = 24;
 T0 = single(20*ones(nodeSize));
 deltaT = 0.05;
-tFinal = single(0.05);
+tFinal = single(15);
 w0 = 0.0168;
 focalPoint = 35;
 MUA = 200;
@@ -32,33 +32,24 @@ tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Jn = 0;
+createMatrices = true;
+%% Running MEX File
 
-%% Timing Tests
-numSamples = 100;
-timeVec = zeros(2,numSamples);
-for cc = 0:1
-    createMatrices = logical(cc);
-    for i = 1:numSamples
-        tic
-        if ~silentMode
-            fprintf("\n");
-        end
-        [TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,createMatrices);
-        timeVec(cc+1,i) = toc;
-    end
-    fprintf("CreateMatrices is %d\n", cc);
-    fprintf("Average time per run: %0.4f s\n", mean(timeVec(cc+1,:)));
-    fprintf("Total time for %d samples: %0.4f\n", numSamples, sum(timeVec(cc+1,:)));
+tic
+if ~silentMode
+    fprintf("\n");
 end
+[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
+    deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
+    silentMode,layerInfo,Nn1d,createMatrices);
+toc
 
-%%
+%% Plot Sensor Temps over time
 figure(1);
 clf;
 hold on;
 for ss = 1:size(sensorPositions,1)
-    plot(0:deltaT:tFinal,sensorTempsLayer(ss,:),'LineWidth',2,'DisplayName',...
+    plot(0:deltaT:tFinal,sensorTemps(ss,:),'LineWidth',2,'DisplayName',...
         sprintf("(%g,%g,%g)",sensorPositions(ss,:)));
 end
 hold off
@@ -67,14 +58,14 @@ xlabel("Time (s)");
 ylabel("Temperature (deg C)");
 title("Sensor temperature over time");
 legend()
-%%
+%% plot depth irradiance at final time step
 figure(2);
 clf;
 tiledlayout('flow');
 nexttile()
 hold on
-plot(zLayer,reshape(NFRLayer(17,17,:),size(zLayer)),'LineWidth',2,'DisplayName',"Two Layers")
-% plot(z,reshape(NFR(17,17,:),size(z)),'LineWidth',2,'DisplayName',"One Layers")
+plot(zLayer,reshape(NFRLayer(floor(nodeSize(1)/2),floor(nodeSize(2)/2),:),size(zLayer)),...
+    'LineWidth',2,'DisplayName',"Two Layers")
 hold off
 grid on;
 legend()
@@ -83,8 +74,8 @@ ylabel("Normalized Fluence Rate");
 title("Normalized Fluence Rate with 2 Layers");
 nexttile()
 hold on
-plot(zLayer(1:30),reshape(NFRLayer(17,17,1:30),size(zLayer(1:30))),'LineWidth',2,'DisplayName',"Two Layers")
-% plot(z(1:30),reshape(NFR(17,17,1:30),size(z(1:30))),'LineWidth',2,'DisplayName',"One Layers")
+plot(zLayer(1:30),reshape(NFRLayer(floor(nodeSize(1)/2),floor(nodeSize(2)/2),1:30),size(zLayer(1:30))),...
+    'LineWidth',2,'DisplayName',"Two Layers")
 hold off
 grid on;
 legend()
@@ -92,23 +83,24 @@ xlabel("Penetration depth (cm)");
 ylabel("Normalized Fluence Rate");
 title("Normalized Fluence Rate with 2 Layers");
 
+%% Plot Temperature Depth at final time step
 figure(3);
 clf;
 hold on
-plot(zLayer,reshape(TpredLayer(17,17,:),size(zLayer)),'LineWidth',2,'DisplayName',sprintf("Two Layers"))
-% plot(z,reshape(Tpred(17,17,:),size(z)),'LineWidth',2,'DisplayName',sprintf("One Layer"))
+plot(zLayer,reshape(Tpred(floor(nodeSize(1)/2),floor(nodeSize(2)/2),:),size(zLayer)),...
+    'LineWidth',2,'DisplayName',sprintf("Two Layers"))
 hold off
 grid on;
 xlabel("Depth (cm)");
 ylabel("Temperautre (deg C)");
 title("Temperature Prediction with 2 layers");
 legend()
-%%
+%% Surface Temperature Plot
 figure(4)
 clf;
 tiledlayout('flow')
 nexttile()
-surf(X(:,:,1),Y(:,:,1),TpredLayer(:,:,1))
+surf(X(:,:,1),Y(:,:,1),Tpred(:,:,1))
 xlabel("X Axis (cm)")
 ylabel("Y Axis (cm)");
 title("Suraface Temperature Plot Two-layer mesh")
@@ -117,17 +109,3 @@ c.Label.String = 'Temperature (deg C)';
 axis equal
 view(0,90);
 colormap('hot')
-
-
-nexttile()
-surf(X(:,:,1),Y(:,:,1),Tpred(:,:,1))
-xlabel("X Axis (cm)")
-ylabel("Y Axis (cm)");
-title("Suraface Temperature Plot One-layer mesh")
-c = colorbar();
-c.Label.String = 'Temperature (deg C)';
-axis equal
-view(0,90);
-colormap('hot')
-% h_f2 = plotVolumetric.plotVolumetric(2,x,y,z,Tpred,'MCmatlab_fromZero');
-% title(sprintf('Cpp Final Temp, [C]'))
