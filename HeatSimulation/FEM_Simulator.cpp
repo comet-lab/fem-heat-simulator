@@ -233,7 +233,6 @@ void FEM_Simulator::createKMFelem()
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
-		this->currElement.elementNumber = e;
 		this->ind2sub(e, this->gridSize, eSub);
 		if ((eSub[2] >= this->layerSize) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened, 
@@ -367,7 +366,6 @@ void FEM_Simulator::createFirr()
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
-		this->currElement.elementNumber = e;
 		this->ind2sub(e, this->gridSize, eSub);
 		if ((eSub[2] >= this->layerSize) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened, 
