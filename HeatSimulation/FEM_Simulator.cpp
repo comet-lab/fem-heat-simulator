@@ -16,6 +16,61 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	
 }
 
+FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
+{
+	for (int i = 0; i < 3; i++) {
+		this->gridSize[i] = inputSim.gridSize[i]; // Number of elements in x, y, and z [voxels]
+		this->nodeSize[i] = inputSim.nodeSize[i]; // Number of nodes in x, y, and z. Should be gridSize + 1;
+		this->tissueSize[i] = inputSim.tissueSize[i];  // Length of the tissue in x, y, and z [cm]
+	}
+	this->layerHeight = inputSim.layerHeight; // the z-location where we change element height
+	this->layerSize = inputSim.layerSize; // The number of elements corresponding to the first layer height
+	this->TC = inputSim.TC; // Thermal Conductivity [W/cm C]
+	this->VHC = inputSim.VHC; // Volumetric Heat Capacity [W/cm^3]
+	this->MUA = inputSim.MUA; // Absorption Coefficient [cm^-1]
+	this->ambientTemp = inputSim.ambientTemp;  // Temperature surrounding the tissue for Convection [C]
+	this->Temp = inputSim.Temp; // Our values for temperature at the nodes of the elements
+	this->NFR = inputSim.NFR; // Our values for Heat addition
+	this->alpha = inputSim.alpha; // time step weight
+	this->deltaT = inputSim.deltaT; // time step [s]
+	this->tFinal = inputSim.tFinal; // total duration of simulation [s]
+	this->Qn = inputSim.Qn; // heat escaping the Neumann Boundary
+	this->HTC = inputSim.HTC; // convective heat transfer coefficient [W/cm^2]
+	this->Nn1d = inputSim.Nn1d;
+	this->elemNFR = inputSim.elemNFR; // whether the NFR pertains to an element or a node
+	this->boundaryType = inputSim.boundaryType; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
+	this->tempSensorLocations = inputSim.tempSensorLocations;
+	this->sensorTemps = inputSim.sensorTemps;
+	this->Kint = inputSim.Kint; // Conductivity matrix for non-dirichlet nodes
+	this->Kconv = inputSim.Kconv; //Conductivity matrix due to convection
+	this->M = inputSim.M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
+	// Firr = Firr*muA + Fconv*h + Fk*kappa + Fq
+	this->Firr = inputSim.Firr; // forcing function due to irradiance
+	this->Fconv = inputSim.Fconv; // forcing functino due to convection
+	this->Fk = inputSim.Fk; // forcing function due conductivity matrix on dirichlet nodes
+	this->Fq = inputSim.Fq; // forcing function due to constant flux boundary
+
+	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
+	this->KeInt = inputSim.KeInt; // Elemental Construction of Kint
+	this->Me = inputSim.Me; // Elemental construction of M
+	this->FeIrr = inputSim.FeIrr; // Elemental Construction of Firr
+	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	this->FeQ = inputSim.FeQ; // Element Construction of Fq
+	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	this->FeConv = inputSim.FeConv; // Elemental Construction of FConv
+	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	this->KeConv = inputSim.KeConv; // Elemental construction of KConv
+	this->J = inputSim.J;
+	this->Js1 = inputSim.Js1;
+	this->Js2 = inputSim.Js2;
+	this->Js3 = inputSim.Js3;
+	this->validNodes = inputSim.validNodes; // global indicies on non-dirichlet boundary nodes
+	this->dirichletNodes = inputSim.dirichletNodes;
+	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
+	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
+	this->nodeMap = inputSim.nodeMap;
+}
+
 void FEM_Simulator::performTimeStepping()
 {
 	auto startTime = std::chrono::high_resolution_clock::now();
