@@ -127,7 +127,6 @@ public:
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 
-	element currElement;
 
 	void initializeBoundaryNodes();
 	void initializeElementNodeSurfaceMap();
