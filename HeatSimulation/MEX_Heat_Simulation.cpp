@@ -130,14 +130,14 @@ public:
 
 
     /* This is the gateway routine for the MEX-file. */
-    void
-        operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+    void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        checkArguments(outputs, inputs);
         stream.str("");
+        stream << "Start of () function" << std::endl;
+        displayOnMATLAB(stream);
         try {
-            checkArguments(outputs, inputs);
-            stream << "First Call: " << this->createAllMatrices << std::endl;
-            displayOnMATLAB(stream);
-
+            
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
             std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
@@ -147,7 +147,6 @@ public:
             tissueSize[0] = inputs[2][0];
             tissueSize[1] = inputs[2][1];
             tissueSize[2] = inputs[2][2];
-
             
             // Get time step and final time
             float tFinal = inputs[3][0];
@@ -158,7 +157,6 @@ public:
             float TC = inputs[5][1];
             float VHC = inputs[5][2];
             float HTC = inputs[5][3];
-
 
             // Get boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
@@ -297,7 +295,10 @@ public:
         }
         outputs[1] = sensorTempsOutput;
 
-        
+        auto stopTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        stream << "End of MEX() Function:  " << duration.count() / 1000000.0 << std::endl;
+        displayOnMATLAB(stream);
     }
 
     /* This function makes sure that user has provided the proper inputs
@@ -306,7 +307,7 @@ public:
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
             displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal,"
-                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (layers), (Nn1d) (silentMode)");
+                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -364,6 +365,11 @@ public:
         }
         if (inputs.size() > 13) {
             Nn1d = inputs[13][0];
+        }
+        if (inputs.size() > 14) { 
+            // this parameter is primarily here for debugging and timing tests. Not really practical for someone
+            // to use this while they're running simulations
+            this->createAllMatrices = this->createAllMatrices || inputs[14][0];
         }
     }
 
