@@ -888,6 +888,11 @@ float FEM_Simulator::calcKconvAB(float xi[3], int AiBi, int dim)
 
 void FEM_Simulator::initializeBoundaryNodes()
 {
+	/* This function has 3 tasks. 
+	1. Locate all nodes that a dirichlet nodes and put them into the diricheltNodes vector.
+	2. All nodes that are not dirichlet nodes are added to the validNodes vector
+	3. We map create a mapping between global node indicies and the index into the global K/M/F matrices. 
+	*/
 	// we only need to scan nodes on the surface. Since we are assuming a cuboid this is easy to predetermine
 	// Create mapping
 	this->validNodes.clear();

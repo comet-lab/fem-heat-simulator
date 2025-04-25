@@ -128,15 +128,15 @@ public:
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 
 
-	void initializeBoundaryNodes();
-	void initializeElementNodeSurfaceMap();
-	void initializeElementMatrices(int layer);
+	void initializeBoundaryNodes(); // function has test cases
+	void initializeElementNodeSurfaceMap(); // function has test case for Nn1d = 2
+	void initializeElementMatrices(int layer); 
 	int determineNodeFace(int globalNode); // function has test cases
 	float calculateNA(float xi[3], int Ai); // function has test cases
-	float calculateNABase(float xi, int Ai);
+	float calculateNABase(float xi, int Ai); //function has test cases
 	Eigen::Matrix3<float> calculateJ(int layer=1); // function has test cases
-	Eigen::Matrix2<float> calculateJs(int dim,int layer=1);
-	float calculateNADotBase(float xi, int Ai);
+	Eigen::Matrix2<float> calculateJs(int dim,int layer=1); // function has test cases
+	float calculateNADotBase(float xi, int Ai); // function has test cases
 	// function has test cases
 	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases

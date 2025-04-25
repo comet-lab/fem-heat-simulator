@@ -92,14 +92,14 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\Program Files\MATLAB\R2021a\extern\include;C:\Users\nickp\OneDrive - Worcester Polytechnic Institute %28wpi.edu%29\PhD\Repositories\CppLibraries\eigen-3.4.0;$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\MATLAB\R2021a\extern\include;C:\Users\nepacheco\OneDrive - Worcester Polytechnic Institute (wpi.edu)\PhD\Repositories\CppLibraries\eigen-3.4.0;$(VCInstallDir)UnitTest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2021a\extern\include;C:\Users\nickp\OneDrive - Worcester Polytechnic Institute %28wpi.edu%29\PhD\Repositories\CppLibraries\eigen-3.4.0;$(VCInstallDir)UnitTest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2021a\extern\include;C:\Users\nepacheco\OneDrive - Worcester Polytechnic Institute (wpi.edu)\PhD\Repositories\CppLibraries\eigen-3.4.0;$(VCInstallDir)UnitTest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

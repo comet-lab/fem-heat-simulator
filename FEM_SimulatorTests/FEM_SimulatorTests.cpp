@@ -261,26 +261,209 @@ namespace FEMSimulatorTests
 
 		TEST_METHOD(TestDetermineNodeFace1)
 		{
+
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} } };
 			float tissueSize[3] = { 1,1,1 };
 			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			
+			int expected0 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::LEFT;
+			int expected1 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::LEFT;
+			int expected2 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
+			int expected3 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::BACK;
+			int expected4 = FEM_Simulator::tissueFace::TOP;
+			int expected5 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT;
+			int expected6 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::RIGHT;
+			int expected7 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::RIGHT;
+			int expected8 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::RIGHT;
+			int expected9 = FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::LEFT;
+			int expected10 = FEM_Simulator::tissueFace::LEFT;
+			int expected11 = FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
+			int expected12 = FEM_Simulator::tissueFace::BACK;
+			int expected13 = FEM_Simulator::tissueFace::INTERNAL;
+			int expected14 = FEM_Simulator::tissueFace::FRONT;
+			int expected15 = FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::RIGHT;
+			int expected16 = FEM_Simulator::tissueFace::RIGHT;
+			int expected17 = FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::RIGHT;
+			int expected18 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::LEFT;
+			int expected19 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::LEFT;
+			int expected20 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
+			int expected21 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::BACK;
+			int expected22 = FEM_Simulator::tissueFace::BOTTOM;
+			int expected23 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::FRONT;
+			int expected24 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::RIGHT;
+			int expected25 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::RIGHT;
+			int expected26 = FEM_Simulator::tissueFace::BOTTOM + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::RIGHT;
+			int expected[27] = { expected0,expected1,expected2,expected3,expected4,expected5,expected6,expected7,expected8,expected9,expected10,
+								expected11,expected12,expected13,expected14,expected15,expected16,expected17,expected18,expected19,expected20,
+								expected21,expected22,expected23,expected24,expected25,expected26 };
+
 			int faces[27];
 			for (int i = 0; i < 27; i++) {
 				faces[i] = simulator->determineNodeFace(i);
+				std::cout << i << ", Expected: " << expected[i] <<" Actual: " << faces[i] << std::endl;
+				Assert::AreEqual(expected[i], faces[i]);
 			}
+		}
 
-			int expected0 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
-			int expected2 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::RIGHT;
-			int expected13 = FEM_Simulator::tissueFace::INTERNAL;
-			int expected16 = FEM_Simulator::tissueFace::BACK;
-			int expected22 = FEM_Simulator::tissueFace::BOTTOM;
-			Assert::AreEqual(expected0, faces[0]);
-			Assert::AreEqual(expected2, faces[2]);
-			Assert::AreEqual(expected13, faces[13]);
-			Assert::AreEqual(expected16, faces[16]);
-			Assert::AreEqual(expected22, faces[22]);
+		TEST_METHOD(TestInitializeElementNodeSurfaceMap1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			int Nne = pow(Nn1d, 3);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			simulator->Nn1d = 2;
+			simulator->initializeElementNodeSurfaceMap();
+			std::array<std::vector<int>,6> surfMap = simulator->elemNodeSurfaceMap;
+
+			
+			std::vector<std::vector<bool>> nodeCondition = { { true,false,false,false,true,true }, // Node 0 belongs to the top, back and left faces
+														     { true,false,true,false,false,true }, // Node 1 belongs to the top, front, and left faces
+															 { true,false,false,true,true,false }, // Node 2 belongs to the top, back, and right faces
+															 { true,false,true,true,false,false }, // Node 3 belongs to the top, front, and right faces
+															 { false,true,false,false,true,true }, // Node 4 belongs to the bottom, back and left faces
+															 { false,true,true,false,false,true }, // Node 5 belongs to the bottom, front, and left faces
+															 { false,true,false,true,true,false }, // Node 6 belongs to the bottom, back, and right faces
+															 { false,true,true,true,false,false }, // Node 7 belongs to the bottom, front, and right faces
+			}; 
+			for (int A = 0; A < Nne; A++)
+			{
+				for (int f = 0; f < 6; f++) {
+					bool contains = (std::find(surfMap[f].begin(), surfMap[f].end(), A) != surfMap[f].end());
+					Assert::IsTrue((contains == nodeCondition[A][f]));
+				}
+			}
+		}
+
+		TEST_METHOD(TestInitializeBoundaryNodes1)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			int Nne = pow(Nn1d, 3);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int BC[6] = { 0,0,0,0,0,0 }; // All nodes except the one in the center should be dirichlet nodes 
+			simulator->setBoundaryConditions(BC);
+
+			simulator->initializeBoundaryNodes();
+			
+			for (int idx = 0; idx < 27; idx++) {
+				std::vector<int> dirchletNodes = simulator->dirichletNodes;
+				std::vector<int> validNodes = simulator->validNodes;
+				std::vector<int> nodeMap = simulator->nodeMap;
+				bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
+				bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
+				if (idx != 13) {
+					Assert::IsTrue(dirContains);
+					Assert::IsFalse(validContains);
+					Assert::AreEqual(-1, nodeMap[idx]);
+				}
+				else {
+					// Node 13 is in the middle of everything and is the exception
+					Assert::IsFalse(dirContains);
+					Assert::IsTrue(validContains);
+					Assert::AreEqual(0, nodeMap[idx]);
+				}
+			}
+		}
+
+		TEST_METHOD(TestInitializeBoundaryNodes2)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			int Nne = pow(Nn1d, 3);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int BC[6] = { 0,0,0,1,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
+			simulator->setBoundaryConditions(BC);
+
+			simulator->initializeBoundaryNodes();
+
+			bool dirichletCond[27] = { true,true,true,true,true,true,true,true,true, // top layer
+									  false,false,true,false,false,true,false,false,true, //middle layer
+									  true,true,true,true,true,true,true,true,true }; // bottom layer
+			int trueMap[27] = { -1,-1,-1,-1,-1,-1,-1,-1,-1, // top layer
+									  0,1,-1,2,3,-1,4,5,-1, //middle layer
+									  -1,-1,-1,-1,-1,-1,-1,-1,-1 }; // bottom layer
+			for (int idx = 0; idx < 27; idx++) {
+				std::vector<int> dirchletNodes = simulator->dirichletNodes;
+				std::vector<int> validNodes = simulator->validNodes;
+				std::vector<int> nodeMap = simulator->nodeMap;
+				bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
+				bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
+				
+				Assert::IsTrue(dirContains==dirichletCond[idx]);
+				Assert::IsTrue(validContains==(!dirichletCond[idx]));
+				Assert::AreEqual(trueMap[idx], nodeMap[idx]);
+			}
+		}
+
+		TEST_METHOD(TestInitializeBoundaryNodes3)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			int Nne = pow(Nn1d, 3);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int BC[6] = { 1,2,2,0,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
+			simulator->setBoundaryConditions(BC);
+
+			simulator->initializeBoundaryNodes();
+
+			bool dirichletCond[27] = { false,false,false,false,false,false,true,true,true, // top layer
+									  false,false,false,false,false,false,true,true,true, //middle layer
+									  false,false,false,false,false,false,true,true,true }; // bottom layer
+			int trueMap[27] = { 0,1,2,3,4,5,-1,-1,-1, // top layer
+									  6,7,8,9,10,11,-1,-1,-1, //middle layer
+									  12,13,14,15,16,17,-1,-1,-1 }; // bottom layer
+			for (int idx = 0; idx < 27; idx++) {
+				std::vector<int> dirchletNodes = simulator->dirichletNodes;
+				std::vector<int> validNodes = simulator->validNodes;
+				std::vector<int> nodeMap = simulator->nodeMap;
+				bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
+				bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
+
+				Assert::IsTrue(dirContains == dirichletCond[idx]);
+				Assert::IsTrue(validContains == (!dirichletCond[idx]));
+				Assert::AreEqual(trueMap[idx], nodeMap[idx]);
+			}
+		}
+
+		TEST_METHOD(TestInitializeBoundaryNodes4)
+		{
+			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} },
+															   { {0,0,0}, {0,0,0}, {0,0,0} } };
+			float tissueSize[3] = { 1,1,1 };
+			int Nn1d = 2;
+			int Nne = pow(Nn1d, 3);
+			FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+			int BC[6] = { 1,2,2,1,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
+			simulator->setBoundaryConditions(BC);
+
+			simulator->initializeBoundaryNodes();
+
+			for (int idx = 0; idx < 27; idx++) {
+				std::vector<int> dirchletNodes = simulator->dirichletNodes;
+				std::vector<int> validNodes = simulator->validNodes;
+				std::vector<int> nodeMap = simulator->nodeMap;
+				bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
+				bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
+
+				Assert::IsTrue(dirContains == false);
+				Assert::IsTrue(validContains == true);
+				Assert::AreEqual(idx, nodeMap[idx]);
+			}
 		}
 
 		TEST_METHOD(TestCalculateJ1)
@@ -411,7 +594,8 @@ namespace FEMSimulatorTests
 			Assert::AreEqual(5, sub[2]);
 		}
 
-		TEST_METHOD(TestCreateKABFunction1)
+
+		TEST_METHOD(TestCalcKABFunction1)
 		{
 			std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 															   { {0,0,0}, {0,0,0}, {0,0,0} },
@@ -565,104 +749,12 @@ namespace FEMSimulatorTests
 			for (int k = 0; k < nodeSize[2]; k++) {
 				for (int j = 0; j < nodeSize[1]; j++) {
 					for (int i = 0; i < nodeSize[0]; i++) {
-						Assert::IsTrue(abs(simulatorQuad->Temp[i][j][k] - simulatorQuad->Temp[i][j][k]) < 0.001);
+						int idx = i + j * nodeSize[0] + k * nodeSize[0] * nodeSize[1];
+						Assert::IsTrue(abs(simulatorQuad->Temp(idx) - simulatorQuad->Temp(idx)) < 0.001);
 					}
 				}
 			}
 
 		}
-
-		//TEST_METHOD(TestCreateKMF1) {
-		//	//checking that createKMF and createKMFelem create the same matrices.
-		//	int nodeSize[3] = { 10,10,10 };
-		//	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
-		//	std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
-		//	for (int i = 0; i < nodeSize[0]; i++) {
-		//		for (int j = 0; j < nodeSize[1]; j++) {
-		//			for (int k = 0; k < nodeSize[2]; k++) {
-		//				Temp[i][j][k] = 0.0f;
-		//				NFR[i][j][k] = 1.5f;
-		//			}
-		//		}
-		//	}
-		//	float tissueSize[3] = { 1.0f,1.0f,1.0f };
-		//	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
-		//	simulator->deltaT = 0.1f;
-		//	simulator->tFinal = 1.0f;
-		//	int BC[6] = { 1,0,1,0,2,2 };
-		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setFlux(1);
-		//	simulator->setAmbientTemp(0);
-		//	simulator->setNFR(NFR);
-
-		//	simulator->createKMFelem();
-		//	Eigen::VectorXf Felem = simulator->Firr;
-		//	Eigen::SparseMatrix<float> Kelem = simulator->Kint;
-		//	Eigen::SparseMatrix<float> Melem = simulator->M;
-		//	simulator->createKMF();
-		//	Eigen::VectorXf Fnode = simulator->Firr;
-		//	Eigen::SparseMatrix<float> Knode = simulator->Kint;
-		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
-		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
-		//	for (int i = 0; i < totalNodes; i++) {
-		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"Firr - Error on index i: ") + std::to_wstring(i)).c_str());
-		//		for (int j = 0; j < totalNodes; j++) {
-		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i,j)) < 0.0000001, (std::wstring(L"Kint - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-		//		}
-		//	}
-
-		//	simulator->performTimeStepping();
-		//}
-
-		//TEST_METHOD(TestCreateKMF2) {
-		//	//checking that createKMF and createKMFelem create the same matrices for elemental NFR.
-		//	int nodeSize[3] = { 10,10,10 };
-		//	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
-		//	std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0]-1, std::vector<std::vector<float>>(nodeSize[1]-1, std::vector<float>(nodeSize[2]-1)));
-		//	for (int i = 0; i < nodeSize[0]; i++) {
-		//		for (int j = 0; j < nodeSize[1]; j++) {
-		//			for (int k = 0; k < nodeSize[2]; k++) {
-		//				Temp[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
-		//			}
-		//		}
-		//	}
-		//	// setting up elemental NFR
-		//	for (int i = 0; i < nodeSize[0]-1; i++) {
-		//		for (int j = 0; j < nodeSize[1]-1; j++) {
-		//			for (int k = 0; k < nodeSize[2]-1; k++) {
-		//				NFR[i][j][k] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX) + 1;
-		//			}
-		//		}
-		//	}
-		//	float tissueSize[3] = { 1.0f,1.0f,1.0f };
-		//	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 5.22, 100, 1);
-		//	simulator->deltaT = 0.1f;
-		//	simulator->tFinal = 1.0f;
-		//	int BC[6] = { 1,0,1,0,2,2 };
-		//	simulator->setBoundaryConditions(BC);
-		//	simulator->setFlux(1);
-		//	simulator->setAmbientTemp(0);
-		//	simulator->setNFR(NFR);
-
-		//	simulator->createKMFelem();
-		//	Eigen::VectorXf Felem = simulator->Firr;
-		//	Eigen::SparseMatrix<float> Kelem = simulator->Kint;
-		//	Eigen::SparseMatrix<float> Melem = simulator->M;
-		//	simulator->createKMF();
-		//	Eigen::VectorXf Fnode = simulator->Firr;
-		//	Eigen::SparseMatrix<float> Knode = simulator->Kint;
-		//	Eigen::SparseMatrix<float> Mnode = simulator->M;
-		//	int totalNodes = nodeSize[0] * nodeSize[1] * nodeSize[2] - simulator->dirichletNodes.size();
-		//	for (int i = 0; i < totalNodes; i++) {
-		//		Assert::IsTrue(abs(Fnode(i) - Felem(i)) < 0.0000001, (std::wstring(L"Firr - Error on index i: ") + std::to_wstring(i)).c_str());
-		//		for (int j = 0; j < totalNodes; j++) {
-		//			Assert::IsTrue(abs(Knode.coeffRef(i, j) - Kelem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"Kint - Error on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-		//			Assert::IsTrue(abs(Mnode.coeffRef(i, j) - Melem.coeffRef(i, j)) < 0.0000001, (std::wstring(L"M - sError on index i: ") + std::to_wstring(i) + L", j: " + std::to_wstring(j)).c_str());
-		//		}
-		//	}
-
-		//	simulator->performTimeStepping();
-		//}
 	};
 }
