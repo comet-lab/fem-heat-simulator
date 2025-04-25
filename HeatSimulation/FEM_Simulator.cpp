@@ -1113,13 +1113,13 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 	float width = 0; 
 	float xPos = -this->tissueSize[0] / 2;
 	float xStep = this->tissueSize[0] / this->gridSize[0];
-	float yPos = -this->tissueSize[0] / 2;
-	float yStep = this->tissueSize[0] / this->gridSize[0];
+	float yPos = -this->tissueSize[1] / 2;
+	float yStep = this->tissueSize[1] / this->gridSize[1];
 	float zPos = 0;
 	float zStep = this->layerHeight / this->layerSize;
 
 	for (int i = 0; i < this->nodeSize[0]; i++) {
-		yPos = -this->tissueSize[0] / 2;
+		yPos = -this->tissueSize[1] / 2;
 		for (int j = 0; j < this->nodeSize[1]; j++) {
 			zPos = 0;
 			zStep = this->layerHeight / this->layerSize;
