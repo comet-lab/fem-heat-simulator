@@ -271,10 +271,10 @@ namespace FEMSimulatorTests
 				faces[i] = simulator->determineNodeFace(i);
 			}
 
-			int expected0 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
-			int expected2 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::RIGHT;
+			int expected0 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::LEFT;
+			int expected2 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
 			int expected13 = FEM_Simulator::tissueFace::INTERNAL;
-			int expected16 = FEM_Simulator::tissueFace::BACK;
+			int expected16 = FEM_Simulator::tissueFace::RIGHT;
 			int expected22 = FEM_Simulator::tissueFace::BOTTOM;
 			Assert::AreEqual(expected0, faces[0]);
 			Assert::AreEqual(expected2, faces[2]);
@@ -427,11 +427,8 @@ namespace FEMSimulatorTests
 			xi[2] = FEM_Simulator::A[Ai][2];
 			float output1 = simulator->createKABFunction(xi, Ai, Bi);
 			Eigen::MatrixXf Ke(8, 8);
-			for (int Ai = 0; Ai < 8; Ai++) {
-				for (int Bi = 0; Bi < 8; Bi++) {
-					Ke(Ai, Bi) = simulator->integrate(&FEM_Simulator::createKABFunction, 2, 0, Ai, Bi);
-				}
-			}
+			simulator->setKe();
+			Ke = simulator->Ke;
 			// The truth values were calculated in matlab assuming K = 1 and deltaX = deltaY = deltaZ = 0.5
 			Assert::IsTrue((abs(3 * TC / 16.0f) - output1) < 0.0001);
 			for (int Ai = 0; Ai < 8; Ai++) {
