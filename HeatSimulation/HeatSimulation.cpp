@@ -6,42 +6,44 @@
 
 int main()
 {
-
-    auto start = std::chrono::high_resolution_clock::now();
     std::cout << "Starting Program" << std::endl;
-
-    int nodeSize[3] = { 35,35,51 };
+    int nodeSize[3] = { 41,41,50 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
     std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+    
     srand(1);
+
     for (int i = 0; i < nodeSize[0]; i++) {
         for (int j = 0; j < nodeSize[1]; j++) {
             for (int k = 0; k < nodeSize[2]; k++) {
                 Temp[i][j][k] = 20;
-                NFR[i][j][k] = 1;
             }
         }
     }
-    int Nn1d = 2;
-    float tissueSize[3] = { 2.0f,2.0f,0.5f };
+    auto start = std::chrono::high_resolution_clock::now();
 
-    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 40, 0.05, Nn1d);
-    simulator->setLayer(0.1f, 20);
+    
+    int Nn1d = 2;
+    float tissueSize[3] = { 2.0f,2.0f,1.0f };
+
+    FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
+    simulator->setLayer(0.05f, 30);
     std::cout << "Number of nodes: " << simulator->nodeSize[0] * simulator->nodeSize[1] * simulator->nodeSize[2] << std::endl;
     std::cout << "Number of elems: " << simulator->gridSize[0] * simulator->gridSize[1] * simulator->gridSize[2] << std::endl;
+    float laserPose[6] = { 0.0f,0,-35,0,0,0 };
+    simulator->setNFR(laserPose, 1, 0.0168);
 
     std::cout << "Object Created " << std::endl;
 
     simulator->deltaT = 0.05f;
-    simulator->tFinal = 15.0f;
-    int BC[6] = { 2,2,2,2,2,2 };
+    simulator->tFinal = 0.05f;
+    int BC[6] = { 2,0,0,0,0,0 };
     simulator->setBoundaryConditions(BC);
-    simulator->setJn(0);
+    simulator->setFlux(0.0f);
     simulator->setAmbientTemp(24);
-    simulator->setNFR(NFR);
 
-    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.4} };
+    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.95f}, {1,0,0}, {0,1,0},{0,0,1} };
     simulator->setSensorLocations(tempSensorLocations);
 
     std::cout << "Running FEA" << std::endl;
@@ -53,8 +55,9 @@ int main()
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
 
-    float totalTime = 15.0f;
+    float totalTime = 0.05f;
     simulator->createKMFelem();
+
     for (int i = 0; i < round(totalTime / simulator->tFinal); i++) {
         
         simulator->performTimeStepping();
@@ -68,7 +71,7 @@ int main()
         for (int k = 0; k < nodeSize[2]; k++) {
             for (int j = 0; j < nodeSize[1]; j++) {
                 for (int i = 0; i < nodeSize[0]; i++) {
-                    std::cout << simulator->Temp[i][j][k] << ", ";
+                    std::cout << simulator->Temp(i + j*nodeSize[0] + k*nodeSize[0]*nodeSize[1]) << ", ";
                 }
                 std::cout << std::endl;
             }
@@ -77,12 +80,12 @@ int main()
         std::cout << std::endl;
     }
     else {
-        std::cout << "Top Face Temp: " <<   simulator->Temp[nodeSize[0]/2] [nodeSize[1]/2] [0] << std::endl;
-        std::cout << "Bottom Face Temp: " << simulator->Temp[nodeSize[0] / 2][nodeSize[1] / 2][nodeSize[2] - 1] << std::endl;
-        std::cout << "Front Face Temp: " << simulator->Temp[nodeSize[0]-1][nodeSize[1] / 2][nodeSize[2] / 2] << std::endl;
-        std::cout << "Right Face Temp: " << simulator->Temp[nodeSize[0] / 2][nodeSize[1] - 1][nodeSize[2] / 2] << std::endl;
-        std::cout << "Back Face Temp: " << simulator->Temp[0][nodeSize[1] / 2][nodeSize[2] / 2] << std::endl;
-        std::cout << "Left Face Temp: " <<  simulator->Temp[nodeSize[0]/2] [0] [nodeSize[2]/2] << std::endl;
+        std::cout << "Top Face Temp: " <<   simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) / 2 * nodeSize[0]) << std::endl;
+        std::cout << "Bottom Face Temp: " << simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) / 2 * nodeSize[0] + nodeSize[0]*nodeSize[1]*(nodeSize[2]-1)) << std::endl;
+        std::cout << "Front Face Temp: " << simulator->Temp(nodeSize[0] + nodeSize[1] / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Right Face Temp: " << simulator->Temp((nodeSize[0]-1) / 2 + (nodeSize[1]-1) * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Back Face Temp: " << simulator->Temp((nodeSize[1]-1) / 2 * nodeSize[0] + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
+        std::cout << "Left Face Temp: " <<  simulator->Temp((nodeSize[0]-1) / 2 + nodeSize[0] * nodeSize[1] * (nodeSize[2]-1) / 2) << std::endl;
     }
 
     std::cout << "Sensor Temp: " << simulator->sensorTemps[0][300] << std::endl;

@@ -8,4 +8,7 @@ mex  -v CXXFLAGS='$CXXFLAGS -fopenmp' COMPFLAGS="$COMPFLAGS /openmp" ...
         % -outdir HeatSimulators\FEMSimulator\fem-heat-simulator
     
     
-% "mex COPTIMFLAGS='$COPTIMFLAGS -Ofast -fopenmp -std=c11 -Wall' LDOPTIMFLAGS='$LDOPTIMFLAGS -Ofast -fopenmp -std=c11 -Wall' -outdir +MCmatlab\@model\private .\+MCmatlab\src\finiteElementHeatPropagator.c .\+MCmatlab\src\libut.lib"
+% "mex COPTIMFLAGS='$COPTIMFLAGS -Ofast -fopenmp -std=c11 -Wall' 
+% LDOPTIMFLAGS='$LDOPTIMFLAGS -Ofast -fopenmp -std=c11 -Wall' -outdir 
+% +MCmatlab\@model\private .\+MCmatlab\src\finiteElementHeatPropagator.c 
+% .\+MCmatlab\src\libut.lib"

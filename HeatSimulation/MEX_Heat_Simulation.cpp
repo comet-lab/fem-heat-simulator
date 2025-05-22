@@ -19,6 +19,8 @@ private:
     std::ostringstream stream;
     bool silentMode = true;
     bool useAllCPUs = true;
+    bool createAllMatrices = true;
+    bool createFirrMatrix = true;
     float layerHeight = 1;
     int layerSize = 1;
     int Nn1d = 2;
@@ -97,7 +99,7 @@ public:
     */
     void displayOnMATLAB(std::ostringstream& stream) {
         // Pass stream content to MATLAB fprintf function
-        if (!silentMode) {
+        if (!this->silentMode) {
             matlab::data::ArrayFactory factory;
             matlabPtr->feval(u"fprintf", 0,
                 std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
@@ -116,7 +118,7 @@ public:
         for (int k = 0; k < dim3; k++) {
             for (int j = 0; j < dim2; j++) {
                 for (int i = 0; i < dim1; i++) {
-                    stream << simulator->Temp[i][j][k] << ", ";
+                    stream << vec[i][j][k] << ", ";
                     displayOnMATLAB(stream);
                 }
                 stream << std::endl;
@@ -128,72 +130,84 @@ public:
 
 
     /* This is the gateway routine for the MEX-file. */
-    void
-        operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+    void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        auto startTime = std::chrono::high_resolution_clock::now();
+        checkArguments(outputs, inputs);
         stream.str("");
+        stream << "Start of () function" << std::endl;
+        displayOnMATLAB(stream);
         try {
-            checkArguments(outputs, inputs);
-            simulator->initializeElementNodeSurfaceMap();
-
+            
             // Have to convert T0 and NFR to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
-            simulator->setInitialTemperature(T0);
-            //display3DVector(simulator->Temp,"Initial Temp: ");
-
-            simulator->Nn1d = Nn1d;
-
-            // Set the NFR
             std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
-            simulator->setNFR(NFR);
-            
-            // Set tissue size
+
+            // Get tissue size
             float tissueSize[3];
             tissueSize[0] = inputs[2][0];
             tissueSize[1] = inputs[2][1];
             tissueSize[2] = inputs[2][2];
-            simulator->setTissueSize(tissueSize);
-
-            simulator->setLayer(layerHeight, layerSize);
-
-            // set time step and final time
+            
+            // Get time step and final time
             float tFinal = inputs[3][0];
             float deltaT = inputs[4][0];
-            simulator->tFinal = tFinal;
-            simulator->deltaT = deltaT;
-            stream << "Final Time: " << simulator->tFinal << "\nTime step: " << simulator->deltaT << std::endl;
-            displayOnMATLAB(stream);
 
-
-            // set tissue properties
+            // Extract tissue properties
             float MUA = inputs[5][0];
             float TC = inputs[5][1];
             float VHC = inputs[5][2];
             float HTC = inputs[5][3];
-            simulator->setMUA(MUA);
-            simulator->setTC(TC);
-            simulator->setVHC(VHC);
-            simulator->setHTC(HTC);
-            stream << "TC: " << simulator->TC << ", MUA: " << simulator->MUA << ", VHC: " << simulator->VHC << ", HTC: " << simulator->HTC << std::endl;
-            displayOnMATLAB(stream);
 
-            // set boundary conditions
+            // Get boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
             stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
                boundaryType[i] = inputs[6][i];
-                 stream << boundaryType[0] << ", ";
+               stream << boundaryType[i] << ", ";
             }
             stream << std::endl;
             displayOnMATLAB(stream);
-            simulator->setBoundaryConditions(boundaryType);
+            
 
-            // set flux condition
-            float Jn = inputs[7][0];
-            simulator->setJn(Jn);
-
-            // set ambient temperature
+            // get flux condition
+            float Qn = inputs[7][0];
+            // get ambient temperature
             float ambientTemp = inputs[8][0];
-            simulator->setAmbientTemp(ambientTemp);
+
+            /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
+            // First check to see if certain variables have changed which would require us to reconstruct elements
+            if (!this->createAllMatrices) {
+                this->createAllMatrices = checkForMatrixReset(Nn1d, T0, NFR, tissueSize, layerHeight, layerSize, boundaryType);
+            }
+            // Set the type of basis functions we are using by setting nodes per dimension of an 
+            this->simulator->Nn1d = Nn1d;
+            this->simulator->setTemp(T0);
+            // Set the NFR
+            this->simulator->setNFR(NFR);
+            this->simulator->setTissueSize(tissueSize);
+            // set the layer info
+            this->simulator->setLayer(layerHeight, layerSize);
+            // set the final time
+            this->simulator->tFinal = tFinal;
+            // set the time step
+            this->simulator->deltaT = deltaT;
+            // set the tissue properties
+            this->simulator->setMUA(MUA);
+            this->simulator->setTC(TC);
+            this->simulator->setVHC(VHC);
+            this->simulator->setHTC(HTC);
+            // set boundary conditions
+            this->simulator->setBoundaryConditions(boundaryType);
+            // set flux
+            this->simulator->setFlux(Qn);
+
+            //print statements 
+            stream << "Final Time: " << this->simulator->tFinal << "\nTime step: " << this->simulator->deltaT << std::endl;
+            displayOnMATLAB(stream);
+            stream << "TC: " << this->simulator->TC << ", MUA: " << this->simulator->MUA << ", VHC: " << this->simulator->VHC << ", HTC: " << this->simulator->HTC << std::endl;
+            displayOnMATLAB(stream);
+
+            this->simulator->setAmbientTemp(ambientTemp);
         }
         catch (const std::exception& e) {
             stream << "Error in Setup: " << std::endl;
@@ -201,14 +215,15 @@ public:
             displayError(e.what());
             return;
         }
-
+        
+        // Set sensor locations
         auto sensorTempsInput = inputs[9];
         std::vector<std::array<float, 3>> sensorTemps;
         for (int s = 0; s < sensorTempsInput.getDimensions()[0]; s++) {
             sensorTemps.push_back({ sensorTempsInput[s][0],sensorTempsInput[s][1] ,sensorTempsInput[s][2] });
         }
         try {
-            simulator->setSensorLocations(sensorTemps);
+            this->simulator->setSensorLocations(sensorTemps);
         }
         catch (const std::exception& e){
             stream << "Error setting sensor locations " << std::endl;
@@ -217,7 +232,7 @@ public:
             return;
         }
         
-
+        // Set parallelization
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
         stream << "OPEMMP Enable" << std::endl;
@@ -226,22 +241,35 @@ public:
             Eigen::setNbThreads(omp_get_num_procs()/2);
         }
 #endif
-        
         stream << "Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
-        try {
-            simulator->createKMFelem();
-            stream << "Global matrices created" << std::endl;
+
+        // Create global K M and F 
+        if (this->createAllMatrices) { // only need to create the KMF matrices the first time
+            this->createAllMatrices = false;
+            this->createFirrMatrix = false;
+            try {
+                this->simulator->createKMFelem();
+                stream << "Global matrices created" << std::endl;
+                displayOnMATLAB(stream);
+            }
+            catch (const std::exception& e) {
+                stream << "Error in createKMF() " << std::endl;
+                displayOnMATLAB(stream);
+                displayError(e.what());
+                return;
+            }
+        }
+        else if (this->createFirrMatrix) {
+            this->createFirrMatrix = false;
+            this->simulator->createFirr();
+            stream << "Firr Matrix created" << std::endl;
             displayOnMATLAB(stream);
         }
-        catch (const std::exception& e) {
-            stream << "Error in createKMF() " << std::endl;
-            displayOnMATLAB(stream);
-            displayError(e.what());
-            return;
-        }
-        try {
-            simulator->performTimeStepping();
+
+        // Perform time stepping
+        try { //
+            this->simulator->performTimeStepping();
             stream << "Time Stepping Complete" << std::endl;
             displayOnMATLAB(stream);
         }
@@ -254,17 +282,23 @@ public:
 
 
         // Have to convert the std::vector to a matlab array for output
-        //display3DVector(simulator->Temp, "Final Temp: ");
-        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(simulator->Temp);
+        //display3DVector(this->simulator->Temp, "Final Temp: ");
+        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator->getTemp();
+        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
         matlab::data::ArrayFactory factory;
-        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ simulator->sensorTemps.size(), simulator->sensorTemps[0].size()});
-        for (size_t i = 0; i < simulator->sensorTemps.size(); ++i) {
-            for (size_t j = 0; j < simulator->sensorTemps[i].size(); ++j) {
-                sensorTempsOutput[i][j] = simulator->sensorTemps[i][j];
+        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator->sensorTemps.size(), this->simulator->sensorTemps[0].size()});
+        for (size_t i = 0; i < this->simulator->sensorTemps.size(); ++i) {
+            for (size_t j = 0; j < this->simulator->sensorTemps[i].size(); ++j) {
+                sensorTempsOutput[i][j] = this->simulator->sensorTemps[i][j];
             }
         }
         outputs[1] = sensorTempsOutput;
+
+        auto stopTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        stream << "End of MEX() Function:  " << duration.count() / 1000000.0 << std::endl;
+        displayOnMATLAB(stream);
     }
 
     /* This function makes sure that user has provided the proper inputs
@@ -273,7 +307,7 @@ public:
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
             displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal,"
-                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (layers), (Nn1d) (silentMode)");
+                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -318,8 +352,8 @@ public:
             useAllCPUs = inputs[10][0];
         }
         if (inputs.size() > 11) {
-            silentMode = inputs[11][0];
-            simulator->silentMode = silentMode;
+            this->silentMode = inputs[11][0];
+            this->simulator->silentMode = this->silentMode;
         }
         if (inputs.size() > 12) {
             layerHeight = inputs[12][0];
@@ -332,5 +366,68 @@ public:
         if (inputs.size() > 13) {
             Nn1d = inputs[13][0];
         }
+        if (inputs.size() > 14) { 
+            // this parameter is primarily here for debugging and timing tests. Not really practical for someone
+            // to use this while they're running simulations
+            this->createAllMatrices = this->createAllMatrices || inputs[14][0];
+        }
+    }
+
+    bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& NFR,
+        float tissueSize[3],float layerHeight, int layerSize,int boundaryType[6]) {
+        // this function checks to see if we need to recreate the global element matrices
+        this->createAllMatrices = false;
+
+        // if the number of nodes in 1 dimension for an element changes, we need to reconstruct the matrices
+        if (this->simulator->Nn1d != Nn1d) {
+            this->createAllMatrices = true;
+        }
+        // if the size of our temperature vector changes, we need to reconstruct the matrices
+        if (T0.size() != this->simulator->nodeSize[0]) this->createAllMatrices = true; 
+        if (T0[0].size() != this->simulator->nodeSize[1]) this->createAllMatrices = true;
+        if (T0[0][0].size() != this->simulator->nodeSize[2]) this->createAllMatrices = true;
+
+        // if our NFR has changed, we need to reconstruct at least Firr
+        // TODO make it so that we only reconstruct Firr instead of all of them
+        for (int k = 0; k < NFR[0][0].size(); k++) {
+            if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
+            for (int j = 0; j < NFR[0].size(); j++) {
+                if (this->createFirrMatrix) break; // flags for breaking out of nested loop
+                for (int i = 0; i < NFR.size(); i++) {
+                    if (abs(this->simulator->NFR(i + j*NFR.size() + k*NFR.size()*NFR[0].size()) - NFR[i][j][k]) > 0.0001) { // check if difference is greater than 1e-4
+                        this->createFirrMatrix = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // if our tissue size has changed we need to reconstruct all matrices because our jacobian has changed
+        if (tissueSize[0] != this->simulator->tissueSize[0]) this->createAllMatrices = true;
+        if (tissueSize[1] != this->simulator->tissueSize[1]) this->createAllMatrices = true;
+        if (tissueSize[2] != this->simulator->tissueSize[2]) this->createAllMatrices = true;
+
+        //if layer height or layer size changed then again we have a jacobian change
+        if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createAllMatrices = true;
+        if (layerSize != layerSize) this->createAllMatrices = true;
+
+        // check if any boundaries have changed
+        for (int b = 0; b < 6; b++) {
+            if (boundaryType[b] != this->simulator->boundaryType[b]) {
+                this->createAllMatrices = true;
+                break;
+            }
+        }
+
+        if (this->createAllMatrices) {
+            stream << "Need to recreate Matrices" << std::endl;
+            displayOnMATLAB(stream);
+        }
+        else if (this->createFirrMatrix) {
+            stream << "Need to recreate Firr Matrix Only" << std::endl;
+            displayOnMATLAB(stream);
+        }
+
+        return this->createAllMatrices;
     }
 };
