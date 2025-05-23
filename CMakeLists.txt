@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.29)
 set(CMAKE_CXX_STANDARD 23)
 project(HeatSimulation)
 
+set(EIGEN_DIR "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")  # CHANGE 
+
 include(FetchContent)
 FetchContent_Declare(
   googletest
@@ -21,7 +23,7 @@ add_library(HeatSimulation
 target_include_directories(HeatSimulation PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_include_directories(HeatSimulation PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
+target_include_directories(HeatSimulation PRIVATE ${EIGEN_DIR})
 
 # Add Executable 
 add_executable(main 
@@ -33,21 +35,48 @@ add_executable(main
 target_include_directories(main PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_include_directories(main PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
+target_include_directories(main PRIVATE ${EIGEN_DIR})
 
 enable_testing()
 
-add_executable(
-  FEM_Unit_Tests
+add_executable(FEM_Unit_Tests
   test/FEM_Unit_Tests.cpp
   src/FEM_Simulator.cpp
   src/FEM_Simulator.h
 )
 target_include_directories(FEM_Unit_Tests PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
-target_link_libraries(
-  FEM_Unit_Tests
+target_link_libraries(FEM_Unit_Tests
   GTest::gtest_main
 )
 
 include(GoogleTest)
 gtest_discover_tests(FEM_Unit_Tests)
+
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    find_package(Matlab REQUIRED)
+
+    matlab_add_mex(
+        NAME MEX_Heat_Simulation
+        SRC 
+            src/MEX_Heat_Simulation.cpp
+            src/FEM_Simulator.cpp
+            src/FEM_Simulator.h # <-- Add this
+    )
+    target_include_directories(MEX_Heat_Simulation PRIVATE
+        ${EIGEN_DIR}
+    )
+    target_compile_options(MEX_Heat_Simulation PRIVATE
+        "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
+        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
+    )
+
+    target_link_options(MEX_Heat_Simulation PRIVATE
+        "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
+        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
+    )
+
+    set_target_properties(MEX_Heat_Simulation PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    )
+endif()
