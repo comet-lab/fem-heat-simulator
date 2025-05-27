@@ -383,9 +383,9 @@ public:
             this->createAllMatrices = true;
         }
         // if the size of our temperature vector changes, we need to reconstruct the matrices
-        if (T0.size() != this->simulator->nodeSize[0]) this->createAllMatrices = true; 
-        if (T0[0].size() != this->simulator->nodeSize[1]) this->createAllMatrices = true;
-        if (T0[0][0].size() != this->simulator->nodeSize[2]) this->createAllMatrices = true;
+        if (T0.size() != this->simulator->nodesPerAxis[0]) this->createAllMatrices = true; 
+        if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
+        if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
 
         // if our NFR has changed, we need to reconstruct at least Firr
         // TODO make it so that we only reconstruct Firr instead of all of them

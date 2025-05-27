@@ -38,8 +38,8 @@ public:
 	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
-	int gridSize[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
-	int nodeSize[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be gridSize + 1;
+	int elementsPerAxis[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
+	int nodesPerAxis[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be elementsPerAxis + 1;
 	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
 	float layerHeight = 1.0f; // the z-location where we change element height
 	float layerSize = 2; // The number of elements corresponding to the first layer height
@@ -81,8 +81,8 @@ public:
 	void setHTC(float HTC);
 	void setFlux(float Qn);
 	void setAmbientTemp(float ambientTemp);
-	void setGridSize(int gridSize[3]);
-	void setNodeSize(int nodeSize[3]);
+	void setGridSize(int elementsPerAxis[3]);
+	void setNodeSize(int nodesPerAxis[3]);
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
 	void setJ(int layer=1);
 	void setKeInt();

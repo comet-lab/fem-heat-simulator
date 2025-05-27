@@ -19,8 +19,8 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 {
 	for (int i = 0; i < 3; i++) {
-		this->gridSize[i] = inputSim.gridSize[i]; // Number of elements in x, y, and z [voxels]
-		this->nodeSize[i] = inputSim.nodeSize[i]; // Number of nodes in x, y, and z. Should be gridSize + 1;
+		this->elementsPerAxis[i] = inputSim.elementsPerAxis[i]; // Number of elements in x, y, and z [voxels]
+		this->nodesPerAxis[i] = inputSim.nodesPerAxis[i]; // Number of nodes in x, y, and z. Should be elementsPerAxis + 1;
 		this->tissueSize[i] = inputSim.tissueSize[i];  // Length of the tissue in x, y, and z [cm]
 	}
 	this->layerHeight = inputSim.layerHeight; // the z-location where we change element height
@@ -83,8 +83,8 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
 
 	//this->NFR = NFR;
-	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
-	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 
 	// Create sensorTemperature Vectors and reserve sizes
 	int nSensors = this->tempSensorLocations.size();
@@ -165,7 +165,7 @@ void FEM_Simulator::performTimeStepping()
 	counter = 0;
 	for (int n : validNodes) {
 			//int nodeSub[3];
-			//ind2sub(n, this->nodeSize, nodeSub);
+			//ind2sub(n, this->nodesPerAxis, nodeSub);
 			this->Temp(n) = dVec(counter);
 			counter++;
 	}
@@ -197,9 +197,9 @@ void FEM_Simulator::createKMFelem()
 		std::cout << "Creating Global Matrices" << std::endl;
 	}
 
-	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
-	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-	if (nNodes != (((this->Nn1d-1)*gridSize[0] + 1) * ((this->Nn1d - 1)*gridSize[1] + 1) * ((this->Nn1d - 1)*gridSize[2] + 1))) {
+	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
+	if (nNodes != (((this->Nn1d-1)*elementsPerAxis[0] + 1) * ((this->Nn1d - 1)*elementsPerAxis[1] + 1) * ((this->Nn1d - 1)*elementsPerAxis[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
 	}
 
@@ -233,7 +233,7 @@ void FEM_Simulator::createKMFelem()
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
-		this->ind2sub(e, this->gridSize, eSub);
+		this->ind2sub(e, this->elementsPerAxis, eSub);
 		if ((eSub[2] >= this->layerSize) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened, 
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
@@ -247,7 +247,7 @@ void FEM_Simulator::createKMFelem()
 			for (int ii = 0; ii < 3; ii++) {
 				globalNodeSub[ii] = eSub[ii] * (this->Nn1d - 1) + AiSub[ii];
 			}
-			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 			nodeFace = this->determineNodeFace(globalNodeIdx);
 			matrixInd[0] = this->nodeMap[globalNodeIdx];
@@ -267,7 +267,7 @@ void FEM_Simulator::createKMFelem()
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
-									BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+									BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 									matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 									if (matrixInd[1] >= 0) {
@@ -288,7 +288,7 @@ void FEM_Simulator::createKMFelem()
 				for (int Bi = 0; Bi < Nne; Bi++) {
 					this->ind2sub(Bi, elemNodeSize, BiSub);
 					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
-					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to Kint and M and Firr
@@ -348,9 +348,9 @@ void FEM_Simulator::createFirr()
 		std::cout << "Creating Firr Matrices" << std::endl;
 	}
 
-	int numElems = this->gridSize[0] * this->gridSize[1] * this->gridSize[2];
-	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
-	if (nNodes != (((this->Nn1d - 1) * gridSize[0] + 1) * ((this->Nn1d - 1) * gridSize[1] + 1) * ((this->Nn1d - 1) * gridSize[2] + 1))) {
+	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
+	if (nNodes != (((this->Nn1d - 1) * elementsPerAxis[0] + 1) * ((this->Nn1d - 1) * elementsPerAxis[1] + 1) * ((this->Nn1d - 1) * elementsPerAxis[2] + 1))) {
 		std::cout << "Nodes does not match: \n" << "Elems: " << numElems << "\nNodes: " << nNodes << std::endl;
 	}
 
@@ -366,7 +366,7 @@ void FEM_Simulator::createFirr()
 		// When adding variable voxel height, we are preserving the nodal layout. The number of nodes in each x,y, and z axis is unchanged.
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold.
 
-		this->ind2sub(e, this->gridSize, eSub);
+		this->ind2sub(e, this->elementsPerAxis, eSub);
 		if ((eSub[2] >= this->layerSize) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened,
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental
@@ -380,7 +380,7 @@ void FEM_Simulator::createFirr()
 			for (int ii = 0; ii < 3; ii++) {
 				globalNodeSub[ii] = eSub[ii] * (this->Nn1d - 1) + AiSub[ii];
 			}
-			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 			nodeFace = this->determineNodeFace(globalNodeIdx);
 			matrixInd[0] = this->nodeMap[globalNodeIdx];
@@ -388,7 +388,7 @@ void FEM_Simulator::createFirr()
 				for (int Bi = 0; Bi < Nne; Bi++) {
 					this->ind2sub(Bi, elemNodeSize, BiSub);
 					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
-					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodeSize[0] + BglobalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 					if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
 						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
@@ -413,8 +413,8 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
 	//spacingLayer contains the distance between nodes in eacy layer.
-	float spacingLayer1[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , this->layerHeight / float(this->layerSize) };
-	float spacingLayer2[3] = { this->tissueSize[0] / float(this->gridSize[0]), this->tissueSize[1] / float(this->gridSize[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->gridSize[2]-this->layerSize) };
+	float spacingLayer1[3] = { this->tissueSize[0] / float(this->elementsPerAxis[0]), this->tissueSize[1] / float(this->elementsPerAxis[1]) , this->layerHeight / float(this->layerSize) };
+	float spacingLayer2[3] = { this->tissueSize[0] / float(this->elementsPerAxis[0]), this->tissueSize[1] / float(this->elementsPerAxis[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->elementsPerAxis[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
 		// TODO: Review Cal's Changes
@@ -432,9 +432,9 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 		}
 		// If the global node starting position of the element is the largest in a singular axis then we need to subtract one
 		// and use the previous node position
-		if (globalNodeStart[0] == this->gridSize[0]) globalNodeStart[0] -= 1;
-		if (globalNodeStart[1] == this->gridSize[1]) globalNodeStart[1] -= 1;
-		if (globalNodeStart[2] == this->gridSize[2]) globalNodeStart[2] -= 1;
+		if (globalNodeStart[0] == this->elementsPerAxis[0]) globalNodeStart[0] -= 1;
+		if (globalNodeStart[1] == this->elementsPerAxis[1]) globalNodeStart[1] -= 1;
+		if (globalNodeStart[2] == this->elementsPerAxis[2]) globalNodeStart[2] -= 1;
 		float tempValue = 0;
 		float xi[3];
 		// Xi should be  avalue between -1 and 1 along each axis relating the placement of the sensor in that element.
@@ -448,7 +448,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 			// adjust the global starting node based on the current node we should be visiting
 			int globalNodeSub[3] = { globalNodeStart[0] + (Ai&1),globalNodeStart[1]+((Ai & 2) >> 1), globalNodeStart[2]+ ((Ai & 4) >> 2) };
 			// convert subscript to index
-			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodeSize[0] + globalNodeSub[2] * this->nodeSize[0] * this->nodeSize[1];
+			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 			// add temperature contribution of node
 			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
 				tempValue += this->calculateNA(xi, Ai) * dVec(this->nodeMap[globalNode]);
@@ -552,14 +552,14 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 	Eigen::Matrix3<float> J;
 	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
 	// we assume the z height can change once in the volume. 
-	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
-	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
+	float deltaX = this->tissueSize[0] / float(this->elementsPerAxis[0]);
+	float deltaY = this->tissueSize[1] / float(this->elementsPerAxis[1]);
 	float deltaZ = 0;
 	if (layer == 1) {
 		deltaZ = this->layerHeight / float(this->layerSize);
 	}
 	else if (layer == 2) {
-		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
 	}
 	else {
 		std::cout << "layer must be 1 or 2" << std::endl;
@@ -588,14 +588,14 @@ Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 
 	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
 	// we assume the z height can change once in the volume. 
-	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
-	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
+	float deltaX = this->tissueSize[0] / float(this->elementsPerAxis[0]);
+	float deltaY = this->tissueSize[1] / float(this->elementsPerAxis[1]);
 	float deltaZ = 0;
 	if (layer == 1) {
 		deltaZ = this->layerHeight / float(this->layerSize);
 	}
 	else if (layer == 2) {
-		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->gridSize[2] - this->layerSize);
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
 	}
 	else {
 		std::cout << "layer must be 1 or 2" << std::endl;
@@ -753,11 +753,11 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 	// this function has not been tested. 
 	position[0] = 0; position[1] = 0; position[2] = 0;
 
-	float deltaX = this->tissueSize[0] / float(this->gridSize[0]);
-	float deltaY = this->tissueSize[1] / float(this->gridSize[1]);
-	float deltaZ = this->tissueSize[2] / float(this->gridSize[2]);
+	float deltaX = this->tissueSize[0] / float(this->elementsPerAxis[0]);
+	float deltaY = this->tissueSize[1] / float(this->elementsPerAxis[1]);
+	float deltaZ = this->tissueSize[2] / float(this->elementsPerAxis[2]);
 	int sub[3];
-	this->ind2sub(globalNode, this->nodeSize, sub);
+	this->ind2sub(globalNode, this->nodesPerAxis, sub);
 	position[0] = sub[0] * deltaX;
 	position[1] = sub[1] * deltaY;
 	position[2] = sub[2] * deltaZ;
@@ -898,14 +898,14 @@ void FEM_Simulator::initializeBoundaryNodes()
 	this->validNodes.clear();
 	this->dirichletNodes.clear();
 
-	int nNodes = this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2];
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 	int positionCounter = 0;
 	bool validNode = true;
 	this->nodeMap = std::vector<int>(nNodes, -1); // initialize the mapping to -1. -1 indicates the node passed in is a dirichlet node.
 	for (int i = 0; i < nNodes; i++) {
 		int nodeFace = this->determineNodeFace(i);
 		int nodeSub[3];
-		this->ind2sub(i, this->nodeSize, nodeSub);
+		this->ind2sub(i, this->nodesPerAxis, nodeSub);
 		validNode = true;
 		// Determine if the node lies on a boundary and then determine what kind of boundary
 		if (nodeFace != 0) { // This check saves a lot time since most nodes are not on a surface.
@@ -990,21 +990,21 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 	// The y-axis points towards the right face of the tissue 
 	int output = INTERNAL;
 	int nodeSub[3];
-	this->ind2sub(globalNode, this->nodeSize, nodeSub);
+	this->ind2sub(globalNode, this->nodesPerAxis, nodeSub);
 	if (nodeSub[2] == 0) { 
 		// Nodes on the top of the tissue have z-element = 0
 		output += TOP;
 	}
-	if (nodeSub[2] == (this->nodeSize[2] - 1)) {
-		// Nodes on the bottom of the tissue have z-element = nodeSize[2]-1
+	if (nodeSub[2] == (this->nodesPerAxis[2] - 1)) {
+		// Nodes on the bottom of the tissue have z-element = nodesPerAxis[2]-1
 		output += BOTTOM;
 	}
-	if (nodeSub[0] == (this->nodeSize[0] - 1)) {
-		// Nodes on the front of the tissue have x-element = nodeSize[0] - 1
+	if (nodeSub[0] == (this->nodesPerAxis[0] - 1)) {
+		// Nodes on the front of the tissue have x-element = nodesPerAxis[0] - 1
 		output += FRONT;
 	}
-	if (nodeSub[1] == (this->nodeSize[0] - 1)) {
-		// Nodes on the right of the tissue have y-element = nodeSize[1] - 1
+	if (nodeSub[1] == (this->nodesPerAxis[0] - 1)) {
+		// Nodes on the right of the tissue have y-element = nodesPerAxis[1] - 1
 		output += RIGHT;
 	}
 	if (nodeSub[0] == 0) {
@@ -1032,20 +1032,20 @@ void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 			}
 		}
 	}
-	int gridSize[3]; 
+	int elementsPerAxis[3]; 
 	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
 		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
 	}
-	gridSize[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
-	gridSize[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
-	gridSize[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
-	this->setGridSize(gridSize);
+	elementsPerAxis[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
+	elementsPerAxis[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
+	elementsPerAxis[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
+	this->setGridSize(elementsPerAxis);
 }
 
 void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 {	
 	//TODO make sure Temp is the correct size
-	if (this->nodeSize[0] * this->nodeSize[1] * this->nodeSize[2] != Temp.size()) {
+	if (this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2] != Temp.size()) {
 		throw std::runtime_error("Total number of elements in Temp does not match current Node size.");
 	}
 	this->Temp = Temp;
@@ -1054,12 +1054,12 @@ void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
 {
 	std::vector<std::vector<std::vector<float>>>
-		TempOut(this->nodeSize[0], std::vector<std::vector<float>>(this->nodeSize[1], std::vector<float>(this->nodeSize[2])));
+		TempOut(this->nodesPerAxis[0], std::vector<std::vector<float>>(this->nodesPerAxis[1], std::vector<float>(this->nodesPerAxis[2])));
 
-	for (int i = 0; i < this->nodeSize[0]; i++) {
-		for (int j = 0; j < this->nodeSize[1]; j++) {
-			for (int k = 0; k < this->nodeSize[2]; k++) {
-				TempOut[i][j][k] = Temp(i + j * (this->nodeSize[0]) + k * (this->nodeSize[0] * this->nodeSize[1]));
+	for (int i = 0; i < this->nodesPerAxis[0]; i++) {
+		for (int j = 0; j < this->nodesPerAxis[1]; j++) {
+			for (int k = 0; k < this->nodesPerAxis[2]; k++) {
+				TempOut[i][j][k] = Temp(i + j * (this->nodesPerAxis[0]) + k * (this->nodesPerAxis[0] * this->nodesPerAxis[1]));
 			}
 		}
 	}
@@ -1082,10 +1082,10 @@ void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 		}
 	}
 
-	if ((NFR.size() == this->gridSize[0]) && (NFR[0].size() == this->gridSize[1]) && (NFR[0][0].size() == this->gridSize[2])) {
+	if ((NFR.size() == this->elementsPerAxis[0]) && (NFR[0].size() == this->elementsPerAxis[1]) && (NFR[0][0].size() == this->elementsPerAxis[2])) {
 		this->elemNFR = true;
 	}
-	else if ((NFR.size() == this->nodeSize[0]) && (NFR[0].size() == this->nodeSize[1]) && (NFR[0][0].size() == this->nodeSize[2])) {
+	else if ((NFR.size() == this->nodesPerAxis[0]) && (NFR[0].size() == this->nodesPerAxis[1]) && (NFR[0][0].size() == this->nodesPerAxis[2])) {
 		this->elemNFR = false;
 	}
 	else {
@@ -1103,7 +1103,7 @@ void FEM_Simulator::setNFR(Eigen::VectorXf& NFR)
 
 void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist)
 {
-	this->NFR = Eigen::VectorXf::Zero(this->nodeSize[0]* this->nodeSize[1]* this->nodeSize[2]);
+	this->NFR = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
 	float lambda = 10.6 * pow(10, -4); // wavelength of laser in cm
 	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
 	//TODO: account for orientation shift on the laser
@@ -1112,28 +1112,28 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 	float irr = 0;
 	float width = 0; 
 	float xPos = -this->tissueSize[0] / 2;
-	float xStep = this->tissueSize[0] / this->gridSize[0];
+	float xStep = this->tissueSize[0] / this->elementsPerAxis[0];
 	float yPos = -this->tissueSize[1] / 2;
-	float yStep = this->tissueSize[1] / this->gridSize[1];
+	float yStep = this->tissueSize[1] / this->elementsPerAxis[1];
 	float zPos = 0;
 	float zStep = this->layerHeight / this->layerSize;
 
-	for (int i = 0; i < this->nodeSize[0]; i++) {
+	for (int i = 0; i < this->nodesPerAxis[0]; i++) {
 		yPos = -this->tissueSize[1] / 2;
-		for (int j = 0; j < this->nodeSize[1]; j++) {
+		for (int j = 0; j < this->nodesPerAxis[1]; j++) {
 			zPos = 0;
 			zStep = this->layerHeight / this->layerSize;
-			for (int k = 0; k < this->nodeSize[2]; k++) {
+			for (int k = 0; k < this->nodesPerAxis[2]; k++) {
 				if (k >= this->layerSize) {
 					// if we have passed the layer size
-					zStep = (tissueSize[2] - this->layerHeight) / (this->gridSize[2] - this->layerSize);
+					zStep = (tissueSize[2] - this->layerHeight) / (this->elementsPerAxis[2] - this->layerSize);
 				}
 				// calculate beam width at depth
 				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
 				// calculate laser irradiance
 				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::exp(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
 				// set laser irradiane
-				this->NFR(i + j * this->nodeSize[0] + k * this->nodeSize[0] * this->nodeSize[1]) = irr;
+				this->NFR(i + j * this->nodesPerAxis[0] + k * this->nodesPerAxis[0] * this->nodesPerAxis[1]) = irr;
 				// increase z pos
 				zPos = zPos + zStep;
 			}
@@ -1151,7 +1151,7 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 	// then we need to resize our layer configuration.
 	if (this->layerHeight >= tissueSize[2]) {
 		this->layerHeight = tissueSize[2];
-		this->layerSize = this->gridSize[2];
+		this->layerSize = this->elementsPerAxis[2];
 	}
 	for (int i = 0; i < 3; i++) {
 		this->tissueSize[i] = tissueSize[i];
@@ -1161,7 +1161,7 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 }
 
 void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
-	if ((layerSize > this->gridSize[2])||(layerSize < 0)) {
+	if ((layerSize > this->elementsPerAxis[2])||(layerSize < 0)) {
 		std::cout << "Invalid layer size. The layer must be equal"
 			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
 		throw std::runtime_error("Layer Size must be equal to or less than the toal number of elements in the z direction and greater than 0");
@@ -1175,7 +1175,7 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
 		throw std::runtime_error("Layer Height must be 0 if layer size is 0 and vice versa");
 	}
-	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->gridSize[2])) {
+	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->elementsPerAxis[2])) {
 		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
 		throw std::runtime_error("Layer Height must be the tissue height if layer size is the grid size and vice versa");
 	}
@@ -1209,17 +1209,17 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 	this->ambientTemp = ambientTemp;
 }
 
-void FEM_Simulator::setGridSize(int gridSize[3]) {
+void FEM_Simulator::setGridSize(int elementsPerAxis[3]) {
 	for (int i = 0; i < 3; i++) {
-		this->gridSize[i] = gridSize[i];
-		this->nodeSize[i] = gridSize[i] * (this->Nn1d - 1) + 1;
+		this->elementsPerAxis[i] = elementsPerAxis[i];
+		this->nodesPerAxis[i] = elementsPerAxis[i] * (this->Nn1d - 1) + 1;
 	}
 }
 
-void FEM_Simulator::setNodeSize(int nodeSize[3]) {
+void FEM_Simulator::setNodeSize(int nodesPerAxis[3]) {
 	for (int i = 0; i < 3; i++) {
-		this->gridSize[i] = nodeSize[i] - 1;
-		this->nodeSize[i] = nodeSize[i];
+		this->elementsPerAxis[i] = nodesPerAxis[i] - 1;
+		this->nodesPerAxis[i] = nodesPerAxis[i];
 	}
 }
 

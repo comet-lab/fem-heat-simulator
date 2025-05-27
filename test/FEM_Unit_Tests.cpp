@@ -583,13 +583,13 @@ TEST_F(BaseSim, TestCreateFjFunction1)
 
 TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 
-	int nodeSize[3] = { 5,5,5 };
-	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
-	std::vector<std::vector<std::vector<float>>> NFR(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
+	int nodesPerAxis[3] = { 5,5,5 };
+	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
+	std::vector<std::vector<std::vector<float>>> NFR(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	srand(1);
-	for (int i = 0; i < nodeSize[0]; i++) {
-		for (int j = 0; j < nodeSize[1]; j++) {
-			for (int k = 0; k < nodeSize[2]; k++) {
+	for (int i = 0; i < nodesPerAxis[0]; i++) {
+		for (int j = 0; j < nodesPerAxis[1]; j++) {
+			for (int k = 0; k < nodesPerAxis[2]; k++) {
 				Temp[i][j][k] = 0;
 				NFR[i][j][k] = 1;
 			}
@@ -620,10 +620,10 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 	femSimQuad->createKMFelem();
 	femSimQuad->performTimeStepping();
 
-	for (int k = 0; k < nodeSize[2]; k++) {
-		for (int j = 0; j < nodeSize[1]; j++) {
-			for (int i = 0; i < nodeSize[0]; i++) {
-				int idx = i + j * nodeSize[0] + k * nodeSize[0] * nodeSize[1];
+	for (int k = 0; k < nodesPerAxis[2]; k++) {
+		for (int j = 0; j < nodesPerAxis[1]; j++) {
+			for (int i = 0; i < nodesPerAxis[0]; i++) {
+				int idx = i + j * nodesPerAxis[0] + k * nodesPerAxis[0] * nodesPerAxis[1];
 				EXPECT_TRUE(abs(femSimQuad->Temp(idx) - femSimQuad->Temp(idx)) < 0.001);
 			}
 		}
