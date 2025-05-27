@@ -1039,7 +1039,7 @@ void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 	elementsPerAxis[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
 	elementsPerAxis[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
 	elementsPerAxis[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
-	this->setGridSize(elementsPerAxis);
+	this->setElementsPerAxis(elementsPerAxis);
 }
 
 void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
@@ -1209,14 +1209,14 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 	this->ambientTemp = ambientTemp;
 }
 
-void FEM_Simulator::setGridSize(int elementsPerAxis[3]) {
+void FEM_Simulator::setElementsPerAxis(int elementsPerAxis[3]) {
 	for (int i = 0; i < 3; i++) {
 		this->elementsPerAxis[i] = elementsPerAxis[i];
 		this->nodesPerAxis[i] = elementsPerAxis[i] * (this->Nn1d - 1) + 1;
 	}
 }
 
-void FEM_Simulator::setNodeSize(int nodesPerAxis[3]) {
+void FEM_Simulator::setNodesPerAxis(int nodesPerAxis[3]) {
 	for (int i = 0; i < 3; i++) {
 		this->elementsPerAxis[i] = nodesPerAxis[i] - 1;
 		this->nodesPerAxis[i] = nodesPerAxis[i];

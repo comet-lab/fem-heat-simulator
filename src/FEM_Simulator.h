@@ -81,8 +81,8 @@ public:
 	void setHTC(float HTC);
 	void setFlux(float Qn);
 	void setAmbientTemp(float ambientTemp);
-	void setGridSize(int elementsPerAxis[3]);
-	void setNodeSize(int nodesPerAxis[3]);
+	void setElementsPerAxis(int elementsPerAxis[3]);
+	void setNodesPerAxis(int nodesPerAxis[3]);
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
 	void setJ(int layer=1);
 	void setKeInt();
