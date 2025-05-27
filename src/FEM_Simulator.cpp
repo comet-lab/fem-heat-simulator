@@ -1146,9 +1146,17 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {
+	
+	// if our initial layer configuration would become outside our tissue size
+	// then we need to resize our layer configuration.
+	if (this->layerHeight >= tissueSize[2]) {
+		this->layerHeight = tissueSize[2];
+		this->layerSize = this->gridSize[2];
+	}
 	for (int i = 0; i < 3; i++) {
 		this->tissueSize[i] = tissueSize[i];
 	}
+	
 	this->setJ();
 }
 

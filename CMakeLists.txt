@@ -43,7 +43,7 @@ add_executable(FEM_Unit_Tests
   test/FEM_Unit_Tests.cpp
   src/FEM_Simulator.cpp
   src/FEM_Simulator.h
-)
+ "test/BaseSim.cpp")
 target_include_directories(FEM_Unit_Tests PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
 target_link_libraries(FEM_Unit_Tests
   GTest::gtest_main

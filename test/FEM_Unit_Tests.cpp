@@ -1,22 +1,18 @@
 #include <gtest/gtest.h>
 #include "../src/FEM_Simulator.h"
+#include "BaseSim.cpp"
 #include <iostream>
 #include <string>
 
-TEST(MainTest, TestCalculateNABase1)
+TEST_F(BaseSim, TestCalculateNABase1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
 	int Nn1d = 2;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
 	float xi;
 	for (int Ai = 0; Ai < Nn1d; Ai++) {
 		xi = -1;
-		float output1 = simulator->calculateNABase(-1, Ai);
-		float output3 = simulator->calculateNABase(0, Ai);
-		float output2 = simulator->calculateNABase(1, Ai);
+		float output1 = femSimLin->calculateNABase(-1, Ai);
+		float output3 = femSimLin->calculateNABase(0, Ai);
+		float output2 = femSimLin->calculateNABase(1, Ai);
 		if (Ai == 0) {
 			EXPECT_FLOAT_EQ(1.0f, output1);
 			EXPECT_FLOAT_EQ(0.5f, output3);
@@ -30,22 +26,17 @@ TEST(MainTest, TestCalculateNABase1)
 	}
 }
 
-TEST(MainTest, TestCalculateNABase2)
+TEST_F(BaseSim, TestCalculateNABase2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
 	int Nn1d = 3;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
 	float xi;
 	for (int Ai = 0; Ai < Nn1d; Ai++) {
 		xi = -1;
 
-		float output1 = simulator->calculateNABase(-1, Ai);
-		float output2 = simulator->calculateNABase(0, Ai);
-		float output3 = simulator->calculateNABase(1, Ai);
-		float output4 = simulator->calculateNABase(-0.5f, Ai);
+		float output1 = femSimQuad->calculateNABase(-1, Ai);
+		float output2 = femSimQuad->calculateNABase(0, Ai);
+		float output3 = femSimQuad->calculateNABase(1, Ai);
+		float output4 = femSimQuad->calculateNABase(-0.5f, Ai);
 
 		if (Ai == 0) {
 			EXPECT_FLOAT_EQ(1.0f, output1);
@@ -68,50 +59,38 @@ TEST(MainTest, TestCalculateNABase2)
 	}
 }
 
-TEST(MainTest, TestCalculateNA1)
+TEST_F(BaseSim, TestCalculateNA1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
 	int Nn1d = 2;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
-
 	int Nne = pow(Nn1d, 3);
 	float xi1[3], xi2[3];
 	int AiSub[3];
 	int size[3] = { Nn1d,Nn1d,Nn1d };
 	for (int Ai = 0; Ai < Nne; Ai++) {
-		simulator->ind2sub(Ai, size, AiSub);
+		femSimLin->ind2sub(Ai, size, AiSub);
 		xi1[0] = AiSub[0] * 2 - 1;
 		xi1[1] = AiSub[1] * 2 - 1;
 		xi1[2] = AiSub[2] * 2 - 1;
 		xi2[0] = (((AiSub[0] + 1) % 2) * 2 - 1);
 		xi2[1] = (((AiSub[1] + 1) % 2) * 2 - 1);;
 		xi2[2] = (((AiSub[2] + 1) % 2) * 2 - 1);;
-		float output1 = simulator->calculateNA(xi1, Ai);
-		float output2 = simulator->calculateNA(xi2, Ai);
+		float output1 = femSimLin->calculateNA(xi1, Ai);
+		float output2 = femSimLin->calculateNA(xi2, Ai);
 
 		EXPECT_FLOAT_EQ(1.0f, output1);
 		EXPECT_FLOAT_EQ(0.0f, output2);
 	}
 }
 
-TEST(MainTest, TestCalculateNA2)
+TEST_F(BaseSim, TestCalculateNA2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
 	int Nn1d = 3;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
-
 	int Nne = pow(Nn1d, 3);
 	float xi1[3], xi2[3], xi3[3], xi4[3];
 	int AiSub[3];
 	int size[3] = { Nn1d,Nn1d,Nn1d };
 	for (int Ai = 0; Ai < Nne; Ai++) {
-		simulator->ind2sub(Ai, size, AiSub);
+		femSimQuad->ind2sub(Ai, size, AiSub);
 		xi1[0] = AiSub[0] - 1;
 		xi1[1] = AiSub[1] - 1;
 		xi1[2] = AiSub[2] - 1;
@@ -128,10 +107,10 @@ TEST(MainTest, TestCalculateNA2)
 		xi4[1] = AiSub[1] - 1;
 		xi4[2] = (((AiSub[2] + 1) % Nn1d) - 1);
 
-		float output1 = simulator->calculateNA(xi1, Ai);
-		float output2 = simulator->calculateNA(xi2, Ai);
-		float output3 = simulator->calculateNA(xi3, Ai);
-		float output4 = simulator->calculateNA(xi4, Ai);
+		float output1 = femSimQuad->calculateNA(xi1, Ai);
+		float output2 = femSimQuad->calculateNA(xi2, Ai);
+		float output3 = femSimQuad->calculateNA(xi3, Ai);
+		float output4 = femSimQuad->calculateNA(xi4, Ai);
 
 		EXPECT_FLOAT_EQ(1.0f, output1);
 		EXPECT_FLOAT_EQ(0.0f, output2);
@@ -140,21 +119,16 @@ TEST(MainTest, TestCalculateNA2)
 	}
 }
 
-TEST(MainTest, TestcalculateNADotBase1)
+TEST_F(BaseSim, TestcalculateNADotBase1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	int Nn1d = 2;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
 
+	int Nn1d = 2;
 	for (int Ai = 0; Ai < Nn1d; Ai++) {
 
-		float output1 = simulator->calculateNADotBase(-1, Ai);
-		float output2 = simulator->calculateNADotBase(0, Ai);
-		float output3 = simulator->calculateNADotBase(1, Ai);
-		float output4 = simulator->calculateNADotBase(-0.5, Ai);
+		float output1 = femSimLin->calculateNADotBase(-1, Ai);
+		float output2 = femSimLin->calculateNADotBase(0, Ai);
+		float output3 = femSimLin->calculateNADotBase(1, Ai);
+		float output4 = femSimLin->calculateNADotBase(-0.5, Ai);
 
 		if (Ai == 0) {
 			EXPECT_FLOAT_EQ(-1 / 2.0f, output1);
@@ -171,21 +145,16 @@ TEST(MainTest, TestcalculateNADotBase1)
 	}
 }
 
-TEST(MainTest, TestcalculateNADotBase2)
+TEST_F(BaseSim, TestcalculateNADotBase2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	int Nn1d = 3;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
 
+	int Nn1d = 3;
 	for (int Ai = 0; Ai < Nn1d; Ai++) {
 
-		float output1 = simulator->calculateNADotBase(-1, Ai);
-		float output2 = simulator->calculateNADotBase(0, Ai);
-		float output3 = simulator->calculateNADotBase(1, Ai);
-		float output4 = simulator->calculateNADotBase(-0.5, Ai);
+		float output1 = femSimQuad->calculateNADotBase(-1, Ai);
+		float output2 = femSimQuad->calculateNADotBase(0, Ai);
+		float output3 = femSimQuad->calculateNADotBase(1, Ai);
+		float output4 = femSimQuad->calculateNADotBase(-0.5, Ai);
 
 		if (Ai == 0) {
 			EXPECT_FLOAT_EQ(-3 / 2.0f, output1);
@@ -208,21 +177,16 @@ TEST(MainTest, TestcalculateNADotBase2)
 	}
 }
 
-TEST(MainTest, TestCalculateNADot2)
+TEST_F(BaseSim, TestCalculateNADot2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	int Nn1d = 3;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f, Nn1d);
 
+	int Nn1d = 3;
 	int Nne = pow(Nn1d, 3);
 	float xi1[3], xi2[3], xi3[3], xi4[3];
 	int AiSub[3];
 	int size[3] = { Nn1d,Nn1d,Nn1d };
 	for (int Ai = 0; Ai < Nne; Ai++) {
-		simulator->ind2sub(Ai, size, AiSub);
+		femSimQuad->ind2sub(Ai, size, AiSub);
 		xi1[0] = AiSub[0] - 1;
 		xi1[1] = AiSub[1] - 1;
 		xi1[2] = AiSub[2] - 1;
@@ -231,8 +195,8 @@ TEST(MainTest, TestCalculateNADot2)
 		xi2[1] = (((AiSub[1] + 1) % Nn1d) - 1);
 		xi2[2] = (((AiSub[2] + 1) % Nn1d) - 1);
 
-		Eigen::Vector3f output1 = simulator->calculateNA_dot(xi1, Ai);
-		Eigen::Vector3f output2 = simulator->calculateNA_dot(xi2, Ai);
+		Eigen::Vector3f output1 = femSimQuad->calculateNA_dot(xi1, Ai);
+		Eigen::Vector3f output2 = femSimQuad->calculateNA_dot(xi2, Ai);
 
 		for (int i = 0; i < 3; i++) {
 			if (xi1[i] == -1) {
@@ -249,15 +213,8 @@ TEST(MainTest, TestCalculateNADot2)
 	}
 }
 
-TEST(MainTest, TestDetermineNodeFace1)
+TEST_F(BaseSim, TestDetermineNodeFace1)
 {
-
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-
 	int expected0 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::BACK + FEM_Simulator::tissueFace::LEFT;
 	int expected1 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::LEFT;
 	int expected2 = FEM_Simulator::tissueFace::TOP + FEM_Simulator::tissueFace::FRONT + FEM_Simulator::tissueFace::LEFT;
@@ -291,24 +248,19 @@ TEST(MainTest, TestDetermineNodeFace1)
 
 	int faces[27];
 	for (int i = 0; i < 27; i++) {
-		faces[i] = simulator->determineNodeFace(i);
+		faces[i] = femSimLin->determineNodeFace(i);
 		//std::cout << i << ", Expected: " << expected[i] << " Actual: " << faces[i] << std::endl;
 		EXPECT_FLOAT_EQ(expected[i], faces[i]);
 	}
 }
 
-TEST(MainTest, TestInitializeElementNodeSurfaceMap1)
+TEST_F(BaseSim, TestInitializeElementNodeSurfaceMap1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
+
 	int Nn1d = 2;
 	int Nne = pow(Nn1d, 3);
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-	simulator->Nn1d = 2;
-	simulator->initializeElementNodeSurfaceMap();
-	std::array<std::vector<int>, 6> surfMap = simulator->elemNodeSurfaceMap;
+	femSimLin->initializeElementNodeSurfaceMap();
+	std::array<std::vector<int>, 6> surfMap = femSimLin->elemNodeSurfaceMap;
 
 
 	std::vector<std::vector<bool>> nodeCondition = { { true,false,false,false,true,true }, // Node 0 belongs to the top, back and left faces
@@ -329,24 +281,20 @@ TEST(MainTest, TestInitializeElementNodeSurfaceMap1)
 	}
 }
 
-TEST(MainTest, TestInitializeBoundaryNodes1)
+TEST_F(BaseSim, TestInitializeBoundaryNodes1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
+
 	int Nn1d = 2;
 	int Nne = pow(Nn1d, 3);
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 	int BC[6] = { 0,0,0,0,0,0 }; // All nodes except the one in the center should be dirichlet nodes 
-	simulator->setBoundaryConditions(BC);
+	femSimLin->setBoundaryConditions(BC);
 
-	simulator->initializeBoundaryNodes();
+	femSimLin->initializeBoundaryNodes();
 
 	for (int idx = 0; idx < 27; idx++) {
-		std::vector<int> dirchletNodes = simulator->dirichletNodes;
-		std::vector<int> validNodes = simulator->validNodes;
-		std::vector<int> nodeMap = simulator->nodeMap;
+		std::vector<int> dirchletNodes = femSimLin->dirichletNodes;
+		std::vector<int> validNodes = femSimLin->validNodes;
+		std::vector<int> nodeMap = femSimLin->nodeMap;
 		bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
 		bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
 		if (idx != 13) {
@@ -363,19 +311,15 @@ TEST(MainTest, TestInitializeBoundaryNodes1)
 	}
 }
 
-TEST(MainTest, TestInitializeBoundaryNodes2)
+TEST_F(BaseSim, TestInitializeBoundaryNodes2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
+
 	int Nn1d = 2;
 	int Nne = pow(Nn1d, 3);
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 	int BC[6] = { 0,0,0,1,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
-	simulator->setBoundaryConditions(BC);
+	femSimLin->setBoundaryConditions(BC);
 
-	simulator->initializeBoundaryNodes();
+	femSimLin->initializeBoundaryNodes();
 
 	bool dirichletCond[27] = { true,true,true,true,true,true,true,true,true, // top layer
 							  false,false,true,false,false,true,false,false,true, //middle layer
@@ -384,9 +328,9 @@ TEST(MainTest, TestInitializeBoundaryNodes2)
 							  0,1,-1,2,3,-1,4,5,-1, //middle layer
 							  -1,-1,-1,-1,-1,-1,-1,-1,-1 }; // bottom layer
 	for (int idx = 0; idx < 27; idx++) {
-		std::vector<int> dirchletNodes = simulator->dirichletNodes;
-		std::vector<int> validNodes = simulator->validNodes;
-		std::vector<int> nodeMap = simulator->nodeMap;
+		std::vector<int> dirchletNodes = femSimLin->dirichletNodes;
+		std::vector<int> validNodes = femSimLin->validNodes;
+		std::vector<int> nodeMap = femSimLin->nodeMap;
 		bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
 		bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
 
@@ -396,19 +340,13 @@ TEST(MainTest, TestInitializeBoundaryNodes2)
 	}
 }
 
-TEST(MainTest, TestInitializeBoundaryNodes3)
+TEST_F(BaseSim, TestInitializeBoundaryNodes3)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	int Nn1d = 2;
-	int Nne = pow(Nn1d, 3);
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
-	int BC[6] = { 1,2,2,0,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
-	simulator->setBoundaryConditions(BC);
 
-	simulator->initializeBoundaryNodes();
+	int BC[6] = { 1,2,2,0,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
+	femSimLin->setBoundaryConditions(BC);
+
+	femSimLin->initializeBoundaryNodes();
 
 	bool dirichletCond[27] = { false,false,false,false,false,false,true,true,true, // top layer
 							  false,false,false,false,false,false,true,true,true, //middle layer
@@ -417,9 +355,9 @@ TEST(MainTest, TestInitializeBoundaryNodes3)
 							  6,7,8,9,10,11,-1,-1,-1, //middle layer
 							  12,13,14,15,16,17,-1,-1,-1 }; // bottom layer
 	for (int idx = 0; idx < 27; idx++) {
-		std::vector<int> dirchletNodes = simulator->dirichletNodes;
-		std::vector<int> validNodes = simulator->validNodes;
-		std::vector<int> nodeMap = simulator->nodeMap;
+		std::vector<int> dirchletNodes = femSimLin->dirichletNodes;
+		std::vector<int> validNodes = femSimLin->validNodes;
+		std::vector<int> nodeMap = femSimLin->nodeMap;
 		bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
 		bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
 
@@ -429,24 +367,17 @@ TEST(MainTest, TestInitializeBoundaryNodes3)
 	}
 }
 
-TEST(MainTest, TestInitializeBoundaryNodes4)
+TEST_F(BaseSim, TestInitializeBoundaryNodes4)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	int Nn1d = 2;
-	int Nne = pow(Nn1d, 3);
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 	int BC[6] = { 1,2,2,1,2,1 }; // All Nodes on top/bottom/front faces are dirichlet
-	simulator->setBoundaryConditions(BC);
+	femSimLin->setBoundaryConditions(BC);
 
-	simulator->initializeBoundaryNodes();
+	femSimLin->initializeBoundaryNodes();
 
 	for (int idx = 0; idx < 27; idx++) {
-		std::vector<int> dirchletNodes = simulator->dirichletNodes;
-		std::vector<int> validNodes = simulator->validNodes;
-		std::vector<int> nodeMap = simulator->nodeMap;
+		std::vector<int> dirchletNodes = femSimLin->dirichletNodes;
+		std::vector<int> validNodes = femSimLin->validNodes;
+		std::vector<int> nodeMap = femSimLin->nodeMap;
 		bool dirContains = (std::find(dirchletNodes.begin(), dirchletNodes.end(), idx) != dirchletNodes.end());
 		bool validContains = (std::find(validNodes.begin(), validNodes.end(), idx) != validNodes.end());
 
@@ -456,212 +387,172 @@ TEST(MainTest, TestInitializeBoundaryNodes4)
 	}
 }
 
-TEST(MainTest, TestCalculateJ1)
+TEST_F(BaseSim, TestCalculateJ1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
+	
 	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
-	EXPECT_FLOAT_EQ(tissueSize[0] / 4, simulator->J(0, 0));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(0, 1));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(0, 2));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(1, 0));
-	EXPECT_FLOAT_EQ(tissueSize[1] / 4, simulator->J(1, 1));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(1, 2));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(2, 0));
-	EXPECT_FLOAT_EQ(0.0f, simulator->J(2, 1));
-	EXPECT_FLOAT_EQ(tissueSize[2] / 4, simulator->J(2, 2));
+	femSimLin->setTissueSize(tissueSize);
+	femSimLin->setJ(1);
+
+	EXPECT_FLOAT_EQ(tissueSize[0] / 4.0f, femSimLin->J(0, 0));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(0, 1));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(0, 2));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(1, 0));
+	EXPECT_FLOAT_EQ(tissueSize[1] / 4.0f, femSimLin->J(1, 1));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(1, 2));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(2, 0));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->J(2, 1));
+	EXPECT_FLOAT_EQ(tissueSize[2] / 4.0f, femSimLin->J(2, 2));
 }
 
-TEST(MainTest, TestCalculateJs1_1)
+TEST_F(BaseSim, TestCalculateJs1_1)
 {
-	// Js1 is the partial jacobian for the front/back faces. aka the y-z plane
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
 
-	EXPECT_FLOAT_EQ(tissueSize[1] / 4, simulator->Js1(0, 0));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js1(0, 1));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js1(1, 0));
-	EXPECT_FLOAT_EQ(tissueSize[2] / 4, simulator->Js1(1, 1));
+	float tissueSize[3] = { 2,1,0.5 };
+	femSimLin->setTissueSize(tissueSize);
+	femSimLin->setJ();
+
+	EXPECT_FLOAT_EQ(tissueSize[1] / 4, femSimLin->Js1(0, 0));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js1(0, 1));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js1(1, 0));
+	EXPECT_FLOAT_EQ(tissueSize[2] / 4, femSimLin->Js1(1, 1));
 }
 
-TEST(MainTest, TestCalculateJs2_1)
+TEST_F(BaseSim, TestCalculateJs2_1)
 {
-	// Js2 is the partial jacobian for the left/right faces. aka the x-z plane
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
 	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+	femSimLin->setTissueSize(tissueSize);
+	femSimLin->setJ();
 
-	EXPECT_FLOAT_EQ(tissueSize[0] / 4, simulator->Js2(0, 0));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js2(0, 1));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js2(1, 0));
-	EXPECT_FLOAT_EQ(tissueSize[2] / 4, simulator->Js2(1, 1));
+	EXPECT_FLOAT_EQ(tissueSize[0] / 4, femSimLin->Js2(0, 0));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js2(0, 1));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js2(1, 0));
+	EXPECT_FLOAT_EQ(tissueSize[2] / 4, femSimLin->Js2(1, 1));
 }
 
-TEST(MainTest, TestCalculateJs3_1)
+TEST_F(BaseSim, TestCalculateJs3_1)
 {
-	// Js3 is the partial jacobian for the top/bottom faces. aka the x-y plane
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
 	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+	femSimLin->setTissueSize(tissueSize);
+	femSimLin->setJ();
 
-	EXPECT_FLOAT_EQ(tissueSize[0] / 4, simulator->Js3(0, 0));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js3(0, 1));
-	EXPECT_FLOAT_EQ(0.0f, simulator->Js3(1, 0));
-	EXPECT_FLOAT_EQ(tissueSize[1] / 4, simulator->Js3(1, 1));
+	EXPECT_FLOAT_EQ(tissueSize[0] / 4, femSimLin->Js3(0, 0));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js3(0, 1));
+	EXPECT_FLOAT_EQ(0.0f, femSimLin->Js3(1, 0));
+	EXPECT_FLOAT_EQ(tissueSize[1] / 4, femSimLin->Js3(1, 1));
 }
 
-TEST(MainTest, TestInd2Sub1)
+TEST_F(BaseSim, TestInd2Sub1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+	
+
 	int sub[3];
 	int index = 0;
 	int size[3] = { 10,10,10 };
-	simulator->ind2sub(index, size, sub);
+	femSimLin->ind2sub(index, size, sub);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(0, sub[1]);
 	EXPECT_FLOAT_EQ(0, sub[2]);
 }
 
-TEST(MainTest, TestInd2Sub2)
+TEST_F(BaseSim, TestInd2Sub2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+
 	int sub[3];
 	int index = 10;
 	int size[3] = { 10,10,10 };
-	simulator->ind2sub(index, size, sub);
+	femSimLin->ind2sub(index, size, sub);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(1, sub[1]);
 	EXPECT_FLOAT_EQ(0, sub[2]);
 }
 
-TEST(MainTest, TestInd2Sub3)
+TEST_F(BaseSim, TestInd2Sub3)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+
 	int sub[3];
 	int index = 100;
 	int size[3] = { 10,10,10 };
-	simulator->ind2sub(index, size, sub);
+	femSimLin->ind2sub(index, size, sub);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(0, sub[1]);
 	EXPECT_FLOAT_EQ(1, sub[2]);
 }
 
-TEST(MainTest, TestInd2Sub4)
+TEST_F(BaseSim, TestInd2Sub4)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 2,1,0.5 };
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, 0.006, 5, 1, 1.0f);
+	
 	int sub[3];
 	int index = 521;
 	int size[3] = { 10,10,10 };
-	simulator->ind2sub(index, size, sub);
+	femSimLin->ind2sub(index, size, sub);
 	EXPECT_FLOAT_EQ(1, sub[0]);
 	EXPECT_FLOAT_EQ(2, sub[1]);
 	EXPECT_FLOAT_EQ(5, sub[2]);
 }
 
 
-TEST(MainTest, TestCalcKABFunction1)
+TEST_F(BaseSim, TestCalcKABFunction1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	float TC = 1.0f;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f);
+
+	float TC = femSimLin->TC;
 	int Ai = 0;
 	int Bi = 0;
 	float xi[3];
 	xi[0] = FEM_Simulator::A[Ai][0];
 	xi[1] = FEM_Simulator::A[Ai][1];
 	xi[2] = FEM_Simulator::A[Ai][2];
-	float output1 = simulator->calcKintAB(xi, Ai, Bi);
+	float output1 = femSimLin->calcKintAB(xi, Ai, Bi);
 	Eigen::MatrixXf KeInt(8, 8);
 	for (int Ai = 0; Ai < 8; Ai++) {
 		for (int Bi = 0; Bi < 8; Bi++) {
-			KeInt(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcKintAB, 2, 0, Ai, Bi);
+			KeInt(Ai, Bi) = femSimLin->integrate(&FEM_Simulator::calcKintAB, 2, 0, Ai, Bi);
 		}
 	}
 	// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
-	EXPECT_TRUE((abs(3 * TC / 16.0f) - output1) < 0.0001);
+	EXPECT_TRUE((abs(3 / 16.0f) - output1) < 0.0001);
 	for (int Ai = 0; Ai < 8; Ai++) {
-		EXPECT_TRUE(((1 / 6.0f * TC) - KeInt(Ai, Ai)) < 0.0001);
+		EXPECT_TRUE(((1 / 6.0f ) - KeInt(Ai, Ai)) < 0.0001);
 	}
-	EXPECT_TRUE(((-1 / 24.0f * TC) - KeInt(2, 0)) < 0.0001);
+	EXPECT_TRUE(((-1 / 24.0f) - KeInt(2, 0)) < 0.0001);
 }
 
-TEST(MainTest, TestCreateKABFunction2)
+TEST_F(BaseSim, TestCreateKABFunction2)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	float TC = 1.0f;
-	int Nn1d = 3;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, Nn1d);
 	int Ai = 0;
 	int Bi = 0;
 	float xi[3];
 	xi[0] = -1;
 	xi[1] = -1;
 	xi[2] = -1;
-	float output1 = simulator->calcKintAB(xi, Ai, Bi);
-	simulator->setKeInt();
-	// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 1.0
+	float output1 = femSimQuad->calcKintAB(xi, Ai, Bi);
+	femSimQuad->setKeInt();
+	
 	EXPECT_TRUE(abs(3.375f - output1) < 0.0001);
-	EXPECT_TRUE(abs(0.1244f - simulator->KeInt(0, 0)) < 0.0001);
-	EXPECT_TRUE(abs(0.4267f - simulator->KeInt(1, 1)) < 0.0001);
-	EXPECT_TRUE(abs(1.4222f - simulator->KeInt(4, 4)) < 0.0001);
-	EXPECT_TRUE(abs(4.5511f - simulator->KeInt(13, 13)) < 0.0001);
-	EXPECT_TRUE(abs(-0.0415f - simulator->KeInt(9, 15)) < 0.0001);
-	EXPECT_TRUE(abs(-0.0059f - simulator->KeInt(21, 5)) < 0.0001);
-	EXPECT_TRUE(abs(-0.0370f - simulator->KeInt(21, 15)) < 0.0001);
+	EXPECT_TRUE(abs(0.1244f - femSimQuad->KeInt(0, 0)) < 0.0001);
+	EXPECT_TRUE(abs(0.4267f - femSimQuad->KeInt(1, 1)) < 0.0001);
+	EXPECT_TRUE(abs(1.4222f - femSimQuad->KeInt(4, 4)) < 0.0001);
+	EXPECT_TRUE(abs(4.5511f - femSimQuad->KeInt(13, 13)) < 0.0001);
+	EXPECT_TRUE(abs(-0.0415f - femSimQuad->KeInt(9, 15)) < 0.0001);
+	EXPECT_TRUE(abs(-0.0059f - femSimQuad->KeInt(21, 5)) < 0.0001);
+	EXPECT_TRUE(abs(-0.0370f - femSimQuad->KeInt(21, 15)) < 0.0001);
 }
 
-TEST(MainTest, TestCreateMABFunction1)
+TEST_F(BaseSim, TestCreateMABFunction1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	float TC = 1.0f;
-	float VHC = 1.0f;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, VHC, 1.0f, 1.0f);
+	
 	int Ai = 0;
 	int Bi = 0;
 	float xi[3];
 	xi[0] = -1;
 	xi[1] = -1;
 	xi[2] = -1;
-	float output1 = simulator->calcMAB(xi, Ai, Bi);
+	float output1 = femSimLin->calcMAB(xi, Ai, Bi);
 	Eigen::MatrixXf Me(8, 8);
 	for (int Ai = 0; Ai < 8; Ai++) {
 		for (int Bi = 0; Bi < 8; Bi++) {
-			Me(Ai, Bi) = simulator->integrate(&FEM_Simulator::calcMAB, 2, 0, Ai, Bi);
+			Me(Ai, Bi) = femSimLin->integrate(&FEM_Simulator::calcMAB, 2, 0, Ai, Bi);
 		}
 	}
 	// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
@@ -669,26 +560,19 @@ TEST(MainTest, TestCreateMABFunction1)
 	for (int Ai = 0; Ai < 8; Ai++) {
 		EXPECT_TRUE(((1 / 216.0f) - Me(Ai, Ai)) < 0.0001);
 	}
-	EXPECT_TRUE(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
+	EXPECT_TRUE(((1 / 864.0f) - Me(2, 0)) < 0.0001);
 }
 
-TEST(MainTest, TestCreateFjFunction1)
+TEST_F(BaseSim, TestCreateFjFunction1)
 {
-	std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} },
-													   { {0,0,0}, {0,0,0}, {0,0,0} } };
-	float tissueSize[3] = { 1,1,1 };
-	float TC = 1.0f;
-	float VHC = 1.0f;
-	FEM_Simulator* simulator = new FEM_Simulator(Temp, tissueSize, TC, VHC, 1.0f, 1.0f);
 	int Ai = 0;
 	int Bi = 0;
 	float xi[3];
 	xi[0] = FEM_Simulator::A[Ai][0];
 	xi[1] = FEM_Simulator::A[Ai][1];
 	xi[2] = FEM_Simulator::A[Ai][2];
-	float output1 = simulator->calcFqA(xi, Ai, 1);
-	simulator->setFeQ();
+	float output1 = femSimLin->calcFqA(xi, Ai, 1);
+	femSimLin->setFeQ();
 	// The truth values were calculated in matlab assuming Kint = 1 and deltaX = deltaY = deltaZ = 0.5
 	//EXPECT_TRUE((abs(1 / 64.0f) - output1) < 0.0001);
 	//for (int Ai = 0; Ai < 8; Ai++) {
@@ -697,7 +581,7 @@ TEST(MainTest, TestCreateFjFunction1)
 	//EXPECT_TRUE(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 }
 
-TEST(MainTest, CompareLinearAndQuadratic1) {
+TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 
 	int nodeSize[3] = { 5,5,5 };
 	std::vector<std::vector<std::vector<float>>> Temp(nodeSize[0], std::vector<std::vector<float>>(nodeSize[1], std::vector<float>(nodeSize[2])));
@@ -714,33 +598,33 @@ TEST(MainTest, CompareLinearAndQuadratic1) {
 	float tissueSize[3] = { 1,1,1 };
 	float TC = 1.0f;
 	int BC[6] = { 0,0,2,2,2,2 };
-	FEM_Simulator* simulatorLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
-	FEM_Simulator* simulatorQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
+	FEM_Simulator* femSimLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
+	FEM_Simulator* femSimQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
 
-	simulatorLin->deltaT = 0.05f;
-	simulatorLin->tFinal = 1.0f;
-	simulatorLin->setBoundaryConditions(BC);
-	simulatorLin->setFlux(0);
-	simulatorLin->setAmbientTemp(0);
-	simulatorLin->setNFR(NFR);
+	femSimLin->deltaT = 0.05f;
+	femSimLin->tFinal = 1.0f;
+	femSimLin->setBoundaryConditions(BC);
+	femSimLin->setFlux(0);
+	femSimLin->setAmbientTemp(0);
+	femSimLin->setNFR(NFR);
 
-	simulatorQuad->deltaT = 0.05f;
-	simulatorQuad->tFinal = 1.0f;
-	simulatorQuad->setBoundaryConditions(BC);
-	simulatorQuad->setFlux(0);
-	simulatorQuad->setAmbientTemp(0);
-	simulatorQuad->setNFR(NFR);
+	femSimQuad->deltaT = 0.05f;
+	femSimQuad->tFinal = 1.0f;
+	femSimQuad->setBoundaryConditions(BC);
+	femSimQuad->setFlux(0);
+	femSimQuad->setAmbientTemp(0);
+	femSimQuad->setNFR(NFR);
 
-	simulatorLin->createKMFelem();
-	simulatorLin->performTimeStepping();
-	simulatorQuad->createKMFelem();
-	simulatorQuad->performTimeStepping();
+	femSimLin->createKMFelem();
+	femSimLin->performTimeStepping();
+	femSimQuad->createKMFelem();
+	femSimQuad->performTimeStepping();
 
 	for (int k = 0; k < nodeSize[2]; k++) {
 		for (int j = 0; j < nodeSize[1]; j++) {
 			for (int i = 0; i < nodeSize[0]; i++) {
 				int idx = i + j * nodeSize[0] + k * nodeSize[0] * nodeSize[1];
-				EXPECT_TRUE(abs(simulatorQuad->Temp(idx) - simulatorQuad->Temp(idx)) < 0.001);
+				EXPECT_TRUE(abs(femSimQuad->Temp(idx) - femSimQuad->Temp(idx)) < 0.001);
 			}
 		}
 	}
