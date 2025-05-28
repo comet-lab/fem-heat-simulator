@@ -413,37 +413,18 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 	int Nne = pow(this->Nn1d, 3);
 	// Input time = 0 information into temperature sensors
 	//spacingLayer contains the distance between nodes in eacy layer.
-	float spacingLayer1[3] = { this->tissueSize[0] / float(this->elementsPerAxis[0]), this->tissueSize[1] / float(this->elementsPerAxis[1]) , this->layerHeight / float(this->layerSize) };
-	float spacingLayer2[3] = { this->tissueSize[0] / float(this->elementsPerAxis[0]), this->tissueSize[1] / float(this->elementsPerAxis[1]) , (this->tissueSize[2]-this->layerHeight) / float(this->elementsPerAxis[2]-this->layerSize) };
 	for (int s = 0; s < nSensors; s++) {
 		std::array<float,3> sensorLocation = this->tempSensorLocations[s];
-		// TODO: Review Cal's Changes
-                //globalNodeStart holds the global node subscript of the first node in the element that contains this sensor
-//		int globalNodeStart[3] = { floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0]),
-//			floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1]),
-//			floor(sensorLocation[2] / spacingLayer1[2]) };
-		int globalNodeStart[3] = { static_cast<int>(floor((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0])),
-			static_cast<int>(floor((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1])),
-			static_cast<int>(floor(sensorLocation[2] / spacingLayer1[2])) };
-
-		if (sensorLocation[2] > this->layerHeight) {
-			// This should compensate for the change in layer appropriately.
-			globalNodeStart[2] = this->layerSize + floor((sensorLocation[2] - this->layerHeight) / spacingLayer2[2]);
-		}
-		// If the global node starting position of the element is the largest in a singular axis then we need to subtract one
-		// and use the previous node position
-		if (globalNodeStart[0] == this->elementsPerAxis[0]) globalNodeStart[0] -= 1;
-		if (globalNodeStart[1] == this->elementsPerAxis[1]) globalNodeStart[1] -= 1;
-		if (globalNodeStart[2] == this->elementsPerAxis[2]) globalNodeStart[2] -= 1;
-		float tempValue = 0;
+		// Determine the element (which for 1D linear elements is equivalent to the starting global node)
+		// as well as the location in the bi-unit domain of that element, xi
 		float xi[3];
-		// Xi should be  avalue between -1 and 1 along each axis relating the placement of the sensor in that element.
-		xi[0] = -1 + ((sensorLocation[0] + this->tissueSize[0] / 2.0f) / spacingLayer1[0] - globalNodeStart[0]) * 2;
-		xi[1] = -1 + ((sensorLocation[1] + this->tissueSize[1] / 2.0f) / spacingLayer1[1] - globalNodeStart[1]) * 2;
-		xi[2] = -1 + ((sensorLocation[2]) / spacingLayer1[2] - globalNodeStart[2]) * 2;
-		if (sensorLocation[2] > this->layerHeight) {
-			xi[2] = -1 + (this->layerSize + (sensorLocation[2] - this->layerHeight) / spacingLayer2[2] - globalNodeStart[2]) * 2;
+		std::array<int, 3> elementLocation = positionToElement(sensorLocation,xi);
+		std::array<int, 3> globalNodeStart;
+		// For linear elements, there will be no change between globalNodeStart and elementLocation
+		for (int i = 0; i < 3; i++) {
+			globalNodeStart[i] = elementLocation[0] * (this->Nn1d - 1);
 		}
+		float tempValue = 0;	
 		for (int Ai = 0; Ai < Nne; Ai++) { // iterate through each node in the element
 			// adjust the global starting node based on the current node we should be visiting
 			int globalNodeSub[3] = { globalNodeStart[0] + (Ai&1),globalNodeStart[1]+((Ai & 2) >> 1), globalNodeStart[2]+ ((Ai & 4) >> 2) };
@@ -460,6 +441,42 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 		}
 		this->sensorTemps[s][timeIdx] = tempValue;
 	}
+
+}
+
+std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& position, float xi[3]) {
+	// Input should be a location where we want to place a sensor 
+	float xSpacing = this->tissueSize[0] / float(this->elementsPerAxis[0]);
+	float ySpacing = this->tissueSize[1] / float(this->elementsPerAxis[1]);
+	float zSpacing = this->layerHeight / float(this->layerSize);
+	float zSpacing2 = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
+
+	std::array<int, 3> elementLocation = { static_cast<int>(floor((position[0] + this->tissueSize[0] / 2.0f) / xSpacing)),
+											static_cast<int>(floor((position[1] + this->tissueSize[1] / 2.0f) / ySpacing)),
+											static_cast<int>(floor(position[2] / zSpacing)) };
+
+	if (position[2] > this->layerHeight) {
+		// This should compensate for the change in layer appropriately.
+		elementLocation[2] = this->layerSize + floor((position[2] - this->layerHeight) / zSpacing2);
+	}
+	// If the location of the element is the largest in a singular axis then we need to subtract one
+	// and use the previous element position. This will effect locations on exact boundaries, where 
+	// the 'floor' operation above won't work. 
+	if (elementLocation[0] == this->elementsPerAxis[0]) elementLocation[0] -= 1;
+	if (elementLocation[1] == this->elementsPerAxis[1]) elementLocation[1] -= 1;
+	if (elementLocation[2] == this->elementsPerAxis[2]) elementLocation[2] -= 1;
+
+	// Xi should be  avalue between -1 and 1 along each axis relating the placement of the sensor in that element.
+	// Note that this only works because we assume cuboid elements (i.e. opposite faces are parallel, and each face is a rectangle). 
+	// It should work for linear or quadratic basis functions given our assumptions. 
+	xi[0] = -1 + ((position[0] + this->tissueSize[0] / 2.0f) / xSpacing - elementLocation[0]) * 2;
+	xi[1] = -1 + ((position[1] + this->tissueSize[1] / 2.0f) / ySpacing - elementLocation[1]) * 2;
+	xi[2] = -1 + ((position[2]) / zSpacing - elementLocation[2]) * 2;
+	if (position[2] > this->layerHeight) {
+		xi[2] = -1 + (this->layerSize + (position[2] - this->layerHeight) / zSpacing2 - elementLocation[2]) * 2;
+	}
+
+	return elementLocation;
 
 }
 

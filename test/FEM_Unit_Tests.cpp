@@ -630,3 +630,103 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 	}
 
 }
+
+TEST_F(BaseSim, testPositionToElement1) {
+	// only single layer test
+	std::array<std::array<float, 3>, 5> testPositions = { {
+		{{ -0.5, -0.5, 0 }},
+		{{ 0, 0, 0 }},
+		{{ -0.25, -0.25, 0.75 }},
+		{{ 0.5, 0.5, 1 }},
+		{{ 0.1, -0.2, 0.2 }}
+		} };
+	std::array<std::array<int, 3>, 5> exOutElement = { {
+		{{ 0, 0, 0}},
+		{{ 1, 1, 0}},
+		{{ 0, 0, 1}},
+		{{ 1, 1, 1}},
+		{{ 1, 0, 0}}
+		} };
+	std::array<std::array<float, 3>, 5> exOutXi = { {
+		{{ -1, -1, -1}},
+		{{ -1, -1, -1}},
+		{{ 0, 0, 0}},
+		{{ 1, 1, 1}},
+		{{-0.6, 0.2,-0.2}}
+		} };
+
+	for (int i = 0; i < 5; i++) {
+		float xiOutput[3];
+		std::array<int, 3> elementOutput;
+		elementOutput = femSimLin->positionToElement(testPositions[i], xiOutput);
+		for (int j = 0; j < 3; j++) {
+			ASSERT_EQ(exOutElement[i][j], elementOutput[j]);
+			ASSERT_FLOAT_EQ(exOutXi[i][j], xiOutput[j]); //abs(exOutXi[i][j] - xiOutput[j]) < 0.00001
+		}
+	}
+}
+
+TEST(SecondaryTest, testPositionToElement2) {
+
+	// Multi Layer Test
+
+	int nodesPerAxis[3] = {21,21,20};
+	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
+	for (int i = 0; i < nodesPerAxis[0]; i++) {
+		for (int j = 0; j < nodesPerAxis[1]; j++) {
+			for (int k = 0; k < nodesPerAxis[2]; k++)
+				Temp[i][j][k] = 0;
+		}
+	}
+	float layerHeight = 0.1;
+	int layerSize = 10;
+	float tissueSize[3] = { 2,2,1 };
+	int Nn1d = 2;
+	float mua = 1.0f;
+	float tc = 1.0f;
+	float vhc = 1.0f;
+	float htc = 1.0f;
+
+	FEM_Simulator* femSimLin = new FEM_Simulator(Temp, tissueSize, tc, vhc, mua, htc, Nn1d);
+	femSimLin->setLayer(layerHeight, layerSize);
+
+
+	std::array<std::array<float, 3>,7> testPositions = { {
+		{{ -1, -1, 0 }},
+		{{ 0, 0, 0 }},
+		{{ -0.25, -0.25, 0.02 }},
+		{{ 1, 1, 1 }},
+		{{ -0.25, -0.25, 0.15 }},
+		{{ -0.25, 0.25, 0.5 }},
+		{{ 0.25, -0.25, 0.045 }}
+		} };
+	std::array<std::array<int, 3>, 7> exOutElement = { {
+		{{ 0, 0, 0}},
+		{{ 10, 10, 0}},
+		{{ 7, 7, 2}},
+		{{ 19,19,18}},
+		{{ 7, 7, 10}},
+		{{ 7, 12, 14}},
+		{{ 12, 7, 4}}
+		} };
+	std::array<std::array<float, 3>, 7> exOutXi = { {
+		{{ -1, -1, -1}},
+		{{ -1, -1, -1}},
+		{{ 0, 0, -1}},
+		{{ 1, 1, 1}},
+		{{ 0, 0, 0}},
+		{{ 0, 0, -1}},
+		{{ 0, 0, 0}}
+		} };
+
+	for (int i = 0; i < 7; i++) {
+		float xiOutput[3];
+		std::array<int, 3> elementOutput;
+		elementOutput = femSimLin->positionToElement(testPositions[i], xiOutput);
+		for (int j = 0; j < 3; j++) {
+			ASSERT_EQ(exOutElement[i][j], elementOutput[j]);
+			ASSERT_TRUE(abs(exOutXi[i][j] - xiOutput[j]) < 0.00001); //
+		}
+	}
+
+}
