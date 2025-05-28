@@ -581,6 +581,26 @@ TEST_F(BaseSim, TestCreateFjFunction1)
 	//EXPECT_TRUE(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 }
 
+TEST_F(BaseSim, testCopyConstructor) {
+
+	FEM_Simulator* femSim = new FEM_Simulator(*femSimLin);
+
+	ASSERT_EQ(femSim->MUA, femSimLin->MUA);
+	ASSERT_EQ(femSim->VHC, femSimLin->VHC);
+	ASSERT_EQ(femSim->TC, femSimLin->TC);
+	ASSERT_EQ(femSim->HTC, femSimLin->HTC);
+
+	femSim->setMUA(400);
+	femSim->setTC(0.004);
+	femSim->setHTC(0.02);
+	femSim->setVHC(4.2);
+
+	ASSERT_NE(femSim->MUA, femSimLin->MUA);
+	ASSERT_NE(femSim->VHC, femSimLin->VHC);
+	ASSERT_NE(femSim->TC, femSimLin->TC);
+	ASSERT_NE(femSim->HTC, femSimLin->HTC);
+}
+
 TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 
 	int nodesPerAxis[3] = { 5,5,5 };
