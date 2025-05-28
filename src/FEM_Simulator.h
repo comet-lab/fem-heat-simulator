@@ -35,7 +35,7 @@ public:
 
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
 	std::array<std::vector<int>,6> elemNodeSurfaceMap;
-	//0 - heat sink, 1 - flux boundary, 2 - convection boundary
+	//0 - heat sink, 1 - heatFlux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
 	int elementsPerAxis[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
@@ -52,7 +52,7 @@ public:
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tFinal = 1; // total duration of simulation [s]
-	float Qn = 0; // heat escaping the Neumann Boundary
+	float heatFlux = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	int Nn1d = 2;
 	bool elemNFR = false; // whether the NFR pertains to an element or a node
@@ -80,7 +80,7 @@ public:
 	void setVHC(float VHC);
 	void setMUA(float MUA);
 	void setHTC(float HTC);
-	void setFlux(float Qn);
+	void setFlux(float heatFlux);
 	void setAmbientTemp(float ambientTemp);
 	void setElementsPerAxis(int elementsPerAxis[3]);
 	void setNodesPerAxis(int nodesPerAxis[3]);
@@ -107,7 +107,7 @@ public:
 	Eigen::VectorXf Firr; // forcing function due to irradiance
 	Eigen::VectorXf Fconv; // forcing functino due to convection
 	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes
-	Eigen::VectorXf Fq; // forcing function due to constant flux boundary
+	Eigen::VectorXf Fq; // forcing function due to constant heatFlux boundary
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::MatrixXf KeInt; // Elemental Construction of Kint

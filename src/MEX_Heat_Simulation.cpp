@@ -169,8 +169,8 @@ public:
             displayOnMATLAB(stream);
             
 
-            // get flux condition
-            float Qn = inputs[7][0];
+            // get heatFlux condition
+            float heatFlux = inputs[7][0];
             // get ambient temperature
             float ambientTemp = inputs[8][0];
 
@@ -198,8 +198,8 @@ public:
             this->simulator->setHTC(HTC);
             // set boundary conditions
             this->simulator->setBoundaryConditions(boundaryType);
-            // set flux
-            this->simulator->setFlux(Qn);
+            // set heatFlux
+            this->simulator->setFlux(heatFlux);
 
             //print statements 
             stream << "Final Time: " << this->simulator->tFinal << "\nTime step: " << this->simulator->deltaT << std::endl;

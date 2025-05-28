@@ -34,7 +34,7 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->alpha = inputSim.alpha; // time step weight
 	this->deltaT = inputSim.deltaT; // time step [s]
 	this->tFinal = inputSim.tFinal; // total duration of simulation [s]
-	this->Qn = inputSim.Qn; // heat escaping the Neumann Boundary
+	this->heatFlux = inputSim.heatFlux; // heat escaping the Neumann Boundary
 	this->HTC = inputSim.HTC; // convective heat transfer coefficient [W/cm^2]
 	this->Nn1d = inputSim.Nn1d;
 	this->elemNFR = inputSim.elemNFR; // whether the NFR pertains to an element or a node
@@ -259,7 +259,7 @@ void FEM_Simulator::createKMFelem()
 				if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
-							if ((this->boundaryType[f] == FLUX)) { // flux boundary
+							if ((this->boundaryType[f] == FLUX)) { // heatFlux boundary
 								this->Fq(matrixInd[0]) += this->FeQ(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
@@ -847,7 +847,7 @@ float FEM_Simulator::calcFqA(float xi[3], int Ai, int dim)
 	}
 
 	NAa = this->calculateNA(xi, Ai);
-	FjFunc = (NAa * this->Qn) * Js.determinant();
+	FjFunc = (NAa * this->heatFlux) * Js.determinant();
 	return FjFunc;
 }
 
@@ -928,7 +928,7 @@ void FEM_Simulator::initializeBoundaryNodes()
 		if (nodeFace != 0) { // This check saves a lot time since most nodes are not on a surface.
 			for (int f = 0; f < 6; f++) {
 				if ((nodeFace >> f) & 1) { // Node lies on face f
-					if (this->boundaryType[f] == HEATSINK) { // flux boundary
+					if (this->boundaryType[f] == HEATSINK) { // heatFlux boundary
 						validNode = false;
 						this->dirichletNodes.push_back(i);
 						break;
@@ -1217,9 +1217,9 @@ void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
 }
 
-void FEM_Simulator::setFlux(float Qn)
+void FEM_Simulator::setFlux(float heatFlux)
 {
-	this->Qn = Qn;
+	this->heatFlux = heatFlux;
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
