@@ -12,8 +12,9 @@
 class FEM_Simulator
 {
 public:
-	bool silentMode = false;
+	bool silentMode = false; // controls print statements
 
+	/* not used because we are no longer using arbitrary elements*/
 	struct element {             // Structure declaration
 		int elementNumber;         // Member (int variable)
 		float globalNodePositions[8][3];   // Member (string variable)
@@ -54,21 +55,23 @@ public:
 	float tFinal = 1; // total duration of simulation [s]
 	float heatFlux = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
-	int Nn1d = 2;
+	int Nn1d = 2; // in a single element, the number of nodes used in one dimension
 	bool elemNFR = false; // whether the FluenceRate pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
-	std::vector< std::array<float, 3 >> tempSensorLocations;
-	std::vector<std::vector<float>> sensorTemps;
+	std::vector< std::array<float, 3 >> tempSensorLocations; // locations of temperature sensors
+	std::vector<std::vector<float>> sensorTemps; // stored temperature information for each sensor over time. 
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(FEM_Simulator& inputSim);
-	void performTimeStepping();
-	void createKMF();
-	void createFirr();
-	void initializeSensorTemps();
-	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
-	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]);
+	void performTimeStepping(); // performs time integration after global matrices are created
+	void createKMF(); // creates global matrices and performs spatial discretization
+	void createFirr(); // creates only the Forcing vector for the fluence rate
+	void initializeSensorTemps(); // initialize sensor temps vec with 0s
+	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec); // update sensor temp vec
+	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]); // Convert a 3D position into an element that contains that position
+
+	// Setters and Getters
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
 	std::vector<std::vector<std::vector<float>>> getTemp();
@@ -120,37 +123,36 @@ public:
 	Eigen::MatrixXf FeConv; // Elemental Construction of FConv
 	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	std::array<Eigen::MatrixXf,6> KeConv; // Elemental construction of KConv
-	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f);
-	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f);
-	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f);
-	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f);
+	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f); // bi-unit jacobian
+	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for yz plane
+	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xz plane
+	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xy plane.
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 
 
-	void initializeBoundaryNodes(); // function has test cases
-	void initializeElementNodeSurfaceMap(); // function has test case for Nn1d = 2
-	void initializeElementMatrices(int layer); 
-	int determineNodeFace(int globalNode); // function has test cases
-	float calculateNA(float xi[3], int Ai); // function has test cases
-	float calculateNABase(float xi, int Ai); //function has test cases
-	Eigen::Matrix3<float> calculateJ(int layer=1); // function has test cases
-	Eigen::Matrix2<float> calculateJs(int dim,int layer=1); // function has test cases
-	float calculateNADotBase(float xi, int Ai); // function has test cases
-	// function has test cases
-	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai);
-	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // function has test cases
+	void initializeBoundaryNodes(); // goes through each node and labels them if they are on the boundary
+	void initializeElementNodeSurfaceMap(); // For an arbitrary element, maps what nodes could belong to which faces of the cuboid
+	void initializeElementMatrices(int layer);  // sets the Ke, Me, etc matrices 
+	int determineNodeFace(int globalNode); // determines if/which faces the global node is on
+	float calculateNA(float xi[3], int Ai); // Calculates output of shape function 
+	float calculateNABase(float xi, int Ai); // Calculates output of 1D shape function
+	Eigen::Matrix3<float> calculateJ(int layer=1); // calculates volume bi-unit Jacobian
+	Eigen::Matrix2<float> calculateJs(int dim,int layer=1); // calculates surface bi-unit Jacobian for each of 3 faces. 
+	float calculateNADotBase(float xi, int Ai); // calculates output of 1D shape function derivative
+	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai); // calculates shape function derivative
+	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // performs numerical integration
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
-	float calcKintAB(float xi[3], int Ai, int Bi); // function has test cases
-	float calcMAB(float xi[3], int Ai, int Bi); // function has test cases
-	float calcFintAB(float xi[3], int Ai, int Bi);
-	float calcFqA(float xi[3], int Ai, int dim);
-	float calcFconvA(float xi[3], int Ai, int dim);
-	float calcKconvAB(float xi[3], int Ai, int dim);
+	float calcKintAB(float xi[3], int Ai, int Bi); // function that is integrated to form Ke
+	float calcMAB(float xi[3], int Ai, int Bi); // function that is integrated to form Me
+	float calcFintAB(float xi[3], int Ai, int Bi); // function that is integrated to create Fe int
+	float calcFqA(float xi[3], int Ai, int dim); // function that is integrated for Fq
+	float calcFconvA(float xi[3], int Ai, int dim); // function that is integrated for Fconv
+	float calcKconvAB(float xi[3], int Ai, int dim); // function that is integrated for Kconv
 
-	void ind2sub(int index, int size[3], int sub[3]); // function has test cases
+	void ind2sub(int index, int size[3], int sub[3]); 
 };
 
 

@@ -78,7 +78,7 @@ The remaining elements in the mesh will be used to represent the remaining block
 Other parameters that can be adjusted include the type of time integration. By default, we use a step size of 0.01 seconds
 and perform the time integration for 1 second. Both of these settings can be adjusted with ``deltaT`` and ``tFinal``. 
 By default we use the Crank-Nicolson which sets a term ``alpha`` equal to 0.5. 
-If backward Euler is desired, change ``alpha`` to 0. For forwad Euler, change ``alpha`` to 1. 
+If backward Euler is desired, change ``alpha`` to 1. For forwad Euler, change ``alpha`` to 0. 
 
 Additionally there is a setting to multi-thread for eigen, ``useAllCPUs``, and to remove print statements, ``silentMode``. 
 

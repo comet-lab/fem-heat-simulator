@@ -72,38 +72,47 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 }
 
 void FEM_Simulator::performTimeStepping()
-{
+{	/* this function performs the time integration for the specified duration using the euler family.
+	Each step is solved using conjugate gradient */
 	auto startTime = std::chrono::high_resolution_clock::now();
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 
+
+	/* Here we assume constant tissue properties throughout the mesh. This allows us to 
+	multiply by tissue specific properties after the element construction, which means we can change
+	tissue properties without having to reconstruct the matrices 
+	*/
 	// Apply parameter specific multiplication for each global matrix.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
 	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
 
-	//this->FluenceRate = FluenceRate;
+	// get total number of elements and nodes
 	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 
 	this->initializeSensorTemps();
 
-	// Solve Euler Family 
-	// Initialize d vector
+	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
+	// Initialize d, v, and dTilde vectors
 	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
 	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
 	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
+	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	int counter = 0;
 	for (int n : validNodes) {
 		dVec(counter) = this->Temp(n);
 		counter++;
 	}
+	// Perform the conjugate gradiant to compute what the initial v value is
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 	Eigen::SparseMatrix<float> LHSinit = globM;
 	initSolver.compute(LHSinit);
 	Eigen::VectorXf RHSinit = (globF) - globK*dVec;
 	vVec = initSolver.solve(RHSinit);
 
+	// set temperature sensor at first time step
 	this->updateTemperatureSensors(0, dVec);
 	if (!this->silentMode) {
 		stopTime = std::chrono::high_resolution_clock::now();
@@ -129,18 +138,15 @@ void FEM_Simulator::performTimeStepping()
 
 	Eigen::VectorXf RHS;
 	for (float t = 1; t <= round(this->tFinal/this->deltaT); t ++) { 
-		/*std::stringstream msg;
-		msg << "T: " << t << ", TID: " << omp_get_thread_num() << "\n";
-		std::cout << msg.str();*/
+		// set dTilde which is the explicit step 
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		RHS = globF - globK * dTilde;
+		// velocity should not change too much between time steps so we can use previous v to initial conjugate gradient. 
 		vVec = solver.solveWithGuess(RHS,vVec);
-		//vVec = solver.solve(RHS);
-		/*std::cout << "#iterations:     " << solver.iterations() << std::endl;
-		std::cout << "estimated error: " << solver.error() << std::endl;*/
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
+		// combine explicit and implicit steps. 
 		dVec = dTilde + this->alpha * this->deltaT * vVec;
 
 		this->updateTemperatureSensors(t, dVec);
@@ -155,8 +161,6 @@ void FEM_Simulator::performTimeStepping()
 	// Adjust our Temp with new d vector
 	counter = 0;
 	for (int n : validNodes) {
-			//int nodeSub[3];
-			//ind2sub(n, this->nodesPerAxis, nodeSub);
 			this->Temp(n) = dVec(counter);
 			counter++;
 	}
@@ -171,6 +175,7 @@ void FEM_Simulator::performTimeStepping()
 
 void FEM_Simulator::createKMF()
 {
+	/* This function constructs the global matrices by iterating over each element and summing the local contributions. */
 	int nodeFace;
 	int matrixInd[2];
 	int elemNodeSize[3] = {this->Nn1d, this->Nn1d, this->Nn1d};
@@ -205,6 +210,7 @@ void FEM_Simulator::createKMF()
 	this->Fk = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 	this->Fq = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 
+	// M and K will be sparse matrices because nodes are shared by relatively few elements
 	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
 	this->Kint = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
@@ -212,6 +218,7 @@ void FEM_Simulator::createKMF()
 	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
 	this->Kconv = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kconv.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
+	
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -233,20 +240,24 @@ void FEM_Simulator::createKMF()
 			layerFlag = true;
 		}
 
+		// iterate over the nodes in the element. 
 		for (int Ai = 0; Ai < Nne; Ai++) {
+			// convert node index to a subscript
 			this->ind2sub(Ai, elemNodeSize, AiSub);
 			for (int ii = 0; ii < 3; ii++) {
+				// get the globalNodeSubscript from local node subscript
 				globalNodeSub[ii] = eSub[ii] * (this->Nn1d - 1) + AiSub[ii];
 			}
+			// get global node index
 			globalNodeIdx = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
+			// determine if the node lies on a face of the Mesh
 			nodeFace = this->determineNodeFace(globalNodeIdx);
+			// this is the row of the global matrix associated with this local node
 			matrixInd[0] = this->nodeMap[globalNodeIdx];
 			if (matrixInd[0] >= 0) { // Verify that the node we are working with is not a dirichlet node.
 				
 				// Determine if the node lies on a boundary and then determine what kind of boundary
-				dirichletFlag = false;
-				fluxFlag = false;
 				if (nodeFace > 0) { // This check saves a lot time since most nodes are not on a surface.
 					for (int f = 0; f < 6; f++) { // Iterate through each face of the element
 						if ((nodeFace >> f) & 1) { // Node lies on face f
@@ -254,33 +265,39 @@ void FEM_Simulator::createKMF()
 								this->Fq(matrixInd[0]) += this->FeQ(Ai, f);
 							}
 							else if (this->boundaryType[f] == CONVECTION) { // Convection Boundary
+								// add componenet due to ambient temperature 
 								this->Fconv(matrixInd[0]) += this->FeConv(Ai, f);
+
+								// iterate again over nodes in the element, but only nodes on face 'f'
 								for (int Bi : this->elemNodeSurfaceMap[f]) {
 									this->ind2sub(Bi, elemNodeSize, BiSub);
 									int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
 									BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
+									// this is the column in the global matrix associated with the local node Bi
 									matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 									if (matrixInd[1] >= 0) {
-										//int AiBi = Bi * Nne + Ai; // had to be creative here to encode Ai and Bi in a single variable. We are using base Nne. 
-										//// If we say Nne = 8, if Bi is 1 and Ai is 7, the value is 15. 15 in base 8 is 17. 
 										this->Kconv.coeffRef(matrixInd[0], matrixInd[1]) += this->KeConv[f](Ai, Bi);
 										//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeConv[f](Ai, Bi)));
 									}
 									else {
 										this->Fconv(matrixInd[0]) += -this->KeConv[f](Ai, Bi) * this->Temp(BglobalNodeIdx);
 									}
-								}
-							} 
+								} // iterate through nodes
+							} // if convection boundary
 						} // if Node is face f
 					} // iterate through faces
 				} // if node is a face
 
-				for (int Bi = 0; Bi < Nne; Bi++) {
+				// for all nodes that are not on a surface
+				for (int Bi = 0; Bi < Nne; Bi++) { // iterate again over local nodes
+					// this loop gets the effect of node Bi on node Ai. 
+
 					this->ind2sub(Bi, elemNodeSize, BiSub);
 					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
 					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
+					// get column in global matrix associated with local node Bi
 					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
 					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to Kint and M and Firr
 						this->Kint.coeffRef(matrixInd[0], matrixInd[1]) += this->KeInt(Ai, Bi);
@@ -322,6 +339,7 @@ void FEM_Simulator::createKMF()
 
 void FEM_Simulator::createFirr()
 {
+	/* This function only recreates the global Firr matrix. For when we change the fluence rate, but nothing else*/
 	int nodeFace;
 	int matrixInd[2];
 	int elemNodeSize[3] = { this->Nn1d, this->Nn1d, this->Nn1d };
@@ -486,6 +504,7 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
+	/* Calculate the shape function output for given position in the element. */
 	float output = 1.0f;
 	int AiVec[3]; 
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
@@ -516,6 +535,8 @@ float FEM_Simulator::calculateNABase(float xi, int Ai) {
 }
 
 float FEM_Simulator::calculateNADotBase(float xi, int Ai) {
+	/* This function forms the building block for the derivative of the full shape function in 3D.
+	This function assumes cuboid elements and works for linear or quadratic shape functions. */
 	float output = 0;
 	if (this->Nn1d == 2) {
 		if (Ai == 0) {
@@ -541,6 +562,8 @@ float FEM_Simulator::calculateNADotBase(float xi, int Ai) {
 
 Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 {
+	/* Calculate the derivative of the shape function with respect to all 3 axis. The result is a 3x1 vector. 
+	*/
 	Eigen::Vector3<float> NA_dot;
 	int AiVec[3];
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
@@ -553,23 +576,10 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 
 Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 {
-	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
-	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
-	will only contain values along the diagonal and their values will be equal to (deltaX/2, deltaY/2, and deltaZ/2). 
-
-	Eigen::Vector3<float> NA_dot;
-	for (int i = 0; i < 3; i++) {
-		J(i, 0) = 0; // Make sure we don't have dummy values stored
-		J(i, 1) = 0; // Make sure we don't have dummy values stored
-		J(i, 2) = 0; // Make sure we don't have dummy values stored
-		for (int Ai = 0; Ai < 8; Ai++) {
-			FEM_Simulator::calculateNA_dot(xi, Ai, NA_dot);
-			for (int j = 0; j < 3; j++) {
-				J(i, j) += NA_dot(j) * pos[Ai][i];
-			}
-		}
-	}*/
-
+	/* Builds the Jacobian to relate changes in the bi-unit domain to changes in the cartesian position. 
+	This function takes advantage of the assumption that each element is a cuboid, and there aren't any orientation
+	differences between the cartesian reference frame and bi-unit reference frame
+	*/
 	Eigen::Matrix3<float> J;
 	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
 	// we assume the z height can change once in the volume. 
@@ -602,6 +612,12 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 
 Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 {
+
+	/* Builds the surface Jacobian to relate changes in the bi-unit domain to changes in the cartesian position.
+	This function takes advantage of the assumption that each element is a cuboid, and there aren't any orientation
+	differences between the cartesian reference frame and bi-unit reference frame
+	*/
+
 	// dim should be +-{1,2,3}. The dimension indiciates the axis of the normal vector of the plane. 
 	// +1 is equivalent to (1,0,0) normal vector. -3 is equivalent to (0,0,-1) normal vector. 
 	// We assume the values of xi correspond to the values of the remaining two axis in ascending order.
@@ -641,71 +657,6 @@ Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 	}
 
 	return Js;
-	/* While below is the proper way to calculat the Jacobian for an arbitrary element, we can take advantage of the fact that
-	we are using a cubiod whose axis (x,y,z) are aligned with our axis in the bi-unit domain (xi, eta, zeta). Therefore, the Jacobian
-	will only contain values along the diagonal and their values will be equal to (deltaX/2, deltaY/2, and deltaZ/2).
-
-	int direction = dim / abs(dim);
-	dim = abs(dim);
-	float xiExt[3] = { 0.0,0.0,0.0 };
-	if (dim == 1) { // we are in the y-z plane
-		xiExt[0] = direction;
-		xiExt[1] = xi[0];
-		xiExt[2] = xi[1];
-		for (int i = 1; i < 3; i++) {
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			for (int Ai = 0; Ai < 8; Ai++) {
-				for (int j = 0; j < 2; j++) {
-					if (j == 0) {
-						Js(i, j) += FEM_Simulator::calculateNA_eta(xiExt, Ai) * pos[Ai][i];
-					}
-					else if (j == 1) {
-						Js(i, j) += FEM_Simulator::calculateNA_zeta(xiExt, Ai) * pos[Ai][i];
-					}
-				}
-			}
-		}
-	}
-	else if (dim == 2) { // we are in the x-z plane
-		xiExt[0] = xi[0];
-		xiExt[1] = direction;
-		xiExt[2] = xi[1];
-		float NA_dot[3] = { 0,0,0 };
-		for (int i = 0; i < 3; i = i + 2) {
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			for (int Ai = 0; Ai < 8; Ai++) {
-				for (int j = 0; j < 2; j++) {
-					if (j == 0) {
-						Js(i, j) += FEM_Simulator::calculateNA_xi(xiExt, Ai) * pos[Ai][i];
-					}
-					else if (j == 1) {
-						Js(i, j) += FEM_Simulator::calculateNA_zeta(xiExt, Ai) * pos[Ai][i];
-					}
-				}
-			}
-		}
-	}
-	else if (dim == 3) { // we are in the x-y plane
-		xiExt[0] = xi[0];
-		xiExt[1] = xi[1];
-		xiExt[2] = direction;
-		for (int i = 0; i < 2; i++) {
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			Js(i, 0) = 0; // Make sure we don't have dummy values stored
-			for (int Ai = 0; Ai < 8; Ai++) {
-				for (int j = 0; j < 2; j++) {
-					if (j == 0) {
-						Js(i, j) += FEM_Simulator::calculateNA_xi(xiExt, Ai) * pos[Ai][i];
-					}
-					else if (j == 1) {
-						Js(i, j) += FEM_Simulator::calculateNA_eta(xiExt, Ai) * pos[Ai][i];
-					}
-				}
-			}
-		}
-	} */
 }
 
 void FEM_Simulator::ind2sub(int index, int size[3], int sub[3])
@@ -721,6 +672,12 @@ void FEM_Simulator::ind2sub(int index, int size[3], int sub[3])
 
 float FEM_Simulator::integrate(float (FEM_Simulator::* func)(float[3], int, int), int points, int dim, int param1, int param2)
 {
+	/* Perform Gaussian Quadrature numerical integration. 
+	points: the number of points used for the integration
+	dim: determines if the integration is over all 3 dimensions or just 2
+	param1: passed into the function to integrate
+	param2: passed into the function to integrate 
+	*/
 	std::vector<float> zeros;
 	std::vector<float> weights;
 	float output = 0;
@@ -786,6 +743,9 @@ void FEM_Simulator::getGlobalPosition(int globalNode, float position[3])
 
 float FEM_Simulator::calcKintAB(float xi[3], int Ai, int Bi)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	float KABfunc = 0;
 	Eigen::Vector3<float> NAdotA;
 	Eigen::Vector3<float> NAdotB;
@@ -805,6 +765,9 @@ float FEM_Simulator::calcKintAB(float xi[3], int Ai, int Bi)
 
 float FEM_Simulator::calcMAB(float xi[3], int Ai, int Bi)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	float MABfunc = 0;
 	float NAa;
 	float NAb;
@@ -820,6 +783,9 @@ float FEM_Simulator::calcMAB(float xi[3], int Ai, int Bi)
 
 float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	float FintFunc = 0;
 	float NAa;
 	float NAb;
@@ -836,6 +802,9 @@ float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 
 float FEM_Simulator::calcFqA(float xi[3], int Ai, int dim)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	float FjFunc = 0;
 	float NAa;
 	Eigen::Matrix2f Js; 
@@ -857,6 +826,9 @@ float FEM_Simulator::calcFqA(float xi[3], int Ai, int dim)
 
 float FEM_Simulator::calcFconvA(float xi[3], int Ai, int dim)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	float FvFunc = 0;
 	float NAa;
 	Eigen::Matrix2f Js;
@@ -880,6 +852,9 @@ float FEM_Simulator::calcFconvA(float xi[3], int Ai, int dim)
 
 float FEM_Simulator::calcKconvAB(float xi[3], int AiBi, int dim)
 {
+	/* Calculates the value of function within the integral of the weak form when building the local
+	matrices. This function will get integrated to build the local matrices
+	*/
 	int Nne = pow(this->Nn1d, 3);
 	float FvuFunc = 0;
 	int Ai = AiBi % Nne; // AiBi is passed in in base 8. the ones digit is Ai, the 8s digit is Bi.
@@ -1153,7 +1128,7 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
 				// calculate laser irradiance
 				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::exp(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
-				// set laser irradiane
+				// set laser irradiance
 				this->FluenceRate(i + j * this->nodesPerAxis[0] + k * this->nodesPerAxis[0] * this->nodesPerAxis[1]) = irr;
 				// increase z pos
 				zPos = zPos + zStep;
