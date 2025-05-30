@@ -27,7 +27,7 @@ xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
 yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
 zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
 [X,Y,Z] = meshgrid(xLayer,yLayer,zLayer);
-NFRLayer = single(I(X,Y,Z,MUA));
+fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
@@ -43,7 +43,7 @@ for cc = 0:1
         if ~silentMode
             fprintf("\n");
         end
-        [TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
+        [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
             silentMode,layerInfo,Nn1d,createMatrices);
         timeVec(cc+1,i) = toc;

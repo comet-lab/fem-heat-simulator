@@ -42,20 +42,20 @@ public:
 	int nodesPerAxis[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be elementsPerAxis + 1;
 	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
 	float layerHeight = 1.0f; // the z-location where we change element height
-	float layerSize = 2; // The number of elements corresponding to the first layer height
+	float elemsInLayer = 2; // The number of elements corresponding to the first layer height
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
 	Eigen::VectorXf Temp; // Our values for temperature at the nodes of the elements
-	Eigen::VectorXf NFR; // Our values for Heat addition
+	Eigen::VectorXf FluenceRate; // Our values for Heat addition
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float tFinal = 1; // total duration of simulation [s]
 	float heatFlux = 0; // heat escaping the Neumann Boundary
 	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	int Nn1d = 2;
-	bool elemNFR = false; // whether the NFR pertains to an element or a node
+	bool elemNFR = false; // whether the FluenceRate pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	std::vector< std::array<float, 3 >> tempSensorLocations;
 	std::vector<std::vector<float>> sensorTemps;
@@ -71,11 +71,11 @@ public:
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
 	std::vector<std::vector<std::vector<float>>> getTemp();
-	void setNFR(std::vector<std::vector<std::vector<float>>> NFR);
-	void setNFR(Eigen::VectorXf& NFR);
-	void setNFR(float laserPose[6], float laserPower, float beamWaist);
+	void setFluenceRate(std::vector<std::vector<std::vector<float>>> FluenceRate);
+	void setFluenceRate(Eigen::VectorXf& FluenceRate);
+	void setFluenceRate(float laserPose[6], float laserPower, float beamWaist);
 	void setTissueSize(float tissueSize[3]);
-	void setLayer(float layerHeight, int layerSize);
+	void setLayer(float layerHeight, int elemsInLayer);
 	void setTC(float TC);
 	void setVHC(float VHC);
 	void setMUA(float MUA);

@@ -10,7 +10,7 @@ int main()
     int nodesPerAxis[3] = { 41,41,50 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
-    std::vector<std::vector<std::vector<float>>> NFR(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
+    std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
     
     srand(1);
 
@@ -32,7 +32,7 @@ int main()
     std::cout << "Number of nodes: " << simulator.nodesPerAxis[0] * simulator.nodesPerAxis[1] * simulator.nodesPerAxis[2] << std::endl;
     std::cout << "Number of elems: " << simulator.elementsPerAxis[0] * simulator.elementsPerAxis[1] * simulator.elementsPerAxis[2] << std::endl;
     float laserPose[6] = { 0.0f,0,-35,0,0,0 };
-    simulator.setNFR(laserPose, 1, 0.0168);
+    simulator.setFluenceRate(laserPose, 1, 0.0168);
 
     std::cout << "Object Created " << std::endl;
 

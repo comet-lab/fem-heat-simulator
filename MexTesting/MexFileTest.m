@@ -3,9 +3,9 @@ clc; clear; close all;
 clear MEX_Heat_Simulation
 %% Initialization of parameters
 tissueSize = [2.0,2.0,1.0];
-nodeSize = [41,41,71];
+nodesPerAxis = [41,41,71];
 ambientTemp = 24;
-T0 = single(20*ones(nodeSize));
+T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
 tFinal = single(15);
 w0 = 0.0168;
@@ -23,15 +23,15 @@ sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
 
-xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodeSize(1));
-yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodeSize(2));
-zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodeSize(3)-layerInfo(2))];
-[X,Y,Z] = meshgrid(xLayer,yLayer,zLayer);
-NFRLayer = single(I(X,Y,Z,MUA));
+x = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
+y = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
+z = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
+[X,Y,Z] = meshgrid(x,y,z);
+fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
-Jn = 0;
+flux = 0;
 createMatrices = true;
 %% Running MEX File
 
@@ -39,8 +39,8 @@ tic
 if ~silentMode
     fprintf("\n");
 end
-[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
-    deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
+[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,useAllCPUs,...
     silentMode,layerInfo,Nn1d,createMatrices);
 toc
 
@@ -64,7 +64,7 @@ clf;
 tiledlayout('flow');
 nexttile()
 hold on
-plot(zLayer,reshape(NFRLayer(floor(nodeSize(1)/2),floor(nodeSize(2)/2),:),size(zLayer)),...
+plot(z,reshape(fluenceRate(floor(nodesPerAxis(1)/2),floor(nodesPerAxis(2)/2),:),size(z)),...
     'LineWidth',2,'DisplayName',"Two Layers")
 hold off
 grid on;
@@ -74,7 +74,7 @@ ylabel("Normalized Fluence Rate");
 title("Normalized Fluence Rate with 2 Layers");
 nexttile()
 hold on
-plot(zLayer(1:30),reshape(NFRLayer(floor(nodeSize(1)/2),floor(nodeSize(2)/2),1:30),size(zLayer(1:30))),...
+plot(z(1:30),reshape(fluenceRate(floor(nodesPerAxis(1)/2),floor(nodesPerAxis(2)/2),1:30),size(z(1:30))),...
     'LineWidth',2,'DisplayName',"Two Layers")
 hold off
 grid on;
@@ -87,7 +87,7 @@ title("Normalized Fluence Rate with 2 Layers");
 figure(3);
 clf;
 hold on
-plot(zLayer,reshape(Tpred(floor(nodeSize(1)/2),floor(nodeSize(2)/2),:),size(zLayer)),...
+plot(z,reshape(Tpred(floor(nodesPerAxis(1)/2),floor(nodesPerAxis(2)/2),:),size(z)),...
     'LineWidth',2,'DisplayName',sprintf("Two Layers"))
 hold off
 grid on;

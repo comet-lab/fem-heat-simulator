@@ -605,13 +605,13 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 
 	int nodesPerAxis[3] = { 5,5,5 };
 	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
-	std::vector<std::vector<std::vector<float>>> NFR(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
+	std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	srand(1);
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
 		for (int j = 0; j < nodesPerAxis[1]; j++) {
 			for (int k = 0; k < nodesPerAxis[2]; k++) {
 				Temp[i][j][k] = 0;
-				NFR[i][j][k] = 1;
+				FluenceRate[i][j][k] = 1;
 			}
 		}
 	}
@@ -626,14 +626,14 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 	femSimLin->setBoundaryConditions(BC);
 	femSimLin->setFlux(0);
 	femSimLin->setAmbientTemp(0);
-	femSimLin->setNFR(NFR);
+	femSimLin->setFluenceRate(FluenceRate);
 
 	femSimQuad->deltaT = 0.05f;
 	femSimQuad->tFinal = 1.0f;
 	femSimQuad->setBoundaryConditions(BC);
 	femSimQuad->setFlux(0);
 	femSimQuad->setAmbientTemp(0);
-	femSimQuad->setNFR(NFR);
+	femSimQuad->setFluenceRate(FluenceRate);
 
 	femSimLin->createKMFelem();
 	femSimLin->performTimeStepping();
@@ -699,7 +699,7 @@ TEST(SecondaryTest, testPositionToElement2) {
 		}
 	}
 	float layerHeight = 0.1;
-	int layerSize = 10;
+	int elemsInLayer = 10;
 	float tissueSize[3] = { 2,2,1 };
 	int Nn1d = 2;
 	float mua = 1.0f;
@@ -708,7 +708,7 @@ TEST(SecondaryTest, testPositionToElement2) {
 	float htc = 1.0f;
 
 	FEM_Simulator* femSimLin = new FEM_Simulator(Temp, tissueSize, tc, vhc, mua, htc, Nn1d);
-	femSimLin->setLayer(layerHeight, layerSize);
+	femSimLin->setLayer(layerHeight, elemsInLayer);
 
 
 	std::array<std::array<float, 3>,7> testPositions = { {

@@ -24,20 +24,20 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 		this->tissueSize[i] = inputSim.tissueSize[i];  // Length of the tissue in x, y, and z [cm]
 	}
 	this->layerHeight = inputSim.layerHeight; // the z-location where we change element height
-	this->layerSize = inputSim.layerSize; // The number of elements corresponding to the first layer height
+	this->elemsInLayer = inputSim.elemsInLayer; // The number of elements corresponding to the first layer height
 	this->TC = inputSim.TC; // Thermal Conductivity [W/cm C]
 	this->VHC = inputSim.VHC; // Volumetric Heat Capacity [W/cm^3]
 	this->MUA = inputSim.MUA; // Absorption Coefficient [cm^-1]
 	this->ambientTemp = inputSim.ambientTemp;  // Temperature surrounding the tissue for Convection [C]
 	this->Temp = inputSim.Temp; // Our values for temperature at the nodes of the elements
-	this->NFR = inputSim.NFR; // Our values for Heat addition
+	this->FluenceRate = inputSim.FluenceRate; // Our values for Heat addition
 	this->alpha = inputSim.alpha; // time step weight
 	this->deltaT = inputSim.deltaT; // time step [s]
 	this->tFinal = inputSim.tFinal; // total duration of simulation [s]
 	this->heatFlux = inputSim.heatFlux; // heat escaping the Neumann Boundary
 	this->HTC = inputSim.HTC; // convective heat transfer coefficient [W/cm^2]
 	this->Nn1d = inputSim.Nn1d;
-	this->elemNFR = inputSim.elemNFR; // whether the NFR pertains to an element or a node
+	this->elemNFR = inputSim.elemNFR; // whether the FluenceRate pertains to an element or a node
 	this->boundaryType = inputSim.boundaryType; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	this->tempSensorLocations = inputSim.tempSensorLocations;
 	this->sensorTemps = inputSim.sensorTemps;
@@ -82,7 +82,7 @@ void FEM_Simulator::performTimeStepping()
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
 	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
 
-	//this->NFR = NFR;
+	//this->FluenceRate = FluenceRate;
 	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 
@@ -234,7 +234,7 @@ void FEM_Simulator::createKMFelem()
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold. 
 
 		this->ind2sub(e, this->elementsPerAxis, eSub);
-		if ((eSub[2] >= this->layerSize) && !layerFlag) {
+		if ((eSub[2] >= this->elemsInLayer) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened, 
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental 
 			// matrices once and we are good to go. 
@@ -296,20 +296,20 @@ void FEM_Simulator::createKMFelem()
 						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeInt(Ai, Bi)));
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
 						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
-						if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+						if (elemNFR) {// element-wise FluenceRate so we assume each node on the element has FluenceRate
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
 						}
-						else {//nodal NFR so use as given
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+						else {//nodal FluenceRate so use as given
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
 						}
 					}
 					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to Firr... could be an if - else
 						this->Fk(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
-						if (elemNFR) { // element-wise NFR so we assume each node on the element has NFR
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+						if (elemNFR) { // element-wise FluenceRate so we assume each node on the element has FluenceRate
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
 						}
-						else {//nodal NFR so use as given
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+						else {//nodal FluenceRate so use as given
+							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
 						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
@@ -367,7 +367,7 @@ void FEM_Simulator::createFirr()
 		// The only thing we are asssuming to change is the length along the z axis for elements after a certain threshold.
 
 		this->ind2sub(e, this->elementsPerAxis, eSub);
-		if ((eSub[2] >= this->layerSize) && !layerFlag) {
+		if ((eSub[2] >= this->elemsInLayer) && !layerFlag) {
 			// we currently assume there will only be one element height change and once the transition has happened,
 			// we won't encounter any elements that have the original height. Therefore, we just reset J and all the elemental
 			// matrices once and we are good to go.
@@ -390,11 +390,11 @@ void FEM_Simulator::createFirr()
 					int BglobalNodeSub[3] = { eSub[0] * (this->Nn1d - 1) + BiSub[0], eSub[1] * (this->Nn1d - 1) + BiSub[1], eSub[2] * (this->Nn1d - 1) + BiSub[2] };
 					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
-					if (elemNFR) {// element-wise NFR so we assume each node on the element has NFR
-						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(e);
+					if (elemNFR) {// element-wise FluenceRate so we assume each node on the element has FluenceRate
+						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
 					}
-					else {//nodal NFR so use as given
-						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->NFR(BglobalNodeIdx);
+					else {//nodal FluenceRate so use as given
+						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
 					}
 				} // For loop through Bi
 			} // If our node is not a dirichlet node
@@ -448,8 +448,8 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 	// Input should be a location where we want to place a sensor 
 	float xSpacing = this->tissueSize[0] / float(this->elementsPerAxis[0]);
 	float ySpacing = this->tissueSize[1] / float(this->elementsPerAxis[1]);
-	float zSpacing = this->layerHeight / float(this->layerSize);
-	float zSpacing2 = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
+	float zSpacing = this->layerHeight / float(this->elemsInLayer);
+	float zSpacing2 = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->elemsInLayer);
 
 	std::array<int, 3> elementLocation = { static_cast<int>(floor((position[0] + this->tissueSize[0] / 2.0f) / xSpacing)),
 											static_cast<int>(floor((position[1] + this->tissueSize[1] / 2.0f) / ySpacing)),
@@ -457,7 +457,7 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 
 	if (position[2] > this->layerHeight) {
 		// This should compensate for the change in layer appropriately.
-		elementLocation[2] = this->layerSize + floor((position[2] - this->layerHeight) / zSpacing2);
+		elementLocation[2] = this->elemsInLayer + floor((position[2] - this->layerHeight) / zSpacing2);
 	}
 	// If the location of the element is the largest in a singular axis then we need to subtract one
 	// and use the previous element position. This will effect locations on exact boundaries, where 
@@ -473,7 +473,7 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 	xi[1] = -1 + ((position[1] + this->tissueSize[1] / 2.0f) / ySpacing - elementLocation[1]) * 2;
 	xi[2] = -1 + ((position[2]) / zSpacing - elementLocation[2]) * 2;
 	if (position[2] > this->layerHeight) {
-		xi[2] = -1 + (this->layerSize + (position[2] - this->layerHeight) / zSpacing2 - elementLocation[2]) * 2;
+		xi[2] = -1 + (this->elemsInLayer + (position[2] - this->layerHeight) / zSpacing2 - elementLocation[2]) * 2;
 	}
 
 	return elementLocation;
@@ -573,10 +573,10 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 	float deltaY = this->tissueSize[1] / float(this->elementsPerAxis[1]);
 	float deltaZ = 0;
 	if (layer == 1) {
-		deltaZ = this->layerHeight / float(this->layerSize);
+		deltaZ = this->layerHeight / float(this->elemsInLayer);
 	}
 	else if (layer == 2) {
-		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->elemsInLayer);
 	}
 	else {
 		std::cout << "layer must be 1 or 2" << std::endl;
@@ -609,10 +609,10 @@ Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
 	float deltaY = this->tissueSize[1] / float(this->elementsPerAxis[1]);
 	float deltaZ = 0;
 	if (layer == 1) {
-		deltaZ = this->layerHeight / float(this->layerSize);
+		deltaZ = this->layerHeight / float(this->elemsInLayer);
 	}
 	else if (layer == 2) {
-		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->layerSize);
+		deltaZ = (this->tissueSize[2] - this->layerHeight) / float(this->elementsPerAxis[2] - this->elemsInLayer);
 	}
 	else {
 		std::cout << "layer must be 1 or 2" << std::endl;
@@ -826,7 +826,7 @@ float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 	// The 1 should be replaced with this->MUA if we change how the elemental matrices are computed
 	// Right now we are computing matrices as parameter agnostic and then multiplying by the parameter
 	FintFunc = 1 * (NAa * NAb) * J.determinant();
-	// Output of this still needs to get multiplied by the NFR at node Bi
+	// Output of this still needs to get multiplied by the FluenceRate at node Bi
 	return FintFunc;
 }
 
@@ -1084,25 +1084,25 @@ std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
 	return TempOut;
 }
 
-void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
+void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> FluenceRate)
 {
-	this->NFR = Eigen::VectorXf::Zero(NFR.size() * NFR[0].size() * NFR[0][0].size());
+	this->FluenceRate = Eigen::VectorXf::Zero(FluenceRate.size() * FluenceRate[0].size() * FluenceRate[0][0].size());
 	// Convert nested vectors into a single column Eigen Vector. 
-	for (int i = 0; i < NFR.size(); i++) // associated with x and is columns of matlab matrix
+	for (int i = 0; i < FluenceRate.size(); i++) // associated with x and is columns of matlab matrix
 	{
-		for (int j = 0; j < NFR[0].size(); j++) // associated with y and is rows of matlab matrix
+		for (int j = 0; j < FluenceRate[0].size(); j++) // associated with y and is rows of matlab matrix
 		{
-			for (int k = 0; k < NFR[0][0].size(); k++) // associated with z and is depth of matlab matrix
+			for (int k = 0; k < FluenceRate[0][0].size(); k++) // associated with z and is depth of matlab matrix
 			{
-				this->NFR(i + j * NFR.size() + k * NFR.size() * NFR[0].size()) = NFR[i][j][k];
+				this->FluenceRate(i + j * FluenceRate.size() + k * FluenceRate.size() * FluenceRate[0].size()) = FluenceRate[i][j][k];
 			}
 		}
 	}
 
-	if ((NFR.size() == this->elementsPerAxis[0]) && (NFR[0].size() == this->elementsPerAxis[1]) && (NFR[0][0].size() == this->elementsPerAxis[2])) {
+	if ((FluenceRate.size() == this->elementsPerAxis[0]) && (FluenceRate[0].size() == this->elementsPerAxis[1]) && (FluenceRate[0][0].size() == this->elementsPerAxis[2])) {
 		this->elemNFR = true;
 	}
-	else if ((NFR.size() == this->nodesPerAxis[0]) && (NFR[0].size() == this->nodesPerAxis[1]) && (NFR[0][0].size() == this->nodesPerAxis[2])) {
+	else if ((FluenceRate.size() == this->nodesPerAxis[0]) && (FluenceRate[0].size() == this->nodesPerAxis[1]) && (FluenceRate[0][0].size() == this->nodesPerAxis[2])) {
 		this->elemNFR = false;
 	}
 	else {
@@ -1111,16 +1111,16 @@ void FEM_Simulator::setNFR(std::vector<std::vector<std::vector<float>>> NFR)
 	}
 }
 
-void FEM_Simulator::setNFR(Eigen::VectorXf& NFR)
+void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 {
-	this->NFR = NFR;
-	//TODO Check for element or nodal NFR;
+	this->FluenceRate = FluenceRate;
+	//TODO Check for element or nodal FluenceRate;
 	this->elemNFR = false;
 }
 
-void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist)
+void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
 {
-	this->NFR = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
+	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
 	float lambda = 10.6 * pow(10, -4); // wavelength of laser in cm
 	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
 	//TODO: account for orientation shift on the laser
@@ -1133,24 +1133,24 @@ void FEM_Simulator::setNFR(float laserPose[6], float laserPower, float beamWaist
 	float yPos = -this->tissueSize[1] / 2;
 	float yStep = this->tissueSize[1] / this->elementsPerAxis[1];
 	float zPos = 0;
-	float zStep = this->layerHeight / this->layerSize;
+	float zStep = this->layerHeight / this->elemsInLayer;
 
 	for (int i = 0; i < this->nodesPerAxis[0]; i++) {
 		yPos = -this->tissueSize[1] / 2;
 		for (int j = 0; j < this->nodesPerAxis[1]; j++) {
 			zPos = 0;
-			zStep = this->layerHeight / this->layerSize;
+			zStep = this->layerHeight / this->elemsInLayer;
 			for (int k = 0; k < this->nodesPerAxis[2]; k++) {
-				if (k >= this->layerSize) {
+				if (k >= this->elemsInLayer) {
 					// if we have passed the layer size
-					zStep = (tissueSize[2] - this->layerHeight) / (this->elementsPerAxis[2] - this->layerSize);
+					zStep = (tissueSize[2] - this->layerHeight) / (this->elementsPerAxis[2] - this->elemsInLayer);
 				}
 				// calculate beam width at depth
 				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
 				// calculate laser irradiance
 				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::exp(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
 				// set laser irradiane
-				this->NFR(i + j * this->nodesPerAxis[0] + k * this->nodesPerAxis[0] * this->nodesPerAxis[1]) = irr;
+				this->FluenceRate(i + j * this->nodesPerAxis[0] + k * this->nodesPerAxis[0] * this->nodesPerAxis[1]) = irr;
 				// increase z pos
 				zPos = zPos + zStep;
 			}
@@ -1168,7 +1168,7 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 	// then we need to resize our layer configuration.
 	if (this->layerHeight >= tissueSize[2]) {
 		this->layerHeight = tissueSize[2];
-		this->layerSize = this->elementsPerAxis[2];
+		this->elemsInLayer = this->elementsPerAxis[2];
 	}
 	for (int i = 0; i < 3; i++) {
 		this->tissueSize[i] = tissueSize[i];
@@ -1177,8 +1177,8 @@ void FEM_Simulator::setTissueSize(float tissueSize[3]) {
 	this->setJ();
 }
 
-void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
-	if ((layerSize > this->elementsPerAxis[2])||(layerSize < 0)) {
+void FEM_Simulator::setLayer(float layerHeight, int elemsInLayer) {
+	if ((elemsInLayer > this->elementsPerAxis[2])||(elemsInLayer < 0)) {
 		std::cout << "Invalid layer size. The layer must be equal"
 			<< " to or less than the total number of elements in the z direction and greater than 0" << std::endl;
 		throw std::runtime_error("Layer Size must be equal to or less than the toal number of elements in the z direction and greater than 0");
@@ -1188,16 +1188,16 @@ void FEM_Simulator::setLayer(float layerHeight, int layerSize) {
 			<< "and greater than zero" << std::endl;
 		throw std::runtime_error("Invalid layer height. The layer dimension must be less than or equal to the tissue size and greater than zero");
 	}
-	if ((layerHeight == 0) != (layerSize == 0)) {
+	if ((layerHeight == 0) != (elemsInLayer == 0)) {
 		std::cout << "Layer Height must be 0 if layer size is 0 and vice versa" << std::endl;
 		throw std::runtime_error("Layer Height must be 0 if layer size is 0 and vice versa");
 	}
-	if ((layerHeight == this->tissueSize[2]) != (layerSize == this->elementsPerAxis[2])) {
+	if ((layerHeight == this->tissueSize[2]) != (elemsInLayer == this->elementsPerAxis[2])) {
 		std::cout << "Layer Height must be the tissue height if layer size is the grid size and vice versa" << std::endl;
 		throw std::runtime_error("Layer Height must be the tissue height if layer size is the grid size and vice versa");
 	}
 	this->layerHeight = layerHeight;
-	this->layerSize = layerSize;
+	this->elemsInLayer = elemsInLayer;
 	this->setJ(1);
 }
 
