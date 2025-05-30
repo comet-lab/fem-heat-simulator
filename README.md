@@ -38,7 +38,7 @@ See 'main.cpp' for an example of how to initialize and run the simulator.
 The simulator will discretize the mesh into elements, create the global M, K, and F matrices, and 
 perform the time integration. Note that the simulator uses a left handed coordinate system. The origin is located
 at the center of the top surface of the cuboid. Assuming a planar (2D) view of the tissue with the origin at the top of the page,
-the z-axis points down the page, the x-axis points to the right, and the y-axis points into the page. 
+the z-axis points down the page, the x-axis points out of the page, and the y-axis points to the right. 
 
 
 To construct a basic simulation object, you need the following information
