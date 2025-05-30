@@ -249,7 +249,7 @@ public:
             this->createAllMatrices = false;
             this->createFirrMatrix = false;
             try {
-                this->simulator->createKMFelem();
+                this->simulator->createKMF();
                 stream << "Global matrices created" << std::endl;
                 displayOnMATLAB(stream);
             }

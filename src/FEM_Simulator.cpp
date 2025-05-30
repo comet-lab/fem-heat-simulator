@@ -169,7 +169,7 @@ void FEM_Simulator::performTimeStepping()
 	}
 }
 
-void FEM_Simulator::createKMFelem()
+void FEM_Simulator::createKMF()
 {
 	int nodeFace;
 	int matrixInd[2];

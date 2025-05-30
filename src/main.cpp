@@ -56,7 +56,7 @@ int main()
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
 
     float totalTime = 0.05f;
-    simulator.createKMFelem();
+    simulator.createKMF();
 
     for (int i = 0; i < round(totalTime / simulator.tFinal); i++) {
         
