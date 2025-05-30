@@ -43,12 +43,12 @@ the z-axis points down the page, the x-axis points out of the page, and the y-ax
 
 To construct a basic simulation object, you need the following information
 
-- ``Temp``: the initial temperature at every node in the mesh [�C],
+- ``Temp``: the initial temperature at every node in the mesh [ $^o\text{C}$ ],
 - ``tissueSize``: the tissue size along the x, y, and z axes [cm]
-- ``TC``: the thermal conductivity of the tissue [W/cm �C]
-- ``VHC``: the volumetric heat capacity of the tissue [J/cm^3 �C]
-- ``MUA``: the absorption coefficient of the laser [cm^-1]
-- ``HTC``: the heat transfer coefficient [W/cm^2 �C]
+- ``TC``: the thermal conductivity of the tissue [ $\frac{\text{W}}{\text{cm}~^o\text{C}}$ ]
+- ``VHC``: the volumetric heat capacity of the tissue [ $\frac{\text{J}}{\text{cm}^3~^o\text{C}}$ ]
+- ``MUA``: the absorption coefficient of the laser [ $\text{cm}^{-1}$ ]
+- ``HTC``: the heat transfer coefficient [ $\frac{\text{W}}{\text{cm}^2~^o\text{C}}$ ]
 - ``Nn1d``: the number of nodes along one dimension of an element. For linear basis functions use 2. For quadratic basis functions use 3. Some functionality may not be available with quadratic basis functions.
 
 To perform the spatial discretization, run the function ``FEM_Simulator::createKMF()`` and perform the time stepping using
