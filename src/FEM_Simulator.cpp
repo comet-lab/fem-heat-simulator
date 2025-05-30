@@ -426,7 +426,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 		std::array<int, 3> globalNodeStart;
 		// For linear elements, there will be no change between globalNodeStart and elementLocation
 		for (int i = 0; i < 3; i++) {
-			globalNodeStart[i] = elementLocation[0] * (this->Nn1d - 1);
+			globalNodeStart[i] = elementLocation[i] * (this->Nn1d - 1);
 		}
 		float tempValue = 0;	
 		for (int Ai = 0; Ai < Nne; Ai++) { // iterate through each node in the element

@@ -695,7 +695,7 @@ TEST(SecondaryTest, testPositionToElement2) {
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
 		for (int j = 0; j < nodesPerAxis[1]; j++) {
 			for (int k = 0; k < nodesPerAxis[2]; k++)
-				Temp[i][j][k] = 0;
+				Temp[i][j][k] = i + j * nodesPerAxis[0] + k * (nodesPerAxis[0] * nodesPerAxis[1]);
 		}
 	}
 	float layerHeight = 0.1;
@@ -747,6 +747,61 @@ TEST(SecondaryTest, testPositionToElement2) {
 			ASSERT_EQ(exOutElement[i][j], elementOutput[j]);
 			ASSERT_TRUE(abs(exOutXi[i][j] - xiOutput[j]) < 0.00001); //
 		}
+	}
+
+}
+
+TEST(SecondaryTest, testSetSensorTemps) {
+
+	// Multi Layer Test
+
+	int nodesPerAxis[3] = { 21,21,20 };
+	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
+	for (int i = 0; i < nodesPerAxis[0]; i++) {
+		for (int j = 0; j < nodesPerAxis[1]; j++) {
+			for (int k = 0; k < nodesPerAxis[2]; k++)
+				Temp[i][j][k] = i + j * nodesPerAxis[0] + k * (nodesPerAxis[0] * nodesPerAxis[1]);
+		}
+	}
+	float layerHeight = 0.1;
+	int elemsInLayer = 10;
+	float tissueSize[3] = { 2,2,1 };
+	int Nn1d = 2;
+	float mua = 1.0f;
+	float tc = 1.0f;
+	float vhc = 1.0f;
+	float htc = 1.0f;
+
+	FEM_Simulator* femSimLin = new FEM_Simulator(Temp, tissueSize, tc, vhc, mua, htc, Nn1d);
+	femSimLin->setLayer(layerHeight, elemsInLayer);
+	femSimLin->initializeBoundaryNodes();
+
+	int nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
+	Eigen::VectorXf dVec(nNodes - femSimLin->dirichletNodes.size());
+	int counter = 0;
+	for (int n : femSimLin->validNodes) {
+		dVec(counter) = femSimLin->Temp(n);
+		counter++;
+	}
+
+	std::vector<std::array<float, 3>> sensorLocations = { 
+		{ -1, -1, 0 },
+		{ 0, 0, 0 },
+		{ -0.25, -0.25, 0.02 },
+		{ 1, 1, 1 },
+		{ -0.25, -0.25, 0.15 },
+		{ -0.25, 0.25, 0.5 },
+		{ 0.25, -0.25, 0.045 }
+		};
+
+	femSimLin->setSensorLocations(sensorLocations);
+	femSimLin->initializeSensorTemps();
+	femSimLin->updateTemperatureSensors(0, dVec);
+
+	std::vector<float> expectedSensorTemp = {0,220,1047,8819,4795.5,6444,2154.5};
+
+	for (int i = 0; i < 7; i++) {
+		ASSERT_FLOAT_EQ(expectedSensorTemp[i], femSimLin->sensorTemps[i][0]);
 	}
 
 }
