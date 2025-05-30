@@ -86,16 +86,7 @@ void FEM_Simulator::performTimeStepping()
 	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 
-	// Create sensorTemperature Vectors and reserve sizes
-	int nSensors = this->tempSensorLocations.size();
-	if (nSensors == 0) { // if there weren't any sensors initialized, put one at 0,0,0
-		nSensors = 1;
-		this->tempSensorLocations.push_back({ 0,0,0 });
-	}
-	this->sensorTemps.resize(nSensors);
-	for (int s = 0; s < nSensors; s++) {
-		this->sensorTemps[s].resize(round(this->tFinal / deltaT) + 1);
-	}
+	this->initializeSensorTemps();
 
 	// Solve Euler Family 
 	// Initialize d vector
@@ -404,6 +395,19 @@ void FEM_Simulator::createFirr()
 		auto stopTime = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 		std::cout << "Built the Firr Matrix: " << duration.count() / 1000000.0 << std::endl;
+	}
+}
+
+void FEM_Simulator::initializeSensorTemps() {
+	// Create sensorTemperature Vectors and reserve sizes
+	int nSensors = this->tempSensorLocations.size();
+	if (nSensors == 0) { // if there weren't any sensors added, put one at 0,0,0
+		nSensors = 1;
+		this->tempSensorLocations.push_back({ 0,0,0 });
+	}
+	this->sensorTemps.resize(nSensors);
+	for (int s = 0; s < nSensors; s++) {
+		this->sensorTemps[s].resize(round(this->tFinal / deltaT) + 1);
 	}
 }
 

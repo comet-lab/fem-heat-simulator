@@ -66,6 +66,7 @@ public:
 	void performTimeStepping();
 	void createKMFelem();
 	void createFirr();
+	void initializeSensorTemps();
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec);
 	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]);
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
