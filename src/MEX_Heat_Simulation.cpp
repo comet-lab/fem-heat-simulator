@@ -22,7 +22,7 @@ private:
     bool createAllMatrices = true;
     bool createFirrMatrix = true;
     float layerHeight = 1;
-    int layerSize = 1;
+    int elemsInLayer = 1;
     int Nn1d = 2;
 
 public:
@@ -138,9 +138,9 @@ public:
         displayOnMATLAB(stream);
         try {
             
-            // Have to convert T0 and NFR to std::vector<<<float>>>
+            // Have to convert T0 and FluenceRate to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
-            std::vector<std::vector<std::vector<float>>> NFR = convertMatlabArrayToVector(inputs[1]);
+            std::vector<std::vector<std::vector<float>>> FluenceRate = convertMatlabArrayToVector(inputs[1]);
 
             // Get tissue size
             float tissueSize[3];
@@ -169,24 +169,24 @@ public:
             displayOnMATLAB(stream);
             
 
-            // get flux condition
-            float Qn = inputs[7][0];
+            // get heatFlux condition
+            float heatFlux = inputs[7][0];
             // get ambient temperature
             float ambientTemp = inputs[8][0];
 
             /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
             // First check to see if certain variables have changed which would require us to reconstruct elements
             if (!this->createAllMatrices) {
-                this->createAllMatrices = checkForMatrixReset(Nn1d, T0, NFR, tissueSize, layerHeight, layerSize, boundaryType);
+                this->createAllMatrices = checkForMatrixReset(Nn1d, T0, FluenceRate, tissueSize, layerHeight, elemsInLayer, boundaryType);
             }
             // Set the type of basis functions we are using by setting nodes per dimension of an 
             this->simulator->Nn1d = Nn1d;
             this->simulator->setTemp(T0);
-            // Set the NFR
-            this->simulator->setNFR(NFR);
+            // Set the FluenceRate
+            this->simulator->setFluenceRate(FluenceRate);
             this->simulator->setTissueSize(tissueSize);
             // set the layer info
-            this->simulator->setLayer(layerHeight, layerSize);
+            this->simulator->setLayer(layerHeight, elemsInLayer);
             // set the final time
             this->simulator->tFinal = tFinal;
             // set the time step
@@ -198,8 +198,8 @@ public:
             this->simulator->setHTC(HTC);
             // set boundary conditions
             this->simulator->setBoundaryConditions(boundaryType);
-            // set flux
-            this->simulator->setFlux(Qn);
+            // set heatFlux
+            this->simulator->setFlux(heatFlux);
 
             //print statements 
             stream << "Final Time: " << this->simulator->tFinal << "\nTime step: " << this->simulator->deltaT << std::endl;
@@ -249,7 +249,7 @@ public:
             this->createAllMatrices = false;
             this->createFirrMatrix = false;
             try {
-                this->simulator->createKMFelem();
+                this->simulator->createKMF();
                 stream << "Global matrices created" << std::endl;
                 displayOnMATLAB(stream);
             }
@@ -302,7 +302,7 @@ public:
     }
 
     /* This function makes sure that user has provided the proper inputs
-    * Inputs: T0, NFR, tissueSize TC, VHC, MUA, HTC, boundaryConditions
+    * Inputs: T0, FluenceRate, tissueSize TC, VHC, MUA, HTC, boundaryConditions
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
@@ -357,10 +357,10 @@ public:
         }
         if (inputs.size() > 12) {
             layerHeight = inputs[12][0];
-            layerSize = int(inputs[12][1]);
+            elemsInLayer = int(inputs[12][1]);
         }
         else {
-            layerSize = inputs[0].getDimensions()[2];
+            elemsInLayer = inputs[0].getDimensions()[2];
             layerHeight = inputs[2][2];
         }
         if (inputs.size() > 13) {
@@ -373,8 +373,8 @@ public:
         }
     }
 
-    bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& NFR,
-        float tissueSize[3],float layerHeight, int layerSize,int boundaryType[6]) {
+    bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& FluenceRate,
+        float tissueSize[3],float layerHeight, int elemsInLayer,int boundaryType[6]) {
         // this function checks to see if we need to recreate the global element matrices
         this->createAllMatrices = false;
 
@@ -383,18 +383,18 @@ public:
             this->createAllMatrices = true;
         }
         // if the size of our temperature vector changes, we need to reconstruct the matrices
-        if (T0.size() != this->simulator->nodeSize[0]) this->createAllMatrices = true; 
-        if (T0[0].size() != this->simulator->nodeSize[1]) this->createAllMatrices = true;
-        if (T0[0][0].size() != this->simulator->nodeSize[2]) this->createAllMatrices = true;
+        if (T0.size() != this->simulator->nodesPerAxis[0]) this->createAllMatrices = true; 
+        if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
+        if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
 
-        // if our NFR has changed, we need to reconstruct at least Firr
+        // if our FluenceRate has changed, we need to reconstruct at least Firr
         // TODO make it so that we only reconstruct Firr instead of all of them
-        for (int k = 0; k < NFR[0][0].size(); k++) {
+        for (int k = 0; k < FluenceRate[0][0].size(); k++) {
             if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
-            for (int j = 0; j < NFR[0].size(); j++) {
+            for (int j = 0; j < FluenceRate[0].size(); j++) {
                 if (this->createFirrMatrix) break; // flags for breaking out of nested loop
-                for (int i = 0; i < NFR.size(); i++) {
-                    if (abs(this->simulator->NFR(i + j*NFR.size() + k*NFR.size()*NFR[0].size()) - NFR[i][j][k]) > 0.0001) { // check if difference is greater than 1e-4
+                for (int i = 0; i < FluenceRate.size(); i++) {
+                    if (abs(this->simulator->FluenceRate(i + j*FluenceRate.size() + k*FluenceRate.size()*FluenceRate[0].size()) - FluenceRate[i][j][k]) > 0.0001) { // check if difference is greater than 1e-4
                         this->createFirrMatrix = true;
                         break;
                     }
@@ -409,7 +409,7 @@ public:
 
         //if layer height or layer size changed then again we have a jacobian change
         if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createAllMatrices = true;
-        if (layerSize != layerSize) this->createAllMatrices = true;
+        if (elemsInLayer != elemsInLayer) this->createAllMatrices = true;
 
         // check if any boundaries have changed
         for (int b = 0; b < 6; b++) {
