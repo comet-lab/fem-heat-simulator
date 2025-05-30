@@ -3,9 +3,9 @@ clc; clear; close all;
 clear MEX_Heat_Simulation
 %% Initialization of parameters
 tissueSize = [2.0,2.0,1.0];
-nodeSize = [41,41,71];
+nodesPerAxis = [41,41,71];
 ambientTemp = 24;
-T0 = single(20*ones(nodeSize));
+T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
 tFinal = single(0.05);
 w0 = 0.0168;
@@ -23,15 +23,15 @@ sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
 
-xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodeSize(1));
-yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodeSize(2));
-zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodeSize(3)-layerInfo(2))];
+xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
+yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
+zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
 [X,Y,Z] = meshgrid(xLayer,yLayer,zLayer);
 NFRLayer = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
-Jn = 0;
+Flux = 0;
 
 %% Timing Tests
 numSamples = 100;
@@ -44,7 +44,7 @@ for cc = 0:1
             fprintf("\n");
         end
         [TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,Jn,ambientTemp,sensorPositions,useAllCPUs,...
+            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
             silentMode,layerInfo,Nn1d,createMatrices);
         timeVec(cc+1,i) = toc;
     end
