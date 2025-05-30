@@ -560,11 +560,11 @@ float FEM_Simulator::calculateNADotBase(float xi, int Ai) {
 	return output;
 }
 
-Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
+Eigen::Vector3f FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 {
 	/* Calculate the derivative of the shape function with respect to all 3 axis. The result is a 3x1 vector. 
 	*/
-	Eigen::Vector3<float> NA_dot;
+	Eigen::Vector3f NA_dot;
 	int AiVec[3];
 	int size[3] = { this->Nn1d,this->Nn1d,this->Nn1d };
 	this->ind2sub(Ai, size, AiVec);
@@ -574,13 +574,13 @@ Eigen::Vector3<float> FEM_Simulator::calculateNA_dot(float xi[3], int Ai)
 	return NA_dot;
 }
 
-Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
+Eigen::Matrix3f FEM_Simulator::calculateJ(int layer)
 {
 	/* Builds the Jacobian to relate changes in the bi-unit domain to changes in the cartesian position. 
 	This function takes advantage of the assumption that each element is a cuboid, and there aren't any orientation
 	differences between the cartesian reference frame and bi-unit reference frame
 	*/
-	Eigen::Matrix3<float> J;
+	Eigen::Matrix3f J;
 	//**** ASSUMING X-Y VOXEL SIZE IS CONSTANT THROUGHOUT VOLUME **********
 	// we assume the z height can change once in the volume. 
 	float deltaX = this->tissueSize[0] / float(this->elementsPerAxis[0]);
@@ -610,7 +610,7 @@ Eigen::Matrix3<float> FEM_Simulator::calculateJ(int layer)
 
 }
 
-Eigen::Matrix2<float> FEM_Simulator::calculateJs(int dim, int layer)
+Eigen::Matrix2f FEM_Simulator::calculateJs(int dim, int layer)
 {
 
 	/* Builds the surface Jacobian to relate changes in the bi-unit domain to changes in the cartesian position.
@@ -747,9 +747,9 @@ float FEM_Simulator::calcKintAB(float xi[3], int Ai, int Bi)
 	matrices. This function will get integrated to build the local matrices
 	*/
 	float KABfunc = 0;
-	Eigen::Vector3<float> NAdotA;
-	Eigen::Vector3<float> NAdotB;
-	Eigen::Matrix3<float> J = this->J;
+	Eigen::Vector3f NAdotA;
+	Eigen::Vector3f NAdotB;
+	Eigen::Matrix3f J = this->J;
 	Eigen::Matrix3f Jinv = J.inverse();
 
 
@@ -771,7 +771,7 @@ float FEM_Simulator::calcMAB(float xi[3], int Ai, int Bi)
 	float MABfunc = 0;
 	float NAa;
 	float NAb;
-	Eigen::Matrix3<float> J = this->J;
+	Eigen::Matrix3f J = this->J;
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);
@@ -789,7 +789,7 @@ float FEM_Simulator::calcFintAB(float xi[3], int Ai, int Bi)
 	float FintFunc = 0;
 	float NAa;
 	float NAb;
-	Eigen::Matrix3<float> J = this->J;
+	Eigen::Matrix3f J = this->J;
 
 	NAa = this->calculateNA(xi, Ai);
 	NAb = this->calculateNA(xi, Bi);

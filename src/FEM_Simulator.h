@@ -123,10 +123,10 @@ public:
 	Eigen::MatrixXf FeConv; // Elemental Construction of FConv
 	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	std::array<Eigen::MatrixXf,6> KeConv; // Elemental construction of KConv
-	Eigen::Matrix3<float> J = Eigen::Matrix3f::Constant(0.0f); // bi-unit jacobian
-	Eigen::Matrix2<float> Js1 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for yz plane
-	Eigen::Matrix2<float> Js2 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xz plane
-	Eigen::Matrix2<float> Js3 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xy plane.
+	Eigen::Matrix3f J = Eigen::Matrix3f::Constant(0.0f); // bi-unit jacobian
+	Eigen::Matrix2f Js1 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for yz plane
+	Eigen::Matrix2f Js2 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xz plane
+	Eigen::Matrix2f Js3 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xy plane.
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
@@ -139,10 +139,10 @@ public:
 	int determineNodeFace(int globalNode); // determines if/which faces the global node is on
 	float calculateNA(float xi[3], int Ai); // Calculates output of shape function 
 	float calculateNABase(float xi, int Ai); // Calculates output of 1D shape function
-	Eigen::Matrix3<float> calculateJ(int layer=1); // calculates volume bi-unit Jacobian
-	Eigen::Matrix2<float> calculateJs(int dim,int layer=1); // calculates surface bi-unit Jacobian for each of 3 faces. 
+	Eigen::Matrix3f calculateJ(int layer=1); // calculates volume bi-unit Jacobian
+	Eigen::Matrix2f calculateJs(int dim,int layer=1); // calculates surface bi-unit Jacobian for each of 3 faces. 
 	float calculateNADotBase(float xi, int Ai); // calculates output of 1D shape function derivative
-	Eigen::Vector3<float> calculateNA_dot(float xi[3], int Ai); // calculates shape function derivative
+	Eigen::Vector3f calculateNA_dot(float xi[3], int Ai); // calculates shape function derivative
 	float integrate(float (FEM_Simulator::*func)(float[3], int, int), int points, int dim, int Ai, int Bi); // performs numerical integration
 	void getGlobalPosition(int globalNode, float position[3]); // function not used because of uniform cuboid assumptions
 	float calcKintAB(float xi[3], int Ai, int Bi); // function that is integrated to form Ke
