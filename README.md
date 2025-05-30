@@ -87,7 +87,7 @@ Additionally there is a setting to multi-thread for eigen, ``useAllCPUs``, and t
 The mex file can be called in MATALB as long as it is on the MATLAB Path. 
 Example usage can be found in the folder MexTesting/MexFileTest.m
 
-``[TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,NFRLayer,tissueSize',tFinal,
+``[TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,
             silentMode,layerInfo,Nn1d,createMatrices);``
 
