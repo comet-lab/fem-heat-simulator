@@ -23,7 +23,8 @@ add_library(HeatSimulation
 target_include_directories(HeatSimulation PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_link_libraries(HeatSimulation Eigen3::Eigen)
+target_link_libraries(HeatSimulation 
+  Eigen3::Eigen)
 
 # Add Executable 
 add_executable(main 
@@ -35,7 +36,8 @@ add_executable(main
 target_include_directories(main PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_link_libraries(main Eigen3::Eigen)
+target_link_libraries(main 
+  Eigen3::Eigen)
 
 enable_testing()
 
@@ -47,11 +49,13 @@ add_executable(FEM_Unit_Tests
 target_include_directories(FEM_Unit_Tests PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
 target_link_libraries(FEM_Unit_Tests
   GTest::gtest_main
+  Eigen3::Eigen
 )
 
 include(GoogleTest)
 gtest_discover_tests(FEM_Unit_Tests)
 
+message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     find_package(Matlab REQUIRED)
@@ -63,7 +67,13 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
             src/FEM_Simulator.cpp
             src/FEM_Simulator.h # <-- Add this
     )
-   target_link_libraries(MEX_Heat_Simulation Eigen3::Eigen)
+    target_link_libraries(MEX_Heat_Simulation Eigen3::Eigen)
+
+    set_target_properties(MEX_Heat_Simulation PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}" # For windows mex
+      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}" # For MAC and Linux mex
+    )
+
     target_compile_options(MEX_Heat_Simulation PRIVATE
         "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
         "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
@@ -72,9 +82,5 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
     target_link_options(MEX_Heat_Simulation PRIVATE
         "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
         "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
-    )
-
-    set_target_properties(MEX_Heat_Simulation PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
 endif()
