@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.29)
 set(CMAKE_CXX_STANDARD 23)
 project(HeatSimulation)
 
-set(EIGEN_DIR "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")  # CHANGE 
+find_package(Eigen3 REQUIRED NO_MODULE)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -23,7 +23,7 @@ add_library(HeatSimulation
 target_include_directories(HeatSimulation PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_include_directories(HeatSimulation PRIVATE ${EIGEN_DIR})
+target_link_libraries(HeatSimulation Eigen3::Eigen)
 
 # Add Executable 
 add_executable(main 
@@ -35,7 +35,7 @@ add_executable(main
 target_include_directories(main PUBLIC include)
 
 # Include local Eigen/Dense header by specifying the full path here
-target_include_directories(main PRIVATE ${EIGEN_DIR})
+target_link_libraries(main Eigen3::Eigen)
 
 enable_testing()
 
@@ -63,9 +63,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
             src/FEM_Simulator.cpp
             src/FEM_Simulator.h # <-- Add this
     )
-    target_include_directories(MEX_Heat_Simulation PRIVATE
-        ${EIGEN_DIR}
-    )
+   target_link_libraries(MEX_Heat_Simulation Eigen3::Eigen)
     target_compile_options(MEX_Heat_Simulation PRIVATE
         "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
         "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
