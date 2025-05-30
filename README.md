@@ -94,7 +94,7 @@ Example usage can be found in the folder MexTesting/MexFileTest.m
 
 # References
 [1] N. E. Pacheco, K. Zhang, A. S. Reyes, C. J. Pacheco, L. Burstein,
-and L. Fichera, �Towards a physics engine to simulate robotic laser
-surgery: Finite element modeling of thermal laser-tissue interactions,�
+and L. Fichera, ''Towards a physics engine to simulate robotic laser
+surgery: Finite element modeling of thermal laser-tissue interactions'',
 International Symposium on Medical Robotics, 2025, [In Press] Available:
 https://arxiv.org/abs/2411.14249.
