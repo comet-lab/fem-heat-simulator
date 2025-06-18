@@ -8,13 +8,13 @@ option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_MEX      "Build MATLAB MEX wrapper (Release)" ON)
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ──────────────────────────────────────────────────────────────
 # Dependencies that come from the system or FetchContent
 # ──────────────────────────────────────────────────────────────
-find_package(Eigen3 3.4 CONFIG REQUIRED)
+find_package(Eigen3 3 CONFIG REQUIRED)
 find_package(OpenMP       REQUIRED)
 
 # Helper to add OpenMP to any target with one line
@@ -36,7 +36,8 @@ set(HEATSIM_HEADERS
 add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
 add_library(HeatSimulation::HeatSimulation ALIAS HeatSimulation)
 
-target_compile_features(HeatSimulation PUBLIC cxx_std_23)
+target_compile_options(HeatSimulation PUBLIC -fPIC) # This is needed because linux treats mex files as libraries
+#target_compile_features(HeatSimulation PUBLIC cxx_std_23)
 target_include_directories(HeatSimulation
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
