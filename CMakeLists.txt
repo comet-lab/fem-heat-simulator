@@ -1,86 +1,122 @@
-# TODO: Review Cal's Changes
-cmake_minimum_required(VERSION 3.29)
-set(CMAKE_CXX_STANDARD 23)
-project(HeatSimulation)
+﻿cmake_minimum_required(VERSION 3.29)
+project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
 
-find_package(Eigen3 REQUIRED NO_MODULE)
+# ──────────────────────────────────────────────────────────────
+# Options & global settings
+# ──────────────────────────────────────────────────────────────
+option(BUILD_TESTING  "Build unit‑test runner"            ON)
+option(BUILD_MEX      "Build MATLAB MEX wrapper (Release)" ON)
 
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ──────────────────────────────────────────────────────────────
+# Dependencies that come from the system or FetchContent
+# ──────────────────────────────────────────────────────────────
+find_package(Eigen3 3 CONFIG REQUIRED)
+find_package(OpenMP       REQUIRED)
 
-add_library(HeatSimulation
-        src/FEM_Simulator.cpp
-        src/FEM_Simulator.h)
+# Helper to add OpenMP to any target with one line
+function(enable_openmp tgt)
+    target_link_libraries(${tgt} PUBLIC OpenMP::OpenMP_CXX)
+endfunction()
 
-# Include in larger project (AEnKF_OOP)
-target_include_directories(HeatSimulation PUBLIC include)
-
-# Include local Eigen/Dense header by specifying the full path here
-target_link_libraries(HeatSimulation 
-  Eigen3::Eigen)
-
-# Add Executable 
-add_executable(main 
-            src/FEM_Simulator.cpp
-            src/FEM_Simulator.h
-            "src/main.cpp")
-
-       # Include in larger project (AEnKF_OOP)
-target_include_directories(main PUBLIC include)
-
-# Include local Eigen/Dense header by specifying the full path here
-target_link_libraries(main 
-  Eigen3::Eigen)
-
-enable_testing()
-
-add_executable(FEM_Unit_Tests
-  test/FEM_Unit_Tests.cpp
-  src/FEM_Simulator.cpp
-  src/FEM_Simulator.h
- "test/BaseSim.cpp")
-target_include_directories(FEM_Unit_Tests PRIVATE "C:/Users/nepacheco/OneDrive - Worcester Polytechnic Institute (wpi.edu)/PhD/Repositories/CppLibraries/eigen-3.4.0/")
-target_link_libraries(FEM_Unit_Tests
-  GTest::gtest_main
-  Eigen3::Eigen
+# ──────────────────────────────────────────────────────────────
+# Library: HeatSimulation
+# ──────────────────────────────────────────────────────────────
+set(HEATSIM_SRC
+    src/FEM_Simulator.cpp
 )
 
-include(GoogleTest)
-gtest_discover_tests(FEM_Unit_Tests)
+set(HEATSIM_HEADERS
+    include/FEM_Simulator.h
+)
 
-message(STATUS "CMAKE_SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
+add_library(HeatSimulation::HeatSimulation ALIAS HeatSimulation)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    find_package(Matlab REQUIRED)
+target_compile_options(HeatSimulation PUBLIC -fPIC) # This is needed because linux treats mex files as libraries
+#target_compile_features(HeatSimulation PUBLIC cxx_std_23)
+target_include_directories(HeatSimulation
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_link_libraries(HeatSimulation PUBLIC Eigen3::Eigen)
+enable_openmp(HeatSimulation)
 
-    matlab_add_mex(
-        NAME MEX_Heat_Simulation
-        SRC 
-            src/MEX_Heat_Simulation.cpp
-            src/FEM_Simulator.cpp
-            src/FEM_Simulator.h # <-- Add this
+# ──────────────────────────────────────────────────────────────
+# Executable: main
+# ──────────────────────────────────────────────────────────────
+add_executable(main src/main.cpp)
+target_link_libraries(main PRIVATE HeatSimulation::HeatSimulation)
+
+# ──────────────────────────────────────────────────────────────
+# Unit tests (GoogleTest via FetchContent)
+# ──────────────────────────────────────────────────────────────
+if(BUILD_TESTING)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
     )
-    target_link_libraries(MEX_Heat_Simulation Eigen3::Eigen)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)  # MSVC friendliness
+    # We don't need the GTests installing with the library. 
+    set(INSTALL_GTEST OFF)
+    set(INSTALL_GMOCK OFF)
+    FetchContent_MakeAvailable(googletest)
 
-    set_target_properties(MEX_Heat_Simulation PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}" # For windows mex
-      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}" # For MAC and Linux mex
+    add_executable(FEM_Unit_Tests
+        test/FEM_Unit_Tests.cpp
+        test/BaseSim.cpp
+    )
+    target_link_libraries(FEM_Unit_Tests
+        PRIVATE
+            HeatSimulation::HeatSimulation
+            GTest::gtest_main
     )
 
-    target_compile_options(MEX_Heat_Simulation PRIVATE
-        "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
-        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
-    )
-
-    target_link_options(MEX_Heat_Simulation PRIVATE
-        "$<$<CXX_COMPILER_ID:MSVC>:/openmp>"
-        "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:-fopenmp>"
-    )
+    include(GoogleTest)
+    gtest_discover_tests(FEM_Unit_Tests)
 endif()
+
+# ──────────────────────────────────────────────────────────────
+# MATLAB MEX (only built in Release *and* if MATLAB is found)
+# ──────────────────────────────────────────────────────────────
+if(BUILD_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    find_package(Matlab QUIET COMPONENTS MX_LIBRARY MAIN_PROGRAM)
+    if(Matlab_FOUND)
+        matlab_add_mex(NAME MEX_Heat_Simulation
+            SRC src/MEX_Heat_Simulation.cpp
+        )
+        target_link_libraries(MEX_Heat_Simulation HeatSimulation::HeatSimulation)
+
+        set_target_properties(MEX_Heat_Simulation PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        )
+        # Manually add OpenMP compile flags (don't use helper function) because MEX requires plain linking
+        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(MEX_Heat_Simulation PRIVATE -fopenmp)
+            target_link_libraries(MEX_Heat_Simulation gomp)
+        elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+            target_compile_options(MEX_Heat_Simulation PRIVATE /openmp)
+        endif()
+    endif()
+endif()
+
+# ──────────────────────────────────────────────────────────────
+# Install rules: library + headers (so other projects can `find_package`)
+# ──────────────────────────────────────────────────────────────
+install(TARGETS HeatSimulation
+        EXPORT HeatSimulationTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT HeatSimulationTargets
+        FILE HeatSimulationTargets.cmake
+        NAMESPACE HeatSimulation::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HeatSimulation)

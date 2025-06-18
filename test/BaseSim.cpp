@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/FEM_Simulator.h"
+#include "../include/FEM_Simulator.h"
 
 class BaseSim : public testing::Test {
 protected:

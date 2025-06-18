@@ -7,7 +7,7 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    int nodesPerAxis[3] = { 41,41,50 };
+    int nodesPerAxis[3] = { 101,101,100 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
     std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
@@ -37,7 +37,7 @@ int main()
     std::cout << "Object Created " << std::endl;
 
     simulator.deltaT = 0.05f;
-    simulator.tFinal = 0.05f;
+    simulator.tFinal = 5.0f;
     int BC[6] = { 2,0,0,0,0,0 };
     simulator.setBoundaryConditions(BC);
     simulator.setFlux(0.0f);
@@ -49,13 +49,15 @@ int main()
     std::cout << "Running FEA" << std::endl;
 
 #ifdef _OPENMP
+    std::cout << "OpenMP enabled" << std::endl;
     Eigen::setNbThreads(omp_get_num_procs()/2);
 #else
+    std::cout << "OpenMP disabled" << std::endl;
     Eigen::setNbThreads(1);
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
 
-    float totalTime = 0.05f;
+    float totalTime = simulator.tFinal;
     simulator.createKMF();
 
     for (int i = 0; i < round(totalTime / simulator.tFinal); i++) {
