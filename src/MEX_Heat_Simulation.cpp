@@ -235,7 +235,7 @@ public:
         // Set parallelization
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
-        stream << "OPEMMP Enable" << std::endl;
+        stream << "OPEMMP Enabled" << std::endl;
         displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
             Eigen::setNbThreads(omp_get_num_procs()/2);

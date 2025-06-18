@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include "BaseSim.cpp"
 #include <iostream>
 #include <string>

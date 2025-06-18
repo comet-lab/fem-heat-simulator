@@ -29,7 +29,10 @@ This will create three executables and a library that can be included in other p
 - FEM_Unit_Tests.exe: runs unit tests for FEM_Simulator methods. 
 - MEX_Heat_Simulation.mex*64: A mex file callable from matlab to run the simulator. 
 
-The library name is Heat_Simulation.
+The library name is HeatSimulation. If you would like to install the library so it can be found using
+``find-package(HeatSimulation)`` then run the following command:
+
+``cmake --install .``
 
 ## Description of the simulation class
 
