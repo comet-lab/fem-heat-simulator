@@ -65,11 +65,14 @@ public:
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(FEM_Simulator& inputSim);
 	void performTimeStepping(); // performs time integration after global matrices are created
+	void singleStep(Eigen::VectorXf& dVec, Eigen::VectorXf& vVec, Eigen::SparseMatrix<float, Eigen::RowMajor>& globF, Eigen::SparseMatrix<float, Eigen::RowMajor>& globK);
 	void createKMF(); // creates global matrices and performs spatial discretization
 	void createFirr(); // creates only the Forcing vector for the fluence rate
+	void applyParameters();
 	void initializeSensorTemps(); // initialize sensor temps vec with 0s
 	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec); // update sensor temp vec
 	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]); // Convert a 3D position into an element that contains that position
+	
 
 	// Setters and Getters
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
@@ -104,6 +107,7 @@ public:
 
 	// The Kint, M, and Firr matrices for the entire domain
 	// Kint = Kint*kappa + Kconv*h
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
@@ -123,6 +127,11 @@ public:
 	Eigen::MatrixXf FeConv; // Elemental Construction of FConv
 	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	std::array<Eigen::MatrixXf,6> KeConv; // Elemental construction of KConv
+
+	Eigen::SparseMatrix<float, Eigen::RowMajor> globK; // Global Conductivity Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> globM; // Global Thermal Mass Matrix
+	Eigen::VectorXf globF; // Global Heat Source Matrix 
+
 	Eigen::Matrix3f J = Eigen::Matrix3f::Constant(0.0f); // bi-unit jacobian
 	Eigen::Matrix2f Js1 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for yz plane
 	Eigen::Matrix2f Js2 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xz plane

@@ -1,4 +1,7 @@
 #include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -78,15 +81,7 @@ void FEM_Simulator::performTimeStepping()
 	auto stopTime = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 
-
-	/* Here we assume constant tissue properties throughout the mesh. This allows us to 
-	multiply by tissue specific properties after the element construction, which means we can change
-	tissue properties without having to reconstruct the matrices 
-	*/
-	// Apply parameter specific multiplication for each global matrix.
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
-	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
+	this->applyParameters();
 
 	// get total number of elements and nodes
 	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
@@ -123,10 +118,10 @@ void FEM_Simulator::performTimeStepping()
 
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
 	Eigen::SparseMatrix<float> LHS = globM + this->alpha * this->deltaT * globK;
-	solver.compute(LHS);
-	if (solver.info() != Eigen::Success) {
+	LHS.makeCompressed();
+	this->cgSolver.compute(LHS);
+	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
 	if (!this->silentMode) {
@@ -142,8 +137,8 @@ void FEM_Simulator::performTimeStepping()
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		RHS = globF - globK * dTilde;
 		// velocity should not change too much between time steps so we can use previous v to initial conjugate gradient. 
-		vVec = solver.solveWithGuess(RHS,vVec);
-		if (solver.info() != Eigen::Success) {
+		vVec = this->cgSolver.solveWithGuess(RHS,vVec);
+		if (this->cgSolver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
 		// combine explicit and implicit steps. 
@@ -164,13 +159,29 @@ void FEM_Simulator::performTimeStepping()
 			this->Temp(n) = dVec(counter);
 			counter++;
 	}
-
+	 
 	if (!this->silentMode) {
 		stopTime = std::chrono::high_resolution_clock::now();
 		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 		std::cout << "Updated Temp Variable: " << duration.count() / 1000000.0 << std::endl;
 		startTime = stopTime;
 	}
+}
+
+void FEM_Simulator::singleStep(Eigen::VectorXf& dVec, Eigen::VectorXf& vVec, Eigen::SparseMatrix<float, 
+	Eigen::RowMajor>& globF, Eigen::SparseMatrix<float, Eigen::RowMajor>& globK ) {
+
+	// set dTilde which is the explicit step 
+	Eigen::VectorXf dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;
+	Eigen::VectorXf RHS = globF - globK * dTilde;
+	
+	// velocity should not change too much between time steps so we can use previous v to initial conjugate gradient. 
+	vVec = this->cgSolver.solveWithGuess(RHS, vVec);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Issue With Solver" << std::endl;
+	}
+	// combine explicit and implicit steps. 
+	dVec = dTilde + this->alpha * this->deltaT * vVec;
 }
 
 void FEM_Simulator::createKMF()
@@ -416,6 +427,18 @@ void FEM_Simulator::createFirr()
 	}
 }
 
+void FEM_Simulator::applyParameters()
+{
+	/* Here we assume constant tissue properties throughout the mesh. This allows us to
+	multiply by tissue specific properties after the element construction, which means we can change
+	tissue properties without having to reconstruct the matrices
+	*/
+	// Apply parameter specific multiplication for each global matrix.
+	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
+	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	this->globF = this->Firr * this->MUA + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+}
+
 void FEM_Simulator::initializeSensorTemps() {
 	// Create sensorTemperature Vectors and reserve sizes
 	int nSensors = this->tempSensorLocations.size();
@@ -501,6 +524,8 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 	return elementLocation;
 
 }
+
+
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {

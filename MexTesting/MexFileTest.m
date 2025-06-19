@@ -2,12 +2,12 @@ clc; clear; close all;
 
 clear MEX_Heat_Simulation
 %% Initialization of parameters
-tissueSize = [2.0,2.0,1.0];
-nodesPerAxis = [41,41,71];
+tissueSize = [5.0,5.0,1.0];
+nodesPerAxis = [81,81,50];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
-tFinal = single(15);
+tFinal = single(0.05);
 w0 = 0.0168;
 focalPoint = 35;
 MUA = 200;
@@ -109,3 +109,5 @@ c.Label.String = 'Temperature (deg C)';
 axis equal
 view(0,90);
 colormap('hot')
+
+clear mex
