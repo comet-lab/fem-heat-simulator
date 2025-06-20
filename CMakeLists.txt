@@ -8,8 +8,8 @@ option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_MEX      "Build MATLAB MEX wrapper (Release)" ON)
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 23)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ──────────────────────────────────────────────────────────────
 # Dependencies that come from the system or FetchContent
@@ -85,7 +85,7 @@ endif()
 # MATLAB MEX (only built in Release *and* if MATLAB is found)
 # ──────────────────────────────────────────────────────────────
 if(BUILD_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
-    find_package(Matlab QUIET COMPONENTS MX_LIBRARY MAIN_PROGRAM)
+    find_package(Matlab REQUIRED)
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
             SRC src/MEX_Heat_Simulation.cpp
