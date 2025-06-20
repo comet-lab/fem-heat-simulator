@@ -37,7 +37,7 @@ int main()
     std::cout << "Object Created " << std::endl;
 
     simulator.deltaT = 0.05f;
-    simulator.tFinal = 5.0f;
+    simulator.tFinal = 1.0f;
     int BC[6] = { 2,0,0,0,0,0 };
     simulator.setBoundaryConditions(BC);
     simulator.setFlux(0.0f);

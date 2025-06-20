@@ -34,43 +34,21 @@ public:
 	// -1: We are on the back face   - surface normal is -x direction
 	// -2: We are on the left face   - surface normal is -y direction
 
-	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
-	std::array<std::vector<int>,6> elemNodeSurfaceMap;
 	//0 - heat sink, 1 - heatFlux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
-
-	int elementsPerAxis[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
-	int nodesPerAxis[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be elementsPerAxis + 1;
-	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
-	float layerHeight = 1.0f; // the z-location where we change element height
-	float elemsInLayer = 2; // The number of elements corresponding to the first layer height
-	float TC = 0; // Thermal Conductivity [W/cm C]
-	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
-	float MUA = 0; // Absorption Coefficient [cm^-1]
-	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
-	Eigen::VectorXf Temp; // Our values for temperature at the nodes of the elements
-	Eigen::VectorXf FluenceRate; // Our values for Heat addition
-	float alpha = 0.5; // time step weight
-	float deltaT = 0.01; // time step [s]
-	float tFinal = 1; // total duration of simulation [s]
-	float heatFlux = 0; // heat escaping the Neumann Boundary
-	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
-	int Nn1d = 2; // in a single element, the number of nodes used in one dimension
-	bool elemNFR = false; // whether the FluenceRate pertains to an element or a node
-	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
-	std::vector< std::array<float, 3 >> tempSensorLocations; // locations of temperature sensors
-	std::vector<std::vector<float>> sensorTemps; // stored temperature information for each sensor over time. 
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(FEM_Simulator& inputSim);
-	void performTimeStepping(); // performs time integration after global matrices are created
-	void singleStep(Eigen::VectorXf& dVec, Eigen::VectorXf& vVec, Eigen::SparseMatrix<float, Eigen::RowMajor>& globF, Eigen::SparseMatrix<float, Eigen::RowMajor>& globK);
+	void performTimeStepping(float duration); // performs time integration after global matrices are created
+	void multiStep(float duration);
+	void singleStep();
 	void createKMF(); // creates global matrices and performs spatial discretization
 	void createFirr(); // creates only the Forcing vector for the fluence rate
 	void applyParameters();
-	void initializeSensorTemps(); // initialize sensor temps vec with 0s
-	void updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec); // update sensor temp vec
+	void initializeModel();
+	void initializeSensorTemps(float duration); // initialize sensor temps vec with 0s
+	void updateTemperatureSensors(int timeIdx); // update sensor temp vec
 	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]); // Convert a 3D position into an element that contains that position
 	
 
@@ -104,14 +82,38 @@ public:
 
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
+	int elementsPerAxis[3] = { 1,1,1 }; // Number of elements in x, y, and z [voxels]
+	int nodesPerAxis[3] = { 2,2,2 }; // Number of nodes in x, y, and z. Should be elementsPerAxis + 1;
+	float tissueSize[3] = { 1,1,1 };  // Length of the tissue in x, y, and z [cm]
+	float layerHeight = 1.0f; // the z-location where we change element height
+	float elemsInLayer = 2; // The number of elements corresponding to the first layer height
+	float TC = 0; // Thermal Conductivity [W/cm C]
+	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
+	float MUA = 0; // Absorption Coefficient [cm^-1]
+	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
+	Eigen::VectorXf Temp; // Our values for temperature at the nodes of the elements
+	Eigen::VectorXf dVec; // This is our discrete temperature at non-dirichlet nodes from Time-stepping
+	Eigen::VectorXf vVec; // This is our discrete temperature velocity from Time-stepping
+	Eigen::VectorXf FluenceRate; // Our values for Heat addition
+	float alpha = 0.5; // time step weight
+	float deltaT = 0.01; // time step [s]
+	float heatFlux = 0; // heat escaping the Neumann Boundary
+	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	int Nn1d = 2; // in a single element, the number of nodes used in one dimension
+	bool elemNFR = false; // whether the FluenceRate pertains to an element or a node
+	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
+	std::vector< std::array<float, 3 >> tempSensorLocations; // locations of temperature sensors
+	std::vector<std::vector<float>> sensorTemps; // stored temperature information for each sensor over time. 
 
-	// The Kint, M, and Firr matrices for the entire domain
-	// Kint = Kint*kappa + Kconv*h
+	/* This section of variables stores all the matrices used for building the first order ODE
+	There are both global and elemental matrices specified. The global matrices are also distinguished
+	by how they are created (e.g. conduction, laser, etc). These are saved as class attributes because
+	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
-	// Firr = Firr*muA + Fconv*h + Fk*kappa + Fq
+	
 	Eigen::VectorXf Firr; // forcing function due to irradiance
 	Eigen::VectorXf Fconv; // forcing functino due to convection
 	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes
@@ -136,11 +138,16 @@ public:
 	Eigen::Matrix2f Js1 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for yz plane
 	Eigen::Matrix2f Js2 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xz plane
 	Eigen::Matrix2f Js3 = Eigen::Matrix2f::Constant(0.0f); // surface jacobian for xy plane.
+
+	/* This section of variables stores vectors that help us distinguish what type of node or what
+	kind of surface on the element we are at. They are built once during matrix creation */
 	std::vector<int> validNodes; // global indicies on non-dirichlet boundary nodes
 	std::vector<int> dirichletNodes;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<int> nodeMap; 
+	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
+	std::array<std::vector<int>, 6> elemNodeSurfaceMap;
 
 	void initializeBoundaryNodes(); // goes through each node and labels them if they are on the boundary
 	void initializeElementNodeSurfaceMap(); // For an arbitrary element, maps what nodes could belong to which faces of the cuboid
@@ -162,6 +169,7 @@ public:
 	float calcKconvAB(float xi[3], int Ai, int dim); // function that is integrated for Kconv
 
 	void ind2sub(int index, int size[3], int sub[3]); 
+	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
 };
 
 
