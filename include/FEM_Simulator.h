@@ -90,6 +90,7 @@ public:
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA = 0; // Absorption Coefficient [cm^-1]
+	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
 	float ambientTemp = 0;  // Temperature surrounding the tissue for Convection [C]
 	Eigen::VectorXf Temp; // Our values for temperature at the nodes of the elements
 	Eigen::VectorXf dVec; // This is our discrete temperature at non-dirichlet nodes from Time-stepping
@@ -98,8 +99,10 @@ public:
 	float alpha = 0.5; // time step weight
 	float deltaT = 0.01; // time step [s]
 	float heatFlux = 0; // heat escaping the Neumann Boundary
-	float HTC = 1; // convective heat transfer coefficient [W/cm^2]
+	
 	int Nn1d = 2; // in a single element, the number of nodes used in one dimension
+	bool parameterUpdate = true;
+	bool fluenceUpdate = true;
 	bool elemNFR = false; // whether the FluenceRate pertains to an element or a node
 	std::vector<boundaryCond> boundaryType = { HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK }; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	std::vector< std::array<float, 3 >> tempSensorLocations; // locations of temperature sensors

@@ -166,11 +166,12 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
-	if (false){ // check if fluence rate has changed
+	if (this->fluenceUpdate){ // check if fluence rate has changed
 		createFirr();
 		this->applyParameters();
+		this->fluenceUpdate = false;
 	}
-	if (false) { // Check if parameters have changed
+	if (this->parameterUpdate) { // Check if parameters have changed
 		this->applyParameters(); // Apply parameters
 		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
 		this->LHS.makeCompressed(); // compress it for potential speed improvements
@@ -178,6 +179,7 @@ void FEM_Simulator::singleStep() {
 		if (this->cgSolver.info() != Eigen::Success) {
 			std::cout << "Decomposition Failed" << std::endl;
 		}
+		this->parameterUpdate = false;
 	}
 	//this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	// Explicit Forward Step (only if alpha < 1)
@@ -462,8 +464,10 @@ void FEM_Simulator::initializeModel()
 	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
 	like */
 	this->createKMF();
+	this->fluenceUpdate = false;
 
 	this->applyParameters();
+	this->parameterUpdate = false;
 
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
@@ -584,8 +588,6 @@ std::array<int, 3> FEM_Simulator::positionToElement(std::array<float, 3>& positi
 	return elementLocation;
 
 }
-
-
 
 float FEM_Simulator::calculateNA(float xi[3], int Ai)
 {
@@ -1173,6 +1175,8 @@ void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> 
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
+
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
@@ -1180,6 +1184,7 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 	this->FluenceRate = FluenceRate;
 	//TODO Check for element or nodal FluenceRate;
 	this->elemNFR = false;
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
@@ -1224,6 +1229,8 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 		// increase x pos 
 		xPos = xPos + xStep;
 	}
+
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {
@@ -1267,18 +1274,22 @@ void FEM_Simulator::setLayer(float layerHeight, int elemsInLayer) {
 
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setVHC(float VHC) {
 	this->VHC = VHC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setFlux(float heatFlux)
