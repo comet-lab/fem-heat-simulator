@@ -61,6 +61,8 @@ int main()
     simulator.silentMode = true;
     simulator.createKMF();
     for (int i = 0; i < 20; i++) {
+        simulator.setFluenceRate(laserPose, 1, 0.0168);
+        simulator.createFirr();
         simulator.performTimeStepping(totalTime);
     }
     
@@ -73,6 +75,7 @@ int main()
 
     simCopy.initializeModel();
     for (int i = 0; i < 20; i++) {
+        simCopy.setFluenceRate(laserPose, 1, 0.0168);
         simCopy.multiStep(totalTime);
     }
 

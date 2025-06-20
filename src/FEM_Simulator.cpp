@@ -1,9 +1,4 @@
 #include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -107,7 +102,7 @@ void FEM_Simulator::performTimeStepping(float duration)
 	// set temperature sensor at first time step
 	this->initializeSensorTemps(duration);
 	this->updateTemperatureSensors(0);
-	startTime = this->printDuration("D initialized: ", startTime);
+	startTime = this->printDuration("Time Stepping initialized: ", startTime);
 
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
@@ -151,14 +146,16 @@ void FEM_Simulator::multiStep(float duration) {
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
 	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
+	auto startTime = std::chrono::high_resolution_clock::now();
 	this->initializeSensorTemps(duration);
 	this->updateTemperatureSensors(0);
 	int numSteps = round(duration / this->deltaT);
 	for (int t = 1; t <= numSteps; t++) {
 		this->singleStep();
-
 		this->updateTemperatureSensors(t);
 	}
+
+	startTime = this->printDuration("Time Stepping Completed: ", startTime);
 }
 
 void FEM_Simulator::singleStep() {
@@ -466,6 +463,7 @@ void FEM_Simulator::initializeModel()
 	this->createKMF();
 	this->fluenceUpdate = false;
 
+	auto startTime = std::chrono::high_resolution_clock::now();
 	this->applyParameters();
 	this->parameterUpdate = false;
 
@@ -489,6 +487,8 @@ void FEM_Simulator::initializeModel()
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
+	startTime = this->printDuration("Time Stepping Initialized: ", startTime);
+
 	// Prepare solver for future iterations
 	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
 	this->LHS.makeCompressed();
@@ -499,7 +499,7 @@ void FEM_Simulator::initializeModel()
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-	
+	startTime = this->printDuration("Initial Matrix Factorization Complete: ", startTime);
 	// We are now ready to call single step
 }
 
