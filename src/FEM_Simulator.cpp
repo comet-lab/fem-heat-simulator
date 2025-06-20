@@ -38,7 +38,6 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->FluenceRate = inputSim.FluenceRate; // Our values for Heat addition
 	this->alpha = inputSim.alpha; // time step weight
 	this->deltaT = inputSim.deltaT; // time step [s]
-	this->tFinal = inputSim.tFinal; // total duration of simulation [s]
 	this->heatFlux = inputSim.heatFlux; // heat escaping the Neumann Boundary
 	this->HTC = inputSim.HTC; // convective heat transfer coefficient [W/cm^2]
 	this->Nn1d = inputSim.Nn1d;
@@ -89,8 +88,8 @@ void FEM_Simulator::performTimeStepping(float duration)
 
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
 	// Initialize d, v, and dTilde vectors
-	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
-	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
+	this->dVec.resize(nNodes - dirichletNodes.size());
+	this->vVec.resize(nNodes - dirichletNodes.size());
 	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	int counter = 0;
@@ -173,23 +172,26 @@ void FEM_Simulator::singleStep() {
 	}
 	if (false) { // Check if parameters have changed
 		this->applyParameters(); // Apply parameters
-		Eigen::SparseMatrix<float> LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
-		LHS.makeCompressed(); // compress it for potential speed improvements
-		this->cgSolver.factorize(LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
+		this->LHS.makeCompressed(); // compress it for potential speed improvements
+		this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+		if (this->cgSolver.info() != Eigen::Success) {
+			std::cout << "Decomposition Failed" << std::endl;
+		}
 	}
-
+	//this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	// Explicit Forward Step (only if alpha < 1)
-	this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec;
-	// Create Right-hand side of v(M + alpha*deltaT*K) = (F - K*dVec);
-	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec;
+	this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec; // normally the output of this equation is assigned to dTilde for clarity...
+	// Create Right-hand side of v(M + alpha*deltaT*K) = (F - K*dTilde);
+	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
 	// Solve Ax = b using conjugate gradient
 	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
-	vVec = this->cgSolver.solveWithGuess(RHS, this->vVec);
+	this->vVec = this->cgSolver.solveWithGuess(RHS,this->vVec);
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Issue With Solver" << std::endl;
 	}
 	// Implicit Backward Step (only if alpha > 0) 
-	this->dVec = this->dVec + this->alpha * this->deltaT * vVec;
+	this->dVec = this->dVec + this->alpha * this->deltaT * vVec; // ... dTilde would also be on the righ-hand side here. 
 
 	// Adjust our Temp with new d vector
 	this->Temp(validNodes) = this->dVec;
@@ -468,29 +470,31 @@ void FEM_Simulator::initializeModel()
 	// Initialize d, v, and dTilde vectors
 	this->dVec.resize(nNodes - dirichletNodes.size());
 	this->vVec.resize(nNodes - dirichletNodes.size());
+	
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
-	int counter = 0;
-	for (int n : validNodes) {
-		this->dVec(counter) = this->Temp(n);
-		counter++;
-	}
+	this->dVec = this->Temp(validNodes);
+
 	if (this->alpha < 1) { 
 		// Perform the conjugate gradiant to compute the initial vVec value
 		// This is a bit odd because if the user hasn't specified the initial fluence rate it will be 0 initially. 
 		// And can mess up the first few timesteps
-		cgSolver.compute(this->globM);
-		Eigen::VectorXf RHSinit = (globF)-globK * dVec;
-		vVec = cgSolver.solve(RHSinit);
+		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
+		initSolver.compute(this->globM);
+		Eigen::VectorXf RHSinit = (this->globF) - this->globK * this->dVec;
+		vVec = initSolver.solve(RHSinit);
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
 	// Prepare solver for future iterations
-	Eigen::SparseMatrix<float> LHS = globM + this->alpha * this->deltaT * globK;
-	LHS.makeCompressed();
+	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
+	this->LHS.makeCompressed();
 	// These two steps form the cgSolver.compute() function. By calling them separately, we 
 	// only ever need to call factorize when the tissue properties change.
-	this->cgSolver.analyzePattern(LHS);
-	this->cgSolver.factorize(LHS);
+	this->cgSolver.analyzePattern(this->LHS);
+	this->cgSolver.factorize(this->LHS);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Decomposition Failed" << std::endl;
+	}
 	
 	// We are now ready to call single step
 }

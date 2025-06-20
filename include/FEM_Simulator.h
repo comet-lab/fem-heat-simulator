@@ -110,6 +110,7 @@ public:
 	by how they are created (e.g. conduction, laser, etc). These are saved as class attributes because
 	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
+	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
