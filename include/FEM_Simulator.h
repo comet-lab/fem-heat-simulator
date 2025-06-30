@@ -40,9 +40,8 @@ public:
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(FEM_Simulator& inputSim);
-	void performTimeStepping(float duration); // performs time integration after global matrices are created
-	void multiStep(float duration);
-	void singleStep();
+	void multiStep(float duration); // simulates multiple steps of time integration
+	void singleStep(); // simulates a single step of time integration
 	void createKMF(); // creates global matrices and performs spatial discretization
 	void createFirr(); // creates only the Forcing vector for the fluence rate
 	void applyParameters();
@@ -118,7 +117,8 @@ public:
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	
-	Eigen::VectorXf Firr; // forcing function due to irradiance
+	Eigen::SparseMatrix<float> FirrMat; // forcing function due to irradiance when multiplied by nodal fluence rate
+	Eigen::VectorXf FirrElem; // forcing function due to irradiance when using elemental fluence rate
 	Eigen::VectorXf Fconv; // forcing functino due to convection
 	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes
 	Eigen::VectorXf Fq; // forcing function due to constant heatFlux boundary
@@ -126,7 +126,7 @@ public:
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::MatrixXf KeInt; // Elemental Construction of Kint
 	Eigen::MatrixXf Me; // Elemental construction of M
-	Eigen::MatrixXf FeIrr; // Elemental Construction of Firr
+	Eigen::MatrixXf FeIrr; // Elemental Construction of FirrElem
 	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
 	Eigen::MatrixXf FeQ; // Element Construction of Fq
 	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A

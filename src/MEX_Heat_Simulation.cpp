@@ -136,6 +136,7 @@ public:
         stream.str("");
         stream << "Start of () function" << std::endl;
         displayOnMATLAB(stream);
+        float simDuration;
         try {
             
             // Have to convert T0 and FluenceRate to std::vector<<<float>>>
@@ -149,7 +150,7 @@ public:
             tissueSize[2] = inputs[2][2];
             
             // Get time step and final time
-            float tFinal = inputs[3][0];
+            simDuration = inputs[3][0];
             float deltaT = inputs[4][0];
 
             // Extract tissue properties
@@ -187,8 +188,6 @@ public:
             this->simulator->setTissueSize(tissueSize);
             // set the layer info
             this->simulator->setLayer(layerHeight, elemsInLayer);
-            // set the final time
-            this->simulator->tFinal = tFinal;
             // set the time step
             this->simulator->deltaT = deltaT;
             // set the tissue properties
@@ -202,7 +201,7 @@ public:
             this->simulator->setFlux(heatFlux);
 
             //print statements 
-            stream << "Final Time: " << this->simulator->tFinal << "\nTime step: " << this->simulator->deltaT << std::endl;
+            stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator->deltaT << std::endl;
             displayOnMATLAB(stream);
             stream << "TC: " << this->simulator->TC << ", MUA: " << this->simulator->MUA << ", VHC: " << this->simulator->VHC << ", HTC: " << this->simulator->HTC << std::endl;
             displayOnMATLAB(stream);
@@ -246,10 +245,9 @@ public:
 
         // Create global K M and F 
         if (this->createAllMatrices) { // only need to create the KMF matrices the first time
-            this->createAllMatrices = false;
-            this->createFirrMatrix = false;
+            this->createAllMatrices = false
             try {
-                this->simulator->createKMF();
+                this->simulator->initializeModel();
                 stream << "Global matrices created" << std::endl;
                 displayOnMATLAB(stream);
             }
@@ -260,16 +258,10 @@ public:
                 return;
             }
         }
-        else if (this->createFirrMatrix) {
-            this->createFirrMatrix = false;
-            this->simulator->createFirr();
-            stream << "Firr Matrix created" << std::endl;
-            displayOnMATLAB(stream);
-        }
 
         // Perform time stepping
         try { //
-            this->simulator->performTimeStepping();
+            this->simulator->multiStep(simDuration);
             stream << "Time Stepping Complete" << std::endl;
             displayOnMATLAB(stream);
         }
@@ -306,7 +298,7 @@ public:
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
-            displayError("At least 10 inputs required: T0, NFR, tissueSize, tFinal,"
+            displayError("At least 10 inputs required: T0, NFR, tissueSize, simDuration,"
                 "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
         }
         if (outputs.size() > 2) {
@@ -387,8 +379,8 @@ public:
         if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
         if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
 
-        // if our FluenceRate has changed, we need to reconstruct at least Firr
-        // TODO make it so that we only reconstruct Firr instead of all of them
+        // if our FluenceRate has changed, we need to reconstruct at least FirrElem
+        // TODO make it so that we only reconstruct FirrElem instead of all of them
         for (int k = 0; k < FluenceRate[0][0].size(); k++) {
             if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
             for (int j = 0; j < FluenceRate[0].size(); j++) {

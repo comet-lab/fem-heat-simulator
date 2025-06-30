@@ -59,29 +59,15 @@ int main()
 
     float totalTime = 0.05f;
     simulator.silentMode = true;
-    simulator.createKMF();
+    simulator.initializeModel();
     for (int i = 0; i < 20; i++) {
         simulator.setFluenceRate(laserPose, 1, 0.0168);
-        simulator.createFirr();
-        simulator.performTimeStepping(totalTime);
+        simulator.multiStep(totalTime);
     }
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
-
-    std::cout << "Using multiStep" << std::endl;
-    start = std::chrono::high_resolution_clock::now();
-
-    simCopy.initializeModel();
-    for (int i = 0; i < 20; i++) {
-        simCopy.setFluenceRate(laserPose, 1, 0.0168);
-        simCopy.multiStep(totalTime);
-    }
-
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "FEA Duration: " << duration.count() / 1000000.0 << std::endl;
     
     /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {
