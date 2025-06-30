@@ -665,10 +665,10 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 	femSimQuad->setAmbientTemp(0);
 	femSimQuad->setFluenceRate(FluenceRate);
 
-	femSimLin->createKMF();
-	femSimLin->performTimeStepping(1.0f);
-	femSimQuad->createKMF();
-	femSimQuad->performTimeStepping(1.0f);
+	femSimLin->initializeModel();
+	femSimLin->multiStep(1.0f);
+	femSimQuad->initializeModel();
+	femSimQuad->multiStep(1.0f);
 
 	for (int k = 0; k < nodesPerAxis[2]; k++) {
 		for (int j = 0; j < nodesPerAxis[1]; j++) {
