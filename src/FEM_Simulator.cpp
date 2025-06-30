@@ -79,6 +79,10 @@ void FEM_Simulator::multiStep(float duration) {
 	this->initializeSensorTemps(duration);
 	this->updateTemperatureSensors(0);
 	int numSteps = round(duration / this->deltaT);
+	if (!this->silentMode) {
+		std::cout << "Number of Steps: " << numSteps << std::endl;
+	}
+
 	for (int t = 1; t <= numSteps; t++) {
 		this->singleStep();
 		this->updateTemperatureSensors(t);
@@ -92,16 +96,19 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
+	
+
 	if (this->fluenceUpdate){ // check if fluence rate has changed
 		if (this->elemNFR)
 		{ 
 			createFirr();
 		}
-		this->applyParameters();
 		this->fluenceUpdate = false;
 	}
+
+	this->applyParameters(); // This needs to be done if fluence is updated or if parameters are updated, but only after Firr is updated 
+
 	if (this->parameterUpdate) { // Check if parameters have changed
-		this->applyParameters(); // Apply parameters
 		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
 		this->LHS.makeCompressed(); // compress it for potential speed improvements
 		this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
