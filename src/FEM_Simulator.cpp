@@ -33,7 +33,6 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->FluenceRate = inputSim.FluenceRate; // Our values for Heat addition
 	this->alpha = inputSim.alpha; // time step weight
 	this->deltaT = inputSim.deltaT; // time step [s]
-	this->tFinal = inputSim.tFinal; // total duration of simulation [s]
 	this->heatFlux = inputSim.heatFlux; // heat escaping the Neumann Boundary
 	this->HTC = inputSim.HTC; // convective heat transfer coefficient [W/cm^2]
 	this->Nn1d = inputSim.Nn1d;
@@ -71,33 +70,21 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->nodeMap = inputSim.nodeMap;
 }
 
-void FEM_Simulator::performTimeStepping()
+void FEM_Simulator::performTimeStepping(float duration)
 {	/* this function performs the time integration for the specified duration using the euler family.
 	Each step is solved using conjugate gradient */
 	auto startTime = std::chrono::high_resolution_clock::now();
-	auto stopTime = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 
-
-	/* Here we assume constant tissue properties throughout the mesh. This allows us to 
-	multiply by tissue specific properties after the element construction, which means we can change
-	tissue properties without having to reconstruct the matrices 
-	*/
-	// Apply parameter specific multiplication for each global matrix.
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globK = this->Kint*this->TC + this->Kconv*this->HTC;
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
-	Eigen::VectorXf globF = this->Firr*this->MUA + this->Fconv*this->HTC + this->Fq + this->Fk*this->TC;
+	this->applyParameters();
 
 	// get total number of elements and nodes
 	int numElems = this->elementsPerAxis[0] * this->elementsPerAxis[1] * this->elementsPerAxis[2];
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 
-	this->initializeSensorTemps();
-
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
 	// Initialize d, v, and dTilde vectors
-	Eigen::VectorXf dVec(nNodes - dirichletNodes.size());
-	Eigen::VectorXf vVec(nNodes - dirichletNodes.size());
+	this->dVec.resize(nNodes - dirichletNodes.size());
+	this->vVec.resize(nNodes - dirichletNodes.size());
 	Eigen::VectorXf dTilde(nNodes - dirichletNodes.size());
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	int counter = 0;
@@ -113,50 +100,36 @@ void FEM_Simulator::performTimeStepping()
 	vVec = initSolver.solve(RHSinit);
 
 	// set temperature sensor at first time step
-	this->updateTemperatureSensors(0, dVec);
-	if (!this->silentMode) {
-		stopTime = std::chrono::high_resolution_clock::now();
-		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << "D initialized: " << duration.count() / 1000000.0 << std::endl;
-		startTime = stopTime;
-	}
+	this->initializeSensorTemps(duration);
+	this->updateTemperatureSensors(0);
+	startTime = this->printDuration("Time Stepping initialized: ", startTime);
 
 	// Perform TimeStepping
 	// Eigen documentation says using Lower|Upper gives the best performance for the solver with a full matrix. 
-	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> solver;
 	Eigen::SparseMatrix<float> LHS = globM + this->alpha * this->deltaT * globK;
-	solver.compute(LHS);
-	if (solver.info() != Eigen::Success) {
+	LHS.makeCompressed();
+	this->cgSolver.compute(LHS);
+	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-	if (!this->silentMode) {
-		stopTime = std::chrono::high_resolution_clock::now();
-		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << "Matrix Factorized: " << duration.count() / 1000000.0 << std::endl;
-		startTime = stopTime;
-	}
+	startTime = this->printDuration("Matrix Factorized: ", startTime);
 
 	Eigen::VectorXf RHS;
-	for (float t = 1; t <= round(this->tFinal/this->deltaT); t ++) { 
+	for (float t = 1; t <= round(duration/this->deltaT); t ++) { 
 		// set dTilde which is the explicit step 
 		dTilde = dVec + (1 - this->alpha) * this->deltaT * vVec;	
 		RHS = globF - globK * dTilde;
 		// velocity should not change too much between time steps so we can use previous v to initial conjugate gradient. 
-		vVec = solver.solveWithGuess(RHS,vVec);
-		if (solver.info() != Eigen::Success) {
+		vVec = this->cgSolver.solveWithGuess(RHS,vVec);
+		if (this->cgSolver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
 		}
 		// combine explicit and implicit steps. 
 		dVec = dTilde + this->alpha * this->deltaT * vVec;
 
-		this->updateTemperatureSensors(t, dVec);
+		this->updateTemperatureSensors(t);
 	}
-	if (!this->silentMode) {
-		stopTime = std::chrono::high_resolution_clock::now();
-		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << "Time Stepping Completed: " << duration.count() / 1000000.0 << std::endl;
-		startTime = stopTime;
-	}
+	startTime = this->printDuration("Time Stepping Completed: ", startTime);
 
 	// Adjust our Temp with new d vector
 	counter = 0;
@@ -164,13 +137,63 @@ void FEM_Simulator::performTimeStepping()
 			this->Temp(n) = dVec(counter);
 			counter++;
 	}
+	 
+	startTime = this->printDuration("Updated Temp Variable: ", startTime);
+}
 
-	if (!this->silentMode) {
-		stopTime = std::chrono::high_resolution_clock::now();
-		duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << "Updated Temp Variable: " << duration.count() / 1000000.0 << std::endl;
-		startTime = stopTime;
+void FEM_Simulator::multiStep(float duration) {
+	/* This function simulates multiple steps of the heat equation. A single step duration is given by deltaT. If the total
+	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
+	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
+	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
+	auto startTime = std::chrono::high_resolution_clock::now();
+	this->initializeSensorTemps(duration);
+	this->updateTemperatureSensors(0);
+	int numSteps = round(duration / this->deltaT);
+	for (int t = 1; t <= numSteps; t++) {
+		this->singleStep();
+		this->updateTemperatureSensors(t);
 	}
+
+	startTime = this->printDuration("Time Stepping Completed: ", startTime);
+}
+
+void FEM_Simulator::singleStep() {
+	/* Simulates a single step of the heat equation. A single step is given by the duration deltaT. To run single step,
+	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
+	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
+
+	if (this->fluenceUpdate){ // check if fluence rate has changed
+		createFirr();
+		this->applyParameters();
+		this->fluenceUpdate = false;
+	}
+	if (this->parameterUpdate) { // Check if parameters have changed
+		this->applyParameters(); // Apply parameters
+		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
+		this->LHS.makeCompressed(); // compress it for potential speed improvements
+		this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+		if (this->cgSolver.info() != Eigen::Success) {
+			std::cout << "Decomposition Failed" << std::endl;
+		}
+		this->parameterUpdate = false;
+	}
+	//this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+	// Explicit Forward Step (only if alpha < 1)
+	this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec; // normally the output of this equation is assigned to dTilde for clarity...
+	// Create Right-hand side of v(M + alpha*deltaT*K) = (F - K*dTilde);
+	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
+	// Solve Ax = b using conjugate gradient
+	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
+	this->vVec = this->cgSolver.solveWithGuess(RHS,this->vVec);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Issue With Solver" << std::endl;
+	}
+	// Implicit Backward Step (only if alpha > 0) 
+	this->dVec = this->dVec + this->alpha * this->deltaT * vVec; // ... dTilde would also be on the righ-hand side here. 
+
+	// Adjust our Temp with new d vector
+	this->Temp(validNodes) = this->dVec;
 }
 
 void FEM_Simulator::createKMF()
@@ -416,7 +439,71 @@ void FEM_Simulator::createFirr()
 	}
 }
 
-void FEM_Simulator::initializeSensorTemps() {
+void FEM_Simulator::applyParameters()
+{
+	/* Here we assume constant tissue properties throughout the mesh. This allows us to
+	multiply by tissue specific properties after the element construction, which means we can change
+	tissue properties without having to reconstruct the matrices
+	*/
+	// Apply parameter specific multiplication for each global matrix.
+	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
+	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	this->globF = this->Firr * this->MUA + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+}
+
+void FEM_Simulator::initializeModel()
+{ 
+	/* initializeModel gets the system ready to perform time stepping. This function needs to be called whenever
+	the geometry of the tissue changes. This includes things like changing the number of nodes, changing the boundary
+	conditions, changing the layers in the mesh, etc. This function also needs to be called if alpha or the time step 
+	changes. 
+	
+	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
+	like */
+	this->createKMF();
+	this->fluenceUpdate = false;
+
+	auto startTime = std::chrono::high_resolution_clock::now();
+	this->applyParameters();
+	this->parameterUpdate = false;
+
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
+	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
+	// Initialize d, v, and dTilde vectors
+	this->dVec.resize(nNodes - dirichletNodes.size());
+	this->vVec.resize(nNodes - dirichletNodes.size());
+	
+	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
+	this->dVec = this->Temp(validNodes);
+
+	if (this->alpha < 1) { 
+		// Perform the conjugate gradiant to compute the initial vVec value
+		// This is a bit odd because if the user hasn't specified the initial fluence rate it will be 0 initially. 
+		// And can mess up the first few timesteps
+		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
+		initSolver.compute(this->globM);
+		Eigen::VectorXf RHSinit = (this->globF) - this->globK * this->dVec;
+		vVec = initSolver.solve(RHSinit);
+	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
+	// needed for explicit steps. 
+
+	startTime = this->printDuration("Time Stepping Initialized: ", startTime);
+
+	// Prepare solver for future iterations
+	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
+	this->LHS.makeCompressed();
+	// These two steps form the cgSolver.compute() function. By calling them separately, we 
+	// only ever need to call factorize when the tissue properties change.
+	this->cgSolver.analyzePattern(this->LHS);
+	this->cgSolver.factorize(this->LHS);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Decomposition Failed" << std::endl;
+	}
+	startTime = this->printDuration("Initial Matrix Factorization Complete: ", startTime);
+	// We are now ready to call single step
+}
+
+void FEM_Simulator::initializeSensorTemps(float duration) {
 	// Create sensorTemperature Vectors and reserve sizes
 	int nSensors = this->tempSensorLocations.size();
 	if (nSensors == 0) { // if there weren't any sensors added, put one at 0,0,0
@@ -425,11 +512,11 @@ void FEM_Simulator::initializeSensorTemps() {
 	}
 	this->sensorTemps.resize(nSensors);
 	for (int s = 0; s < nSensors; s++) {
-		this->sensorTemps[s].resize(round(this->tFinal / deltaT) + 1);
+		this->sensorTemps[s].resize(round(duration / deltaT) + 1);
 	}
 }
 
-void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec) {
+void FEM_Simulator::updateTemperatureSensors(int timeIdx) {
 	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
 	int nSensors = this->tempSensorLocations.size();
 	int Nne = pow(this->Nn1d, 3);
@@ -454,7 +541,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx, Eigen::VectorXf& dVec)
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 			// add temperature contribution of node
 			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * dVec(this->nodeMap[globalNode]);
+				tempValue += this->calculateNA(xi, Ai) * this->dVec(this->nodeMap[globalNode]);
 			}
 			else { // dirichlet node
 				tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);
@@ -1088,6 +1175,8 @@ void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> 
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
+
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
@@ -1095,6 +1184,7 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 	this->FluenceRate = FluenceRate;
 	//TODO Check for element or nodal FluenceRate;
 	this->elemNFR = false;
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
@@ -1139,6 +1229,8 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 		// increase x pos 
 		xPos = xPos + xStep;
 	}
+
+	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {
@@ -1182,18 +1274,22 @@ void FEM_Simulator::setLayer(float layerHeight, int elemsInLayer) {
 
 void FEM_Simulator::setTC(float TC) {
 	this->TC = TC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setVHC(float VHC) {
 	this->VHC = VHC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setMUA(float MUA) {
 	this->MUA = MUA;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setHTC(float HTC) {
 	this->HTC = HTC;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setFlux(float heatFlux)
@@ -1329,4 +1425,15 @@ void FEM_Simulator::setKeConv() {
 			}
 		}
 	}
+}
+
+std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {
+	if (!this->silentMode) {
+		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+		std::cout << message << duration.count() / 1000000.0 << std::endl;
+		startTime = stopTime;
+		
+	}
+	return startTime;
 }

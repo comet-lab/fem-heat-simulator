@@ -7,7 +7,7 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    int nodesPerAxis[3] = { 101,101,100 };
+    int nodesPerAxis[3] = { 41,41,50 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
     std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
@@ -21,7 +21,7 @@ int main()
             }
         }
     }
-    auto start = std::chrono::high_resolution_clock::now();
+    
 
     
     int Nn1d = 2;
@@ -37,7 +37,6 @@ int main()
     std::cout << "Object Created " << std::endl;
 
     simulator.deltaT = 0.05f;
-    simulator.tFinal = 5.0f;
     int BC[6] = { 2,0,0,0,0,0 };
     simulator.setBoundaryConditions(BC);
     simulator.setFlux(0.0f);
@@ -45,7 +44,7 @@ int main()
 
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.95f}, {1,0,0}, {0,1,0},{0,0,1} };
     simulator.setSensorLocations(tempSensorLocations);
-
+    FEM_Simulator simCopy = FEM_Simulator(simulator);
     std::cout << "Running FEA" << std::endl;
 
 #ifdef _OPENMP
@@ -56,19 +55,35 @@ int main()
     Eigen::setNbThreads(1);
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
 
-    float totalTime = simulator.tFinal;
+    float totalTime = 0.05f;
+    simulator.silentMode = true;
     simulator.createKMF();
-
-    for (int i = 0; i < round(totalTime / simulator.tFinal); i++) {
-        
-        simulator.performTimeStepping();
-    }    
+    for (int i = 0; i < 20; i++) {
+        simulator.setFluenceRate(laserPose, 1, 0.0168);
+        simulator.createFirr();
+        simulator.performTimeStepping(totalTime);
+    }
     
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
 
+    std::cout << "Using multiStep" << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+
+    simCopy.initializeModel();
+    for (int i = 0; i < 20; i++) {
+        simCopy.setFluenceRate(laserPose, 1, 0.0168);
+        simCopy.multiStep(totalTime);
+    }
+
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "FEA Duration: " << duration.count() / 1000000.0 << std::endl;
+    
+    /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {
         for (int k = 0; k < nodesPerAxis[2]; k++) {
             for (int j = 0; j < nodesPerAxis[1]; j++) {
