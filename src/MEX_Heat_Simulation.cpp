@@ -245,7 +245,7 @@ public:
 
         // Create global K M and F 
         if (this->createAllMatrices) { // only need to create the KMF matrices the first time
-            this->createAllMatrices = false
+            this->createAllMatrices = false;
             try {
                 this->simulator->initializeModel();
                 stream << "Global matrices created" << std::endl;
