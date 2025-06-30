@@ -54,6 +54,8 @@ To construct a basic simulation object, you need the following information
 - ``HTC``: the heat transfer coefficient [ $\frac{\text{W}}{\text{cm}^2~^o\text{C}}$ ]
 - ``Nn1d``: the number of nodes along one dimension of an element. For linear basis functions use 2. For quadratic basis functions use 3. Some functionality may not be available with quadratic basis functions.
 
+To initialize the model, call the function ``FEM_Simulator::initializeModel()``. This will perform the spatial discretization and get the system ready
+to perform the time integration. Then call either ``FEM_Simulator::SingleStep()`` or ``FEM_Simulator::MultiStep()`` to simulate the time stepping. 
 To perform the spatial discretization, run the function ``FEM_Simulator::createKMF()`` and perform the time stepping using
 the function ``FEM_Simulator::performTimeStepping()``.
 If there are no changes to the tissue geometry, number of nodes, boundary conditions, or laser input, the matrices do not need to be rebuilt

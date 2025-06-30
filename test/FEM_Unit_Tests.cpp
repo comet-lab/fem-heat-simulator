@@ -581,6 +581,38 @@ TEST_F(BaseSim, TestCreateFjFunction1)
 	//EXPECT_TRUE(((1 / 864.0f * TC) - Me(2, 0)) < 0.0001);
 }
 
+TEST_F(BaseSim, TestSetFeIrr1)
+{
+	int Ai = 0;
+	int Bi = 0;
+	float xi[3];
+	xi[0] = 0;
+	xi[1] = 0;
+	xi[2] = 0;
+
+
+	Eigen::Matrix<float, 8, 8> FeIrr;
+	FeIrr << 8, 4, 4, 2, 4, 2, 2, 1, 
+		    4, 8, 2, 4, 2, 4, 1, 2,
+		4, 2, 8, 4, 2, 1, 4, 2,
+		2, 4, 4, 8, 1, 2, 2, 4,
+		4, 2, 2, 1, 8, 4, 4, 2,
+		2, 4, 1, 2, 4, 8, 2, 4,
+		2, 1, 4, 2, 4, 2, 8, 4,
+		1, 2, 2, 4, 2, 4, 4, 8;
+
+	femSimLin->setJ();
+	FeIrr = FeIrr * femSimLin->J.determinant()/27.0f; // Assuming jacobian is constant in element which is fine for cuboids 
+
+	femSimLin->setFeIrr();
+
+	for (int Ai = 0; Ai < 8; Ai++) {
+		for (int Bi = 0; Bi < 8; Bi++) {
+			ASSERT_FLOAT_EQ(femSimLin->FeIrr(Ai, Bi), FeIrr(Ai, Bi));
+		}
+	}
+}
+
 TEST_F(BaseSim, testCopyConstructor) {
 
 	FEM_Simulator* femSim = new FEM_Simulator(*femSimLin);
@@ -622,23 +654,21 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 	FEM_Simulator* femSimQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
 
 	femSimLin->deltaT = 0.05f;
-	femSimLin->tFinal = 1.0f;
 	femSimLin->setBoundaryConditions(BC);
 	femSimLin->setFlux(0);
 	femSimLin->setAmbientTemp(0);
 	femSimLin->setFluenceRate(FluenceRate);
 
 	femSimQuad->deltaT = 0.05f;
-	femSimQuad->tFinal = 1.0f;
 	femSimQuad->setBoundaryConditions(BC);
 	femSimQuad->setFlux(0);
 	femSimQuad->setAmbientTemp(0);
 	femSimQuad->setFluenceRate(FluenceRate);
 
 	femSimLin->createKMF();
-	femSimLin->performTimeStepping();
+	femSimLin->performTimeStepping(1.0f);
 	femSimQuad->createKMF();
-	femSimQuad->performTimeStepping();
+	femSimQuad->performTimeStepping(1.0f);
 
 	for (int k = 0; k < nodesPerAxis[2]; k++) {
 		for (int j = 0; j < nodesPerAxis[1]; j++) {
@@ -777,12 +807,6 @@ TEST(SecondaryTest, testSetSensorTemps) {
 	femSimLin->initializeBoundaryNodes();
 
 	int nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
-	Eigen::VectorXf dVec(nNodes - femSimLin->dirichletNodes.size());
-	int counter = 0;
-	for (int n : femSimLin->validNodes) {
-		dVec(counter) = femSimLin->Temp(n);
-		counter++;
-	}
 
 	std::vector<std::array<float, 3>> sensorLocations = { 
 		{ -1, -1, 0 },
@@ -794,9 +818,12 @@ TEST(SecondaryTest, testSetSensorTemps) {
 		{ 0.25, -0.25, 0.045 }
 		};
 
+	float laserPose[6] = { 0,0,0,0,0,0 };
+	femSimLin->setFluenceRate(laserPose, 0, 0.1);
+	femSimLin->initializeModel();
 	femSimLin->setSensorLocations(sensorLocations);
-	femSimLin->initializeSensorTemps();
-	femSimLin->updateTemperatureSensors(0, dVec);
+	femSimLin->initializeSensorTemps(1.0f);
+	femSimLin->updateTemperatureSensors(0);
 
 	std::vector<float> expectedSensorTemp = {0,220,1047,8819,4795.5,6444,2154.5};
 
