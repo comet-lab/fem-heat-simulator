@@ -20,7 +20,6 @@ private:
     bool silentMode = true;
     bool useAllCPUs = true;
     bool createAllMatrices = true;
-    bool createFirrMatrix = true;
     float layerHeight = 1;
     int elemsInLayer = 1;
     int Nn1d = 2;
@@ -379,21 +378,6 @@ public:
         if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
         if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
 
-        // if our FluenceRate has changed, we need to reconstruct at least FirrElem
-        // TODO make it so that we only reconstruct FirrElem instead of all of them
-        for (int k = 0; k < FluenceRate[0][0].size(); k++) {
-            if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
-            for (int j = 0; j < FluenceRate[0].size(); j++) {
-                if (this->createFirrMatrix) break; // flags for breaking out of nested loop
-                for (int i = 0; i < FluenceRate.size(); i++) {
-                    if (abs(this->simulator->FluenceRate(i + j*FluenceRate.size() + k*FluenceRate.size()*FluenceRate[0].size()) - FluenceRate[i][j][k]) > 0.0001) { // check if difference is greater than 1e-4
-                        this->createFirrMatrix = true;
-                        break;
-                    }
-                }
-            }
-        }
-
         // if our tissue size has changed we need to reconstruct all matrices because our jacobian has changed
         if (tissueSize[0] != this->simulator->tissueSize[0]) this->createAllMatrices = true;
         if (tissueSize[1] != this->simulator->tissueSize[1]) this->createAllMatrices = true;
@@ -413,10 +397,6 @@ public:
 
         if (this->createAllMatrices) {
             stream << "Need to recreate Matrices" << std::endl;
-            displayOnMATLAB(stream);
-        }
-        else if (this->createFirrMatrix) {
-            stream << "Need to recreate Firr Matrix Only" << std::endl;
             displayOnMATLAB(stream);
         }
 
