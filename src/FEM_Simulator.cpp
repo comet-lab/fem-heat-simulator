@@ -1,4 +1,5 @@
 #include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -106,7 +107,10 @@ void FEM_Simulator::singleStep() {
 		this->fluenceUpdate = false;
 	}
 
-	this->applyParameters(); // This needs to be done if fluence is updated or if parameters are updated, but only after Firr is updated 
+	if (this->fluenceUpdate || this->parameterUpdate) {
+		// This needs to be done if fluence is updated or if parameters are updated, but only after Firr is updated 
+		this->applyParameters(); 
+	}
 
 	if (this->parameterUpdate) { // Check if parameters have changed
 		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
@@ -117,6 +121,9 @@ void FEM_Simulator::singleStep() {
 		}
 		this->parameterUpdate = false;
 	}
+	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
+	this->dVec = this->Temp(validNodes);
+
 	//this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	// Explicit Forward Step (only if alpha < 1)
 	this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec; // normally the output of this equation is assigned to dTilde for clarity...
@@ -1179,6 +1186,12 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 	}
 
 	this->fluenceUpdate = true;
+}
+
+void FEM_Simulator::setDeltaT(float deltaT)
+{
+	this->deltaT = deltaT;
+	this->parameterUpdate = true;
 }
 
 void FEM_Simulator::setTissueSize(float tissueSize[3]) {

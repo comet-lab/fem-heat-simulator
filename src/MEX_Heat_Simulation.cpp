@@ -188,7 +188,7 @@ public:
             // set the layer info
             this->simulator->setLayer(layerHeight, elemsInLayer);
             // set the time step
-            this->simulator->deltaT = deltaT;
+            this->simulator->setDeltaT(deltaT);
             // set the tissue properties
             this->simulator->setMUA(MUA);
             this->simulator->setTC(TC);

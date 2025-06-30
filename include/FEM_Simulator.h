@@ -59,6 +59,7 @@ public:
 	void setFluenceRate(Eigen::VectorXf& FluenceRate);
 	void setFluenceRate(float laserPose[6], float laserPower, float beamWaist);
 	void setTissueSize(float tissueSize[3]);
+	void setDeltaT(float deltaT);
 	void setLayer(float layerHeight, int elemsInLayer);
 	void setTC(float TC);
 	void setVHC(float VHC);
