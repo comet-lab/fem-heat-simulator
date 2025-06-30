@@ -43,8 +43,8 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->Kint = inputSim.Kint; // Conductivity matrix for non-dirichlet nodes
 	this->Kconv = inputSim.Kconv; //Conductivity matrix due to convection
 	this->M = inputSim.M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
-	// Firr = Firr*muA + Fconv*h + Fk*kappa + Fq
-	this->Firr = inputSim.Firr; // forcing function due to irradiance
+	// FirrElem = FirrElem*muA + Fconv*h + Fk*kappa + Fq
+	this->FirrElem = inputSim.FirrElem; // forcing function due to irradiance
 	this->Fconv = inputSim.Fconv; // forcing functino due to convection
 	this->Fk = inputSim.Fk; // forcing function due conductivity matrix on dirichlet nodes
 	this->Fq = inputSim.Fq; // forcing function due to constant flux boundary
@@ -52,7 +52,7 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	this->KeInt = inputSim.KeInt; // Elemental Construction of Kint
 	this->Me = inputSim.Me; // Elemental construction of M
-	this->FeIrr = inputSim.FeIrr; // Elemental Construction of Firr
+	this->FeIrr = inputSim.FeIrr; // Elemental Construction of FirrElem
 	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
 	this->FeQ = inputSim.FeQ; // Element Construction of Fq
 	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
@@ -164,7 +164,10 @@ void FEM_Simulator::singleStep() {
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
 	if (this->fluenceUpdate){ // check if fluence rate has changed
-		createFirr();
+		if (this->elemNFR)
+		{ 
+			createFirr();
+		}
 		this->applyParameters();
 		this->fluenceUpdate = false;
 	}
@@ -227,7 +230,9 @@ void FEM_Simulator::createKMF()
 	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
 
 	// Initialize matrices so that we don't have to resize them later
-	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->FirrElem = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->FirrMat = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes);
+	this->FirrMat.reserve(Eigen::VectorXi::Constant(nNodes, pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	// TODO: make these three vectors sparse because they will only be non zero on the boundary nodes
 	this->Fconv = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 	this->Fk = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
@@ -312,7 +317,7 @@ void FEM_Simulator::createKMF()
 					} // iterate through faces
 				} // if node is a face
 
-				// for all nodes that are not on a surface
+				// for all nodes regardless of whether it is on a surface
 				for (int Bi = 0; Bi < Nne; Bi++) { // iterate again over local nodes
 					// this loop gets the effect of node Bi on node Ai. 
 
@@ -322,26 +327,23 @@ void FEM_Simulator::createKMF()
 
 					// get column in global matrix associated with local node Bi
 					matrixInd[1] = this->nodeMap[BglobalNodeIdx];
-					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to Kint and M and Firr
+					// Apply Fluence Rate regardless of what type of node B is 
+					if (elemNFR) {// element-wise FluenceRate so we assume each node on the element has FluenceRate
+						this->FirrElem(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
+					}
+					else {
+						this->FirrMat.coeffRef(matrixInd[0], BglobalNodeIdx) += this->FeIrr(Ai, Bi); // update matrix which will then multiplied by mua and fluenceRate
+					}
+
+					// Check if B is a dirichlet node for convection and thermal mass components
+					if (matrixInd[1] >= 0) { // Ai and Bi are both valid positions so we add it to Kint and M and FirrElem
 						this->Kint.coeffRef(matrixInd[0], matrixInd[1]) += this->KeInt(Ai, Bi);
 						//Ktriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->KeInt(Ai, Bi)));
 						this->M.coeffRef(matrixInd[0], matrixInd[1]) += this->Me(Ai, Bi);
 						//Mtriplets.push_back(Eigen::Triplet<float>(matrixInd[0], matrixInd[1], this->Me(Ai, Bi)));
-						if (elemNFR) {// element-wise FluenceRate so we assume each node on the element has FluenceRate
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
-						}
-						else {//nodal FluenceRate so use as given
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
-						}
 					}
-					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to Firr... could be an if - else
+					else if (matrixInd[1] < 0) { // valid row, but column is dirichlet node so we add to FirrElem... could be an if - else
 						this->Fk(matrixInd[0]) += -this->KeInt(Ai, Bi) * this->Temp(BglobalNodeIdx);
-						if (elemNFR) { // element-wise FluenceRate so we assume each node on the element has FluenceRate
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
-						}
-						else {//nodal FluenceRate so use as given
-							this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
-						}
 					} // if both are invalid we ignore, if column is valid but row is invalid we ignore
 				} // For loop through Bi
 			} // If our node is not a dirichlet node
@@ -352,6 +354,7 @@ void FEM_Simulator::createKMF()
 	this->Kconv.makeCompressed();
 	this->Kint.makeCompressed();
 	this->M.makeCompressed();
+	this->FirrMat.makeCompressed();
 
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::high_resolution_clock::now();
@@ -362,7 +365,7 @@ void FEM_Simulator::createKMF()
 
 void FEM_Simulator::createFirr()
 {
-	/* This function only recreates the global Firr matrix. For when we change the fluence rate, but nothing else*/
+	/* This function only recreates the global FirrElem matrix. For when we change the fluence rate, but nothing else*/
 	int nodeFace;
 	int matrixInd[2];
 	int elemNodeSize[3] = { this->Nn1d, this->Nn1d, this->Nn1d };
@@ -391,7 +394,9 @@ void FEM_Simulator::createFirr()
 	this->initializeElementMatrices(1); // Initialize the element matrices assuming we are in the first layer
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	// Initialize matrices so that we don't have to resize them later
-	this->Firr = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->FirrElem = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
+	this->FirrMat = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes);
+	this->FirrMat.reserve(Eigen::VectorXi::Constant(nNodes, pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 
 	bool layerFlag = false;
 	for (int e = 0; e < numElems; e++) {
@@ -423,10 +428,10 @@ void FEM_Simulator::createFirr()
 					BglobalNodeIdx = BglobalNodeSub[0] + BglobalNodeSub[1] * this->nodesPerAxis[0] + BglobalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 
 					if (elemNFR) {// element-wise FluenceRate so we assume each node on the element has FluenceRate
-						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
+						this->FirrElem(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(e);
 					}
 					else {//nodal FluenceRate so use as given
-						this->Firr(matrixInd[0]) += this->FeIrr(Ai, Bi) * this->FluenceRate(BglobalNodeIdx);
+						this->FirrMat.coeffRef(matrixInd[0], BglobalNodeIdx) += this->FeIrr(Ai, Bi); // update matrix which will then multiplied by mua and fluenceRate
 					}
 				} // For loop through Bi
 			} // If our node is not a dirichlet node
@@ -448,7 +453,14 @@ void FEM_Simulator::applyParameters()
 	// Apply parameter specific multiplication for each global matrix.
 	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
 	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
-	this->globF = this->Firr * this->MUA + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+	Eigen::VectorXf Firr;
+	if (elemNFR) { // Using Element based NFR so we just use assignment
+		Firr = this->FirrElem;
+	}
+	else { // to calculate Firr we post-multiply FirrMat by nodal irradiance
+		Firr = this->FirrMat * this->FluenceRate;
+	}
+	this->globF = this->MUA * this->FirrMat * this->FluenceRate + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
 }
 
 void FEM_Simulator::initializeModel()

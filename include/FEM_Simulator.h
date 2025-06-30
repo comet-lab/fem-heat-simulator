@@ -118,7 +118,8 @@ public:
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	
-	Eigen::VectorXf Firr; // forcing function due to irradiance
+	Eigen::SparseMatrix<float> FirrMat; // forcing function due to irradiance when multiplied by nodal fluence rate
+	Eigen::VectorXf FirrElem; // forcing function due to irradiance when using elemental fluence rate
 	Eigen::VectorXf Fconv; // forcing functino due to convection
 	Eigen::VectorXf Fk; // forcing function due conductivity matrix on dirichlet nodes
 	Eigen::VectorXf Fq; // forcing function due to constant heatFlux boundary
@@ -126,7 +127,7 @@ public:
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::MatrixXf KeInt; // Elemental Construction of Kint
 	Eigen::MatrixXf Me; // Elemental construction of M
-	Eigen::MatrixXf FeIrr; // Elemental Construction of Firr
+	Eigen::MatrixXf FeIrr; // Elemental Construction of FirrElem
 	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
 	Eigen::MatrixXf FeQ; // Element Construction of Fq
 	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A

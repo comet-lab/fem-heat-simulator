@@ -387,8 +387,8 @@ public:
         if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
         if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
 
-        // if our FluenceRate has changed, we need to reconstruct at least Firr
-        // TODO make it so that we only reconstruct Firr instead of all of them
+        // if our FluenceRate has changed, we need to reconstruct at least FirrElem
+        // TODO make it so that we only reconstruct FirrElem instead of all of them
         for (int k = 0; k < FluenceRate[0][0].size(); k++) {
             if (this->createFirrMatrix || this->createAllMatrices) break; // flag for breaking out of nested loop
             for (int j = 0; j < FluenceRate[0].size(); j++) {
