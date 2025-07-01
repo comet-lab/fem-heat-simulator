@@ -1057,8 +1057,17 @@ int FEM_Simulator::determineNodeFace(int globalNode)
 }
 
 void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
-	
-	this->Temp = Eigen::VectorXf::Zero(Temp.size() * Temp[0].size() * Temp[0][0].size());
+
+	int elementsPerAxis[3];
+	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
+		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
+	}
+	elementsPerAxis[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
+	elementsPerAxis[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
+	elementsPerAxis[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
+	this->setElementsPerAxis(elementsPerAxis);
+
+
 	// Convert nested vectors into a single column Eigen Vector. 
 	for (int i = 0; i < Temp.size(); i++) // associated with x and is columns of matlab matrix
 	{
@@ -1070,21 +1079,14 @@ void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 			}
 		}
 	}
-	int elementsPerAxis[3]; 
-	if (((Temp.size() - 1) % (this->Nn1d - 1) != 0)|| ((Temp[0].size() - 1) % (this->Nn1d - 1) != 0) || ((Temp[0][0].size() - 1) % (this->Nn1d - 1) != 0)) {
-		std::cout << "Invalid Node dimensions given the number of nodes in a single elemental axis" << std::endl;
-	}
-	elementsPerAxis[0] = (Temp.size() - 1) / (this->Nn1d - 1); // Temp contains the temperature at the nodes, so we need to subtract 1 to get the elements
-	elementsPerAxis[1] = (Temp[0].size() - 1) / (this->Nn1d - 1);
-	elementsPerAxis[2] = (Temp[0][0].size() - 1) / (this->Nn1d - 1);
-	this->setElementsPerAxis(elementsPerAxis);
+
 }
 
 void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 {	
 	//TODO make sure Temp is the correct size
 	if (this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2] != Temp.size()) {
-		throw std::runtime_error("Total number of elements in Temp does not match current Node size.");
+		throw std::runtime_error("Total number of elements in Temp does not match current nodes per axis.");
 	}
 	this->Temp = Temp;
 }
@@ -1267,13 +1269,20 @@ void FEM_Simulator::setElementsPerAxis(int elementsPerAxis[3]) {
 		this->elementsPerAxis[i] = elementsPerAxis[i];
 		this->nodesPerAxis[i] = elementsPerAxis[i] * (this->Nn1d - 1) + 1;
 	}
+	this->Temp = Eigen::VectorXf::Zero(this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2]);
+	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2]);
+	this->elemNFR = false;
 }
 
 void FEM_Simulator::setNodesPerAxis(int nodesPerAxis[3]) {
 	for (int i = 0; i < 3; i++) {
-		this->elementsPerAxis[i] = nodesPerAxis[i] - 1;
+		this->elementsPerAxis[i] = nodesPerAxis[i]/(this->Nn1d - 1) - 1;
 		this->nodesPerAxis[i] = nodesPerAxis[i];
 	}
+
+	this->Temp = Eigen::VectorXf::Zero(this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2]);
+	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2]);
+	this->elemNFR = false;
 }
 
 void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
