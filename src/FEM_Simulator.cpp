@@ -126,7 +126,9 @@ void FEM_Simulator::singleStep() {
 
 	//this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	// Explicit Forward Step (only if alpha < 1)
-	this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec; // normally the output of this equation is assigned to dTilde for clarity...
+	if (this->alpha < 1) {
+		this->dVec = this->dVec + (1 - this->alpha) * this->deltaT * this->vVec; // normally the output of this equation is assigned to dTilde for clarity...
+	}
 	// Create Right-hand side of v(M + alpha*deltaT*K) = (F - K*dTilde);
 	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
 	// Solve Ax = b using conjugate gradient
