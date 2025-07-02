@@ -134,9 +134,13 @@ void FEM_Simulator::singleStep() {
 	// Solve Ax = b using conjugate gradient
 	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
 	this->vVec = this->cgSolver.solveWithGuess(RHS,this->vVec);
+	//this->vVec = this->cgSolver.solve(RHS);
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Issue With Solver" << std::endl;
 	}
+	/*if (!this->silentMode) {
+		std::cout << "Iterations: " << this->cgSolver.iterations() << std::endl;
+	}*/
 	// Implicit Backward Step (only if alpha > 0) 
 	this->dVec = this->dVec + this->alpha * this->deltaT * vVec; // ... dTilde would also be on the righ-hand side here. 
 
@@ -428,7 +432,7 @@ void FEM_Simulator::initializeModel()
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
 	// Initialize d, v, and dTilde vectors
 	this->dVec.resize(nNodes - dirichletNodes.size());
-	this->vVec.resize(nNodes - dirichletNodes.size());
+	this->vVec.Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
 	
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);

@@ -357,10 +357,13 @@ public:
         if (inputs.size() > 13) {
             Nn1d = inputs[13][0];
         }
-        if (inputs.size() > 14) { 
+        if (inputs.size() > 14) {
+            this->simulator->alpha = inputs[14][0];
+        }
+        if (inputs.size() > 15) { 
             // this parameter is primarily here for debugging and timing tests. Not really practical for someone
             // to use this while they're running simulations
-            this->createAllMatrices = this->createAllMatrices || inputs[14][0];
+            this->createAllMatrices = this->createAllMatrices || inputs[15][0];
         }
     }
 
