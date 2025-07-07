@@ -7,6 +7,7 @@ nodesPerAxis = [41,41,71];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
+alpha = 1/2;
 tFinal = single(0.05);
 w0 = 0.0168;
 focalPoint = 35;
@@ -35,20 +36,34 @@ Flux = 0;
 
 %% Timing Tests
 numSamples = 100;
-timeVec = zeros(2,numSamples);
-for cc = 0:1
-    createMatrices = logical(cc);
-    for i = 1:numSamples
-        tic
-        if ~silentMode
-            fprintf("\n");
-        end
-        [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+timeVec = zeros(3,numSamples);
+
+%% CASE 1 - Repeated calls to MEX with rebuilding matrices
+createMatrices = true;
+for i = 1:numSamples
+    tic
+    [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,createMatrices);
-        timeVec(cc+1,i) = toc;
-    end
-    fprintf("CreateMatrices is %d\n", cc);
-    fprintf("Average time per run: %0.4f s\n", mean(timeVec(cc+1,:)));
-    fprintf("Total time for %d samples: %0.4f\n", numSamples, sum(timeVec(cc+1,:)));
+            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    timeVec(1,i) = toc;
 end
+fprintf("CASE 1: Total Time %0.3f s\n", sum(timeVec(1,:)));
+%% CASE 2 - Repeated calls to MEX without rebuilding matrices
+createMatrices = false;
+for i = 1:numSamples
+    tic
+    [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
+            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    timeVec(2,i) = toc;
+end
+fprintf("CASE 2: Total Time %0.3f s\n", sum(timeVec(2,:)));
+%% CASE 3 - Single call to MEX 
+createMatrices = true;
+tFinal = numSamples*deltaT;
+tic
+[TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+        deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
+        silentMode,layerInfo,Nn1d,alpha,createMatrices);
+timeVec(3,end) = toc;
+fprintf("CASE 2: Total Time %0.3f s\n", sum(timeVec(3,:)));
