@@ -35,35 +35,71 @@ BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Flux = 0;
 
 %% Timing Tests
-numSamples = 100;
-timeVec = zeros(3,numSamples);
+nCases = 3;
+numTimeSteps = 100;
+timeVec = zeros(nCases,numTimeSteps);
+CaseSensorTemps = ones(nCases,size(sensorPositions,1),numTimeSteps+1)*20;
 
 %% CASE 1 - Repeated calls to MEX with rebuilding matrices
+caseNum = 1;
 createMatrices = true;
-for i = 1:numSamples
+TPrediction = T0;
+for i = 1:numTimeSteps
     tic
-    [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+    [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
             silentMode,layerInfo,Nn1d,alpha,createMatrices);
-    timeVec(1,i) = toc;
+    CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
+    timeVec(caseNum,i) = toc;
 end
-fprintf("CASE 1: Total Time %0.3f s\n", sum(timeVec(1,:)));
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(timeVec(caseNum,:)));
+
 %% CASE 2 - Repeated calls to MEX without rebuilding matrices
-createMatrices = false;
-for i = 1:numSamples
+caseNum = 2;
+createMatrices = true; % create Matrices has to be true for first call to set proper params
+TPrediction = T0;
+for i = 1:numTimeSteps
     tic
-    [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+    [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
             silentMode,layerInfo,Nn1d,alpha,createMatrices);
-    timeVec(2,i) = toc;
+    createMatrices = false; % after first call it will always be false
+    CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
+    timeVec(caseNum,i) = toc;
 end
-fprintf("CASE 2: Total Time %0.3f s\n", sum(timeVec(2,:)));
+fprintf("CASE %d: Total Time %0.3f s\n",caseNum, sum(timeVec(caseNum,:)));
 %% CASE 3 - Single call to MEX 
+caseNum = 3;
 createMatrices = true;
-tFinal = numSamples*deltaT;
+tFinal = numTimeSteps*deltaT;
+TPrediction = T0;
 tic
-[TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+[TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
         deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
         silentMode,layerInfo,Nn1d,alpha,createMatrices);
-timeVec(3,end) = toc;
-fprintf("CASE 2: Total Time %0.3f s\n", sum(timeVec(3,:)));
+CaseSensorTemps(caseNum,:,:) = sensorTemps;
+timeVec(caseNum,end) = toc;
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(timeVec(caseNum,:)));
+
+%% Plot Sensor Temps to confirm the different methods produce the same result
+
+time = 0:deltaT:deltaT*numTimeSteps;
+figure(1);
+clf;
+tl = tiledlayout('flow');
+
+for ss = 1:size(sensorPositions,1)
+    ax = nexttile();
+    for cc = 1:nCases
+        hold on;
+        plot(time,reshape(CaseSensorTemps(cc,ss,:),size(time)),'LineWidth',2,'DisplayName',...
+            sprintf("Case %d",cc));
+        hold off
+    end
+    title(sprintf("Location (%g, %g, %g)",sensorPositions(ss,:)));
+    xlabel("Temperature (deg C)");
+    ylabel("Time (s)");
+    grid on;
+end
+leg = legend('Orientation','horizontal');
+leg.Layout.Tile = 'south';
