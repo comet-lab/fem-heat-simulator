@@ -166,13 +166,13 @@ public:
 
             // Get boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
-            /*stream << "Boundary Conditions: ";
+            //stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
                boundaryType[i] = inputs[6][i];
-               stream << boundaryType[i] << ", ";
+               //stream << boundaryType[i] << ", ";
             }
-            stream << std::endl;
-            displayOnMATLAB(stream);*/
+            //stream << std::endl;
+            //displayOnMATLAB(stream);*/
             
 
             // get heatFlux condition
