@@ -89,7 +89,7 @@ void FEM_Simulator::multiStep(float duration) {
 		this->updateTemperatureSensors(t);
 	}
 
-	startTime = this->printDuration("Time Stepping Completed: ", startTime);
+	startTime = this->printDuration("Time Stepping Completed in ", startTime);
 }
 
 void FEM_Simulator::singleStep() {
@@ -308,7 +308,7 @@ void FEM_Simulator::createKMF()
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << "Built the Matrices: " << duration.count() / 1000000.0 << std::endl;
+		std::cout << "Built the Matrices in " << duration.count() / 1000000.0 << " s" << std::endl;
 	}
 }
 
@@ -448,7 +448,7 @@ void FEM_Simulator::initializeModel()
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
-	startTime = this->printDuration("Time Stepping Initialized: ", startTime);
+	startTime = this->printDuration("Time Stepping Initialized in ", startTime);
 
 	// Prepare solver for future iterations
 	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
@@ -460,7 +460,7 @@ void FEM_Simulator::initializeModel()
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-	startTime = this->printDuration("Initial Matrix Factorization Complete: ", startTime);
+	startTime = this->printDuration("Initial Matrix Factorization Completed in ", startTime);
 	// We are now ready to call single step
 }
 
@@ -1407,7 +1407,7 @@ std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::st
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::high_resolution_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-		std::cout << message << duration.count() / 1000000.0 << std::endl;
+		std::cout << message << duration.count() / 1000000.0 << " s" << std::endl;
 		startTime = stopTime;
 		
 	}

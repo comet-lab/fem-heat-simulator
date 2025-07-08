@@ -28,7 +28,7 @@ int main()
     float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
     FEM_Simulator simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
-    simulator.alpha = 1/2.0f;
+    simulator.alpha = 1;
     simulator.setLayer(0.05f, 30);
     std::cout << "Number of nodes: " << simulator.nodesPerAxis[0] * simulator.nodesPerAxis[1] * simulator.nodesPerAxis[2] << std::endl;
     std::cout << "Number of elems: " << simulator.elementsPerAxis[0] * simulator.elementsPerAxis[1] * simulator.elementsPerAxis[2] << std::endl;
@@ -61,7 +61,7 @@ int main()
     float totalTime = 0.05f;
     simulator.silentMode = false;
     simulator.initializeModel();
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 1; i++) {
         simulator.setFluenceRate(laserPose, 1, 0.0168);
         simulator.multiStep(totalTime);
     }

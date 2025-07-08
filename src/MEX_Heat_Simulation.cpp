@@ -131,9 +131,11 @@ public:
     /* This is the gateway routine for the MEX-file. */
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         auto startTime = std::chrono::high_resolution_clock::now();
+        auto stopTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
         checkArguments(outputs, inputs);
         stream.str("");
-        stream << "Start of () function" << std::endl;
+        stream << "Start of MEX function" << std::endl;
         displayOnMATLAB(stream);
         float simDuration;
         try {
@@ -141,6 +143,10 @@ public:
             // Have to convert T0 and FluenceRate to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayToVector(inputs[0]);
             std::vector<std::vector<std::vector<float>>> FluenceRate = convertMatlabArrayToVector(inputs[1]);
+            stopTime = std::chrono::high_resolution_clock::now();
+            duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+            stream << "Converted MATLAB Matrices to C++ std::vector :  " << duration.count() / 1000000.0 << " seconds" << std::endl;
+
 
             // Get tissue size
             float tissueSize[3];
@@ -160,13 +166,13 @@ public:
 
             // Get boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
-            stream << "Boundary Conditions: ";
+            /*stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
                boundaryType[i] = inputs[6][i];
                stream << boundaryType[i] << ", ";
             }
             stream << std::endl;
-            displayOnMATLAB(stream);
+            displayOnMATLAB(stream);*/
             
 
             // get heatFlux condition
@@ -200,10 +206,10 @@ public:
             this->simulator->setFlux(heatFlux);
 
             //print statements 
-            stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator->deltaT << std::endl;
+            /*stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator->deltaT << std::endl;
             displayOnMATLAB(stream);
             stream << "TC: " << this->simulator->TC << ", MUA: " << this->simulator->MUA << ", VHC: " << this->simulator->VHC << ", HTC: " << this->simulator->HTC << std::endl;
-            displayOnMATLAB(stream);
+            displayOnMATLAB(stream);*/
 
             this->simulator->setAmbientTemp(ambientTemp);
         }
@@ -229,6 +235,10 @@ public:
             displayError(e.what());
             return;
         }
+
+        stopTime = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        stream << "Set all simulation parameters:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
         
         // Set parallelization
         Eigen::setNbThreads(1);
@@ -247,8 +257,8 @@ public:
             this->createAllMatrices = false;
             try {
                 this->simulator->initializeModel();
-                stream << "Global matrices created" << std::endl;
-                displayOnMATLAB(stream);
+                /*stream << "Global matrices created" << std::endl;
+                displayOnMATLAB(stream);*/
             }
             catch (const std::exception& e) {
                 stream << "Error in createKMF() " << std::endl;
@@ -261,8 +271,8 @@ public:
         // Perform time stepping
         try { //
             this->simulator->multiStep(simDuration);
-            stream << "Time Stepping Complete" << std::endl;
-            displayOnMATLAB(stream);
+            /*stream << "Time Stepping Complete" << std::endl;
+            displayOnMATLAB(stream);*/
         }
         catch (const std::exception& e) {
             stream << "Error in performTimeStepping() " << std::endl;
@@ -286,8 +296,8 @@ public:
         }
         outputs[1] = sensorTempsOutput;
 
-        auto stopTime = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        stopTime = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
         stream << "End of MEX() Function:  " << duration.count() / 1000000.0 << std::endl;
         displayOnMATLAB(stream);
     }
