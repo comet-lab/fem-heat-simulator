@@ -69,6 +69,8 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations.
 	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
+
+	this->silentMode = inputSim.silentMode;
 }
 
 void FEM_Simulator::performTimeStepping()
