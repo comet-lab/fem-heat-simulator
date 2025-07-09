@@ -130,6 +130,7 @@ void FEM_Simulator::performTimeStepping()
 	solver.compute(LHS);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
+		throw std::exception("Decomposition failed");
 	}
 	if (!this->silentMode) {
 		stopTime = std::chrono::high_resolution_clock::now();
@@ -147,6 +148,7 @@ void FEM_Simulator::performTimeStepping()
 		vVec = solver.solveWithGuess(RHS,vVec);
 		if (solver.info() != Eigen::Success) {
 			std::cout << "Issue With Solver" << std::endl;
+			throw std::exception("Issues with Solver");
 		}
 		// combine explicit and implicit steps. 
 		dVec = dTilde + this->alpha * this->deltaT * vVec;
