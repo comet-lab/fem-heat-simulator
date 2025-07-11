@@ -59,9 +59,12 @@ tic
 for i = 2:length(time)
     fluenceRate = calcIrradiance(w0,laserPose(:,i),laserPower(:,i),MUA,X,Y,Z);
     if i == 2
-        createMatrices = true;
+        createMatrices = true; % first call is true to make sure matrices are set up appropriately
     else
-        createMatrices = false;
+        createMatrices = false; % remaining calls can be false or true
+        % if true is set and you're using crank-nicolson (alpha = 1/2) then
+        % the results won't actually match because creating the matrices
+        % resets the explicit step in the crank-nicolson
     end
     [Tpred,sensOutput] = MEX_Heat_Simulation(Tpred,fluenceRate,tissueSize',deltaT,...
         deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,useAllCPUs,...
