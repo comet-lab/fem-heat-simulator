@@ -46,7 +46,7 @@ public:
 	void createFirr(); // creates only the Forcing vector for the fluence rate
 	void applyParameters();
 	void initializeModel();
-	void initializeSensorTemps(float duration); // initialize sensor temps vec with 0s
+	void initializeSensorTemps(int numSteps); // initialize sensor temps vec with 0s
 	void updateTemperatureSensors(int timeIdx); // update sensor temp vec
 	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]); // Convert a 3D position into an element that contains that position
 	
@@ -58,6 +58,7 @@ public:
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> FluenceRate);
 	void setFluenceRate(Eigen::VectorXf& FluenceRate);
 	void setFluenceRate(float laserPose[6], float laserPower, float beamWaist);
+	void setFluenceRate(Eigen::Vector<float,6> laserPose, float laserPower, float beamWaist);
 	void setTissueSize(float tissueSize[3]);
 	void setDeltaT(float deltaT);
 	void setLayer(float layerHeight, int elemsInLayer);

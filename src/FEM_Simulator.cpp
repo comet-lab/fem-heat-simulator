@@ -1,5 +1,6 @@
 #include "FEM_Simulator.h"
 #include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -77,9 +78,9 @@ void FEM_Simulator::multiStep(float duration) {
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
 	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
 	auto startTime = std::chrono::high_resolution_clock::now();
-	this->initializeSensorTemps(duration);
-	this->updateTemperatureSensors(0);
 	int numSteps = round(duration / this->deltaT);
+	this->initializeSensorTemps(numSteps);
+	this->updateTemperatureSensors(0);
 	if (!this->silentMode) {
 		std::cout << "Number of Steps: " << numSteps << std::endl;
 	}
@@ -99,28 +100,28 @@ void FEM_Simulator::singleStep() {
 
 	
 
-	if (this->fluenceUpdate){ // check if fluence rate has changed
-		if (this->elemNFR)
-		{ 
+	if (this->fluenceUpdate || this->parameterUpdate) {
+		// only happens if fluenceUpdate is true
+		if (this->fluenceUpdate && this->elemNFR)
+		{
 			createFirr();
 		}
-		this->fluenceUpdate = false;
-	}
-
-	if (this->fluenceUpdate || this->parameterUpdate) {
-		// This needs to be done if fluence is updated or if parameters are updated, but only after Firr is updated 
+		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
 		this->applyParameters(); 
+		this->fluenceUpdate = false;
+
+		if (this->parameterUpdate) { // Happens only if parameters were updated
+			this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
+			this->LHS.makeCompressed(); // compress it for potential speed improvements
+			this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+			if (this->cgSolver.info() != Eigen::Success) {
+				std::cout << "Decomposition Failed" << std::endl;
+			}
+			this->parameterUpdate = false;
+		}
 	}
 
-	if (this->parameterUpdate) { // Check if parameters have changed
-		this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
-		this->LHS.makeCompressed(); // compress it for potential speed improvements
-		this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
-		if (this->cgSolver.info() != Eigen::Success) {
-			std::cout << "Decomposition Failed" << std::endl;
-		}
-		this->parameterUpdate = false;
-	}
+	
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
 
@@ -409,7 +410,7 @@ void FEM_Simulator::applyParameters()
 	else { // to calculate Firr we post-multiply FirrMat by nodal irradiance
 		Firr = this->FirrMat * this->FluenceRate;
 	}
-	this->globF = this->MUA * this->FirrMat * this->FluenceRate + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
 }
 
 void FEM_Simulator::initializeModel()
@@ -464,7 +465,7 @@ void FEM_Simulator::initializeModel()
 	// We are now ready to call single step
 }
 
-void FEM_Simulator::initializeSensorTemps(float duration) {
+void FEM_Simulator::initializeSensorTemps(int numSteps) {
 	// Create sensorTemperature Vectors and reserve sizes
 	int nSensors = this->tempSensorLocations.size();
 	if (nSensors == 0) { // if there weren't any sensors added, put one at 0,0,0
@@ -473,7 +474,7 @@ void FEM_Simulator::initializeSensorTemps(float duration) {
 	}
 	this->sensorTemps.resize(nSensors);
 	for (int s = 0; s < nSensors; s++) {
-		this->sensorTemps[s].resize(round(duration / deltaT) + 1);
+		this->sensorTemps[s].resize(numSteps + 1);
 	}
 }
 
@@ -1193,6 +1194,16 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 		xPos = xPos + xStep;
 	}
 
+	this->fluenceUpdate = true;
+}
+
+void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float laserPower, float beamWaist)
+{
+	float laserPoseVec[6];
+	for (int i = 0; i < 6; i++) {
+		laserPoseVec[i] = laserPose(i);
+	}
+	this->setFluenceRate(laserPoseVec, laserPower, beamWaist);
 	this->fluenceUpdate = true;
 }
 
