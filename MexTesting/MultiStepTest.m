@@ -30,7 +30,7 @@ createMatrices = false; % whether to always recreate all the matrices.
 x = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
 y = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
 z = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
-[X,Y,Z] = meshgrid(x,y,z);
+[Y,X,Z] = meshgrid(y,x,z); % left handed coordinate system
 
 % Set time varying laser power and pose
 laserPower = ones(1,length(time))*1;
@@ -129,9 +129,9 @@ figure(4)
 clf;
 tiledlayout('flow')
 nexttile()
-surf(X(:,:,1),Y(:,:,1),TpredMulti(:,:,1))
-xlabel("X Axis (cm)")
-ylabel("Y Axis (cm)");
+surf(Y(:,:,1),X(:,:,1),TpredMulti(:,:,1))
+xlabel("Y Axis (cm)")
+ylabel("X Axis (cm)");
 title("Suraface Temperature Plot Two-layer mesh")
 c = colorbar();
 c.Label.String = 'Temperature (deg C)';
