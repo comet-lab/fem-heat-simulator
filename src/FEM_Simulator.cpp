@@ -433,7 +433,7 @@ void FEM_Simulator::initializeModel()
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
 	// Initialize d, v, and dTilde vectors
 	this->dVec.resize(nNodes - dirichletNodes.size());
-	this->vVec.Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
+	this->vVec = Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
 	
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
