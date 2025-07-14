@@ -1,6 +1,7 @@
 #include "FEM_Simulator.h"
 #include "FEM_Simulator.h"
 #include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -152,7 +153,7 @@ void FEM_Simulator::singleStep() {
 	this->Temp(validNodes) = this->dVec;
 }
 
-void FEM_Simulator::createKMF()
+void FEM_Simulator::buildMatrices()
 {
 	/* This function constructs the global matrices by iterating over each element and summing the local contributions. */
 	int nodeFace;
@@ -416,18 +417,8 @@ void FEM_Simulator::applyParameters()
 	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
 }
 
-void FEM_Simulator::initializeModel()
-{ 
-	/* initializeModel gets the system ready to perform time stepping. This function needs to be called whenever
-	the geometry of the tissue changes. This includes things like changing the number of nodes, changing the boundary
-	conditions, changing the layers in the mesh, etc. This function also needs to be called if alpha or the time step 
-	changes. 
-	
-	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
-	like */
-	this->createKMF();
-	this->fluenceUpdate = false;
-
+void FEM_Simulator::initializeTimeIntegration()
+{
 	auto startTime = std::chrono::steady_clock::now();
 	this->applyParameters();
 	this->parameterUpdate = false;
@@ -437,11 +428,11 @@ void FEM_Simulator::initializeModel()
 	// Initialize d, v, and dTilde vectors
 	this->dVec.resize(nNodes - dirichletNodes.size());
 	this->vVec = Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
-	
+
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
 
-	if (this->alpha < 1) { 
+	if (this->alpha < 1) {
 		// Perform the conjugate gradiant to compute the initial vVec value
 		// This is a bit odd because if the user hasn't specified the initial fluence rate it will be 0 initially. 
 		// And can mess up the first few timesteps
@@ -465,6 +456,21 @@ void FEM_Simulator::initializeModel()
 		std::cout << "Decomposition Failed" << std::endl;
 	}
 	startTime = this->printDuration("Initial Matrix Factorization Completed in ", startTime);
+}
+
+void FEM_Simulator::initializeModel()
+{ 
+	/* initializeModel gets the system ready to perform time stepping. This function needs to be called whenever
+	the geometry of the tissue changes. This includes things like changing the number of nodes, changing the boundary
+	conditions, changing the layers in the mesh, etc. This function also needs to be called if alpha or the time step 
+	changes. 
+	
+	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
+	like */
+	this->buildMatrices();
+	this->fluenceUpdate = false;
+
+	this->initializeTimeIntegration();
 	// We are now ready to call single step
 }
 

@@ -42,9 +42,10 @@ public:
 	FEM_Simulator(FEM_Simulator& inputSim);
 	void multiStep(float duration); // simulates multiple steps of time integration
 	void singleStep(); // simulates a single step of time integration
-	void createKMF(); // creates global matrices and performs spatial discretization
+	void buildMatrices(); // creates global matrices and performs spatial discretization
 	void createFirr(); // creates only the Forcing vector for the fluence rate
 	void applyParameters();
+	void initializeTimeIntegration();
 	void initializeModel();
 	void initializeSensorTemps(int numSteps); // initialize sensor temps vec with 0s
 	void updateTemperatureSensors(int timeIdx); // update sensor temp vec
