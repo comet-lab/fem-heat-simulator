@@ -7,6 +7,7 @@ project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" ON)
 
+
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
 set(CMAKE_CXX_STANDARD 23)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)

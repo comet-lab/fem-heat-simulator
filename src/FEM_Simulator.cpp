@@ -70,6 +70,8 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations.
 	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
+
+	this->silentMode = inputSim.silentMode;
 }
 
 void FEM_Simulator::multiStep(float duration) {
@@ -92,6 +94,7 @@ void FEM_Simulator::multiStep(float duration) {
 
 	startTime = this->printDuration("Time Stepping Completed in ", startTime);
 }
+
 
 void FEM_Simulator::singleStep() {
 	/* Simulates a single step of the heat equation. A single step is given by the duration deltaT. To run single step,
