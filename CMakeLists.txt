@@ -5,7 +5,7 @@ project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_MEX      "Build MATLAB MEX wrapper (Release)" ON)
+option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" ON)
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
 set(CMAKE_CXX_STANDARD 23)
@@ -84,7 +84,7 @@ endif()
 # ──────────────────────────────────────────────────────────────
 # MATLAB MEX (only built in Release *and* if MATLAB is found)
 # ──────────────────────────────────────────────────────────────
-if(BUILD_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
+if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     find_package(Matlab REQUIRED)
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
