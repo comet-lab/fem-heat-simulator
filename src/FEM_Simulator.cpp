@@ -77,7 +77,7 @@ void FEM_Simulator::multiStep(float duration) {
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
 	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
-	auto startTime = std::chrono::high_resolution_clock::now();
+	auto startTime = std::chrono::steady_clock::now();
 	int numSteps = round(duration / this->deltaT);
 	this->initializeSensorTemps(numSteps);
 	this->updateTemperatureSensors(0);
@@ -163,7 +163,7 @@ void FEM_Simulator::createKMF()
 	int BglobalNodeIdx;
 	bool dirichletFlag = false;
 	bool fluxFlag = false;
-	auto startTime = std::chrono::high_resolution_clock::now();
+	auto startTime = std::chrono::steady_clock::now();
 
 	if (!this->silentMode) {
 		std::cout << "Creating Global Matrices" << std::endl;
@@ -307,7 +307,7 @@ void FEM_Simulator::createKMF()
 	this->FirrMat.makeCompressed();
 
 	if (!this->silentMode) {
-		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto stopTime = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 		std::cout << "Built the Matrices in " << duration.count() / 1000000.0 << " s" << std::endl;
 	}
@@ -327,7 +327,7 @@ void FEM_Simulator::createFirr()
 	int BglobalNodeIdx;
 	bool dirichletFlag = false;
 	bool fluxFlag = false;
-	auto startTime = std::chrono::high_resolution_clock::now();
+	auto startTime = std::chrono::steady_clock::now();
 
 	if (!this->silentMode) {
 		std::cout << "Creating Firr Matrices" << std::endl;
@@ -388,7 +388,7 @@ void FEM_Simulator::createFirr()
 		} // For loop through Ai
 	}
 	if (!this->silentMode) {
-		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto stopTime = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 		std::cout << "Built the Firr Matrix: " << duration.count() / 1000000.0 << std::endl;
 	}
@@ -425,7 +425,7 @@ void FEM_Simulator::initializeModel()
 	this->createKMF();
 	this->fluenceUpdate = false;
 
-	auto startTime = std::chrono::high_resolution_clock::now();
+	auto startTime = std::chrono::steady_clock::now();
 	this->applyParameters();
 	this->parameterUpdate = false;
 
@@ -1416,7 +1416,7 @@ void FEM_Simulator::setKeConv() {
 
 std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {
 	if (!this->silentMode) {
-		auto stopTime = std::chrono::high_resolution_clock::now();
+		auto stopTime = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
 		std::cout << message << duration.count() / 1000000.0 << " s" << std::endl;
 		startTime = stopTime;
