@@ -3,7 +3,7 @@ clc; clear; close all;
 clear MEX_Heat_Simulation
 %% Initialization of parameters
 tissueSize = [2.0,2.0,1.0];
-nodesPerAxis = [41,41,71];
+nodesPerAxis = [41,41,50];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
@@ -15,7 +15,7 @@ MUA = 200;
 TC = 0.0062;
 VHC = 4.3;
 HTC = 0.05;
-useAllCPUs = true;
+useAllCPUs = false;
 silentMode = true;
 Nn1d = 2;
 layerInfo = [0.05,30];
@@ -35,7 +35,7 @@ BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Flux = 0;
 
 %% Timing Tests
-nCases = 4;
+nCases = 5;
 numTimeSteps = 100;
 
 durationVec = zeros(nCases,numTimeSteps);
@@ -93,6 +93,27 @@ time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
 laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
 laserPower = ones(1,length(time));
 TPrediction = T0;
+tic
+[~,sensorTemps] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
+    tissueProperties,BC,Flux,ambientTemp,sensorPositions,w0,time,...
+    laserPose,laserPower,useAllCPUs,...
+    silentMode,layerInfo,Nn1d,alpha);
+CaseSensorTemps(caseNum,:,:) = sensorTemps;
+durationVec(caseNum,end) = toc;
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
+%% CASE 5 - Single call to MEX multiStep but backwards-euler 
+% Note that the point of multistep is to handle changing inputs without
+% multiple calls to mex, so it may not be the fastest, but it will be
+% faster than anything calling MEX multiple times. 
+
+caseNum = 5;
+createMatrices = true;
+time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
+laserPower = ones(1,length(time));
+TPrediction = T0;
+alpha = 1;
 tic
 [~,sensorTemps] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
     tissueProperties,BC,Flux,ambientTemp,sensorPositions,w0,time,...
