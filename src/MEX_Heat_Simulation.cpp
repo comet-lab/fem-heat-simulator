@@ -14,6 +14,13 @@
 
 class MexFunction : public matlab::mex::Function {
 private:
+    /*Inputs required : T0, FluenceRate, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
+   OPTIONAL       : (useAllCPUs), (silentMode), (layers), (Nn1d), (alpha)*/
+    enum VarPlacement {
+        TEMPERATURE, FLUENCE_RATE, TISSUE_SIZE, SIM_DURATION, DELTAT, TISSUE_PROP, BC,
+        FLUX, AMB_TEMP, SENSOR_LOC, USE_ALL_CPUS, SILENT_MODE, LAYERS, NN1D, ALPHA, CREATE_MAT
+    };
+
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
     std::ostringstream stream;
@@ -141,8 +148,8 @@ public:
         try {
             
             // Have to convert T0 and FluenceRate to std::vector<<<float>>>
-            std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayTo3DVector(inputs[0]);
-            std::vector<std::vector<std::vector<float>>> FluenceRate = convertMatlabArrayTo3DVector(inputs[1]);
+            std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayTo3DVector(inputs[VarPlacement::TEMPERATURE]);
+            std::vector<std::vector<std::vector<float>>> FluenceRate = convertMatlabArrayTo3DVector(inputs[VarPlacement::FLUENCE_RATE]);
             stopTime = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
             stream << "MEX: Converted MATLAB Matrices:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
@@ -150,25 +157,25 @@ public:
 
             // Get tissue size
             float tissueSize[3];
-            tissueSize[0] = inputs[2][0];
-            tissueSize[1] = inputs[2][1];
-            tissueSize[2] = inputs[2][2];
+            tissueSize[0] = inputs[VarPlacement::TISSUE_SIZE][0];
+            tissueSize[1] = inputs[VarPlacement::TISSUE_SIZE][1];
+            tissueSize[2] = inputs[VarPlacement::TISSUE_SIZE][2];
             
             // Get time step and final time
-            simDuration = inputs[3][0];
-            float deltaT = inputs[4][0];
+            simDuration = inputs[VarPlacement::SIM_DURATION][0];
+            float deltaT = inputs[VarPlacement::DELTAT][0];
 
             // Extract tissue properties
-            float MUA = inputs[5][0];
-            float TC = inputs[5][1];
-            float VHC = inputs[5][2];
-            float HTC = inputs[5][3];
+            float MUA = inputs[VarPlacement::TISSUE_PROP][0];
+            float TC = inputs[VarPlacement::TISSUE_PROP][1];
+            float VHC = inputs[VarPlacement::TISSUE_PROP][2];
+            float HTC = inputs[VarPlacement::TISSUE_PROP][3];
 
             // Get boundary conditions
             int boundaryType[6] = { 0,0,0,0,0,0 };
             //stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
-               boundaryType[i] = inputs[6][i];
+               boundaryType[i] = inputs[VarPlacement::BC][i];
                //stream << boundaryType[i] << ", ";
             }
             //stream << std::endl;
@@ -176,9 +183,9 @@ public:
             
 
             // get heatFlux condition
-            float heatFlux = inputs[7][0];
+            float heatFlux = inputs[VarPlacement::FLUX][0];
             // get ambient temperature
-            float ambientTemp = inputs[8][0];
+            float ambientTemp = inputs[VarPlacement::AMB_TEMP][0];
 
             /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
             // First check to see if certain variables have changed which would require us to reconstruct elements
@@ -221,7 +228,7 @@ public:
         }
         
         // Set sensor locations
-        auto sensorTempsInput = inputs[9];
+        auto sensorTempsInput = inputs[VarPlacement::SENSOR_LOC];
         std::vector<std::array<float, 3>> sensorTemps;
         for (int s = 0; s < sensorTempsInput.getDimensions()[0]; s++) {
             sensorTemps.push_back({ sensorTempsInput[s][0],sensorTempsInput[s][1] ,sensorTempsInput[s][2] });
@@ -317,7 +324,7 @@ public:
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
             displayError("At least 10 inputs required: T0, NFR, tissueSize, simDuration,"
-                "deltaT tissueProperties, BC, Jn, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
+                "deltaT tissueProperties, BC, Flux, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -325,20 +332,22 @@ public:
         if (outputs.size() < 2) {
             displayError("Not enough outputs specified.");
         }
-        if (inputs[0].getType() != matlab::data::ArrayType::SINGLE) {
+        if (inputs[VarPlacement::TEMPERATURE].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("T0 must be an Array of type Single.");
         }
-        if (inputs[1].getType() != matlab::data::ArrayType::SINGLE) {
+        if (inputs[VarPlacement::FLUENCE_RATE].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("NFR must be an Array of type Single.");
         }
-        if (!((inputs[1].getDimensions()[0] == inputs[0].getDimensions()[0]) && (inputs[1].getDimensions()[1] == inputs[0].getDimensions()[1])
-            && (inputs[1].getDimensions()[2] == inputs[0].getDimensions()[2]))
+        if (!((inputs[VarPlacement::FLUENCE_RATE].getDimensions()[0] == inputs[VarPlacement::TEMPERATURE].getDimensions()[0])
+            && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[1] == inputs[VarPlacement::TEMPERATURE].getDimensions()[1])
+            && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[2] == inputs[VarPlacement::TEMPERATURE].getDimensions()[2]))
             &&
-            !((inputs[1].getDimensions()[0] == (inputs[0].getDimensions()[0] - 1)) && (inputs[1].getDimensions()[1] == (inputs[0].getDimensions()[1] - 1))
-                && (inputs[1].getDimensions()[2] == (inputs[0].getDimensions()[2] - 1)))) {
+            !((inputs[VarPlacement::FLUENCE_RATE].getDimensions()[0] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[0] - 1))
+                && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[1] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[1] - 1))
+                && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[2] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[2] - 1)))) {
             displayError("NFR must have either the same dimensions as Temp, or one less in each axis");
         }
-        if ((inputs[2].getDimensions()[0] != 3) || (inputs[2].getDimensions()[1] != 1)) {
+        if ((inputs[VarPlacement::TISSUE_SIZE].getDimensions()[0] != 3) || (inputs[VarPlacement::TISSUE_SIZE].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
         }
         /* This Check Doesnt work
@@ -346,43 +355,43 @@ public:
             displayError("deltaT must be less than the final time");
         }
         */
-        if ((inputs[5].getDimensions()[0] != 4) || (inputs[5].getDimensions()[1] != 1)) {
+        if ((inputs[VarPlacement::TISSUE_PROP].getDimensions()[0] != 4) || (inputs[VarPlacement::TISSUE_PROP].getDimensions()[1] != 1)) {
             displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
         }
-        if ((inputs[6].getDimensions()[0] != 6) || (inputs[6].getDimensions()[1] != 1)) {
+        if ((inputs[VarPlacement::BC].getDimensions()[0] != 6) || (inputs[VarPlacement::BC].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
         }
-        if ((inputs[6].getType() != matlab::data::ArrayType::INT32)) {
+        if ((inputs[VarPlacement::BC].getType() != matlab::data::ArrayType::INT32)) {
             displayError("Boundary Conditions must be an int");
         }
-        if ((inputs[9].getDimensions()[1] != 3)) {
+        if ((inputs[VarPlacement::SENSOR_LOC].getDimensions()[1] != 3)) {
             displayError("Sensor Locations must be n x 3");
         }
-        if (inputs.size() > 10) {
-            useAllCPUs = inputs[10][0];
+        if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
+            useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
         }
-        if (inputs.size() > 11) {
-            this->silentMode = inputs[11][0];
+        if (inputs.size() > VarPlacement::SILENT_MODE) {
+            this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
             this->simulator->silentMode = this->silentMode;
         }
-        if (inputs.size() > 12) {
-            layerHeight = inputs[12][0];
-            elemsInLayer = int(inputs[12][1]);
+        if (inputs.size() > VarPlacement::LAYERS) {
+            layerHeight = inputs[VarPlacement::LAYERS][0];
+            elemsInLayer = int(inputs[VarPlacement::LAYERS][1]);
         }
         else {
-            elemsInLayer = inputs[0].getDimensions()[2];
-            layerHeight = inputs[2][2];
+            elemsInLayer = inputs[VarPlacement::TEMPERATURE].getDimensions()[2];
+            layerHeight = inputs[VarPlacement::TISSUE_SIZE][2];
         }
-        if (inputs.size() > 13) {
-            Nn1d = inputs[13][0];
+        if (inputs.size() > VarPlacement::NN1D) {
+            Nn1d = inputs[VarPlacement::NN1D][0];
         }
-        if (inputs.size() > 14) {
-            this->simulator->alpha = inputs[14][0];
+        if (inputs.size() > VarPlacement::ALPHA) {
+            this->simulator->alpha = inputs[VarPlacement::ALPHA][0];
         }
-        if (inputs.size() > 15) { 
+        if (inputs.size() > VarPlacement::CREATE_MAT) {
             // this parameter is primarily here for debugging and timing tests. Not really practical for someone
             // to use this while they're running simulations
-            this->createAllMatrices = this->createAllMatrices || inputs[15][0];
+            this->createAllMatrices = this->createAllMatrices || inputs[VarPlacement::CREATE_MAT][0];
         }
     }
 
