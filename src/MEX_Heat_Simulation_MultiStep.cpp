@@ -1,7 +1,3 @@
-/* ========================================================================
-* It compiles in MATLAB, but not in Visual Studio... idk.
- *=======================================================================*/
-
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include<string>
@@ -14,17 +10,16 @@
 
 class MexFunction : public matlab::mex::Function {
 private:
-    /*Inputs required : T0, FluenceRate, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
-   OPTIONAL       : (useAllCPUs), (silentMode), (layers), (Nn1d), (alpha)*/
-    enum VarPlacement {
-        TEMPERATURE, FLUENCE_RATE, TISSUE_SIZE, SIM_DURATION, DELTAT, TISSUE_PROP, BC,
-        FLUX, AMB_TEMP, SENSOR_LOC, USE_ALL_CPUS, SILENT_MODE, LAYERS, NN1D, ALPHA, CREATE_MAT
-    };
+
+    /*Inputs required : T0, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, 
+       OPTIONAL       : (useAllCPUs), (silentMode), (layers), (Nn1d), (alpha)*/
+    enum VarPlacement {TEMPERATURE, TISSUE_SIZE, TISSUE_PROP, BC, FLUX, AMB_TEMP, SENSOR_LOC, BEAM_WAIST, TIME, LASER_POSE, LASER_POWER,
+                        USE_ALL_CPUS, SILENT_MODE, LAYERS, NN1D, ALPHA};
 
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator* simulator;
     std::ostringstream stream;
-    bool silentMode = true;
+    bool silentMode = false;
     bool useAllCPUs = true;
     bool createAllMatrices = true;
     float layerHeight = 1;
@@ -69,6 +64,42 @@ public:
         return result;
     }
 
+    /** @brief Converts a matlab array to a std::vector
+    *
+    *
+    */
+    std::vector<float> convertMatlabArrayTo1DVector(const matlab::data::Array& matlabArray) {       
+        size_t numCols = matlabArray.getDimensions()[1];
+        std::vector<float> result;
+        result.reserve(numCols);
+        for (size_t i = 0; i < numCols; ++i) {
+            result.push_back(static_cast<float>(matlabArray[0][i]));
+        }
+        return result;
+    }
+
+
+    /** @brief Convert a matlab array to a Eigen::MatrixXf
+    *
+    *
+    */
+    Eigen::MatrixXf convertMatlabArrayToEigenMatrix(const matlab::data::Array& matlabArray) {
+        const size_t rows = matlabArray.getDimensions()[0];
+        const size_t cols = matlabArray.getDimensions()[1];
+
+        Eigen::MatrixXf mat(rows, cols);
+        for (size_t j = 0; j < cols; ++j) {
+            for (size_t i = 0; i < rows; ++i) {
+                mat(i, j) = static_cast<float>(matlabArray[i][j]);
+            }
+        }
+        return mat;
+    }
+
+    /** @brief Convert a 3D std::vector to a matlab array
+    *
+    * 
+    */
     matlab::data::TypedArray<float> convertVectorToMatlabArray(const std::vector<std::vector<std::vector<float>>>& vec) {
         // Get dimensions of the input vector
         size_t dim1 = vec.size();
@@ -135,7 +166,13 @@ public:
     }
 
 
-    /* This is the gateway routine for the MEX-file. */
+    /** @brief This is the gateway routine for the MEX-file. 
+    *
+    * This function actually takes the inputs from matlab and performs the heat simulation steps
+    * 
+    * @param outputs - list of outputs matlab expects
+    * @param inputs - list of inputs matlab provideds
+    */
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         auto startTime = std::chrono::high_resolution_clock::now();
         auto stopTime = std::chrono::high_resolution_clock::now();
@@ -144,12 +181,14 @@ public:
         stream.str("");
         stream << "MEX: Start of MEX function" << std::endl;
         displayOnMATLAB(stream);
-        float simDuration;
+        std::vector<float> timeVec;
+        std::vector<float> laserPower;
+        Eigen::MatrixXf laserPose;
+        float beamWaist;
         try {
-            
+
             // Have to convert T0 and FluenceRate to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayTo3DVector(inputs[VarPlacement::TEMPERATURE]);
-            std::vector<std::vector<std::vector<float>>> FluenceRate = convertMatlabArrayTo3DVector(inputs[VarPlacement::FLUENCE_RATE]);
             stopTime = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
             stream << "MEX: Converted MATLAB Matrices:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
@@ -160,10 +199,6 @@ public:
             tissueSize[0] = inputs[VarPlacement::TISSUE_SIZE][0];
             tissueSize[1] = inputs[VarPlacement::TISSUE_SIZE][1];
             tissueSize[2] = inputs[VarPlacement::TISSUE_SIZE][2];
-            
-            // Get time step and final time
-            simDuration = inputs[VarPlacement::SIM_DURATION][0];
-            float deltaT = inputs[VarPlacement::DELTAT][0];
 
             // Extract tissue properties
             float MUA = inputs[VarPlacement::TISSUE_PROP][0];
@@ -175,33 +210,33 @@ public:
             int boundaryType[6] = { 0,0,0,0,0,0 };
             //stream << "Boundary Conditions: ";
             for (int i = 0; i < 6; i++) {
-               boundaryType[i] = inputs[VarPlacement::BC][i];
-               //stream << boundaryType[i] << ", ";
+                boundaryType[i] = inputs[VarPlacement::BC][i];
             }
-            //stream << std::endl;
-            //displayOnMATLAB(stream);*/
-            
 
             // get heatFlux condition
             float heatFlux = inputs[VarPlacement::FLUX][0];
             // get ambient temperature
             float ambientTemp = inputs[VarPlacement::AMB_TEMP][0];
 
+            // beam waist
+            beamWaist = inputs[VarPlacement::BEAM_WAIST][0];
+            stream << "MEX: Setting time dependent variables" << std::endl;
+            displayOnMATLAB(stream);
+            // get time varying inputs
+            timeVec = convertMatlabArrayTo1DVector(inputs[VarPlacement::TIME]);
+            laserPower = convertMatlabArrayTo1DVector(inputs[VarPlacement::LASER_POWER]);
+            laserPose = convertMatlabArrayToEigenMatrix(inputs[VarPlacement::LASER_POSE]);
+
+            stream << "MEX: Apply inputs to simulator" << std::endl;
+            displayOnMATLAB(stream);
+
             /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
-            // First check to see if certain variables have changed which would require us to reconstruct elements
-            if (!this->createAllMatrices) {
-                this->createAllMatrices = checkForMatrixReset(Nn1d, T0, FluenceRate, tissueSize, layerHeight, elemsInLayer, boundaryType);
-            }
             // Set the type of basis functions we are using by setting nodes per dimension of an 
             this->simulator->Nn1d = Nn1d;
             this->simulator->setTemp(T0);
-            // Set the FluenceRate
-            this->simulator->setFluenceRate(FluenceRate);
             this->simulator->setTissueSize(tissueSize);
             // set the layer info
             this->simulator->setLayer(layerHeight, elemsInLayer);
-            // set the time step
-            this->simulator->setDeltaT(deltaT);
             // set the tissue properties
             this->simulator->setMUA(MUA);
             this->simulator->setTC(TC);
@@ -211,13 +246,7 @@ public:
             this->simulator->setBoundaryConditions(boundaryType);
             // set heatFlux
             this->simulator->setFlux(heatFlux);
-
-            //print statements 
-            /*stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator->deltaT << std::endl;
-            displayOnMATLAB(stream);
-            stream << "TC: " << this->simulator->TC << ", MUA: " << this->simulator->MUA << ", VHC: " << this->simulator->VHC << ", HTC: " << this->simulator->HTC << std::endl;
-            displayOnMATLAB(stream);*/
-
+            // set ambient temperature
             this->simulator->setAmbientTemp(ambientTemp);
         }
         catch (const std::exception& e) {
@@ -226,7 +255,7 @@ public:
             displayError(e.what());
             return;
         }
-        
+
         // Set sensor locations
         auto sensorTempsInput = inputs[VarPlacement::SENSOR_LOC];
         std::vector<std::array<float, 3>> sensorTemps;
@@ -236,7 +265,7 @@ public:
         try {
             this->simulator->setSensorLocations(sensorTemps);
         }
-        catch (const std::exception& e){
+        catch (const std::exception& e) {
             stream << "MEX: Error setting sensor locations " << std::endl;
             displayOnMATLAB(stream);
             displayError(e.what());
@@ -254,44 +283,53 @@ public:
         stream << "MEX: OPEMMP Enabled" << std::endl;
         displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
-            Eigen::setNbThreads(omp_get_num_procs()/2);
+            Eigen::setNbThreads(omp_get_num_procs() / 2);
         }
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
 
-        // Create global K M and F 
-        if (this->createAllMatrices) { // only need to create the KMF matrices the first time
-            this->createAllMatrices = false;
+
+        /* Initialize the model for time = 0 or the first index and build the matrices*/
+        try {
+            this->simulator->deltaT = timeVec[1] - timeVec[0]; // set deltaT
+            this->simulator->setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
+            this->simulator->initializeModel(); // initialize model
+            /*stream << "Global matrices created" << std::endl;
+            displayOnMATLAB(stream);*/
+        }
+        catch (const std::exception& e) {
+            stream << "MEX: Error in createKMF() " << std::endl;
+            displayOnMATLAB(stream);
+            displayError(e.what());
+            return;
+        }
+        stopTime = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        stream << "MEX: Matrices Built:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
+        displayOnMATLAB(stream);
+
+        /* Now perform time stepping with singele steps */
+        int numSteps = timeVec.size() - 1; // if time is of size 2, then we only have 1 step.
+        this->simulator->initializeSensorTemps(numSteps);
+        this->simulator->updateTemperatureSensors(0);
+        for (int t = 1; t <= numSteps; t++) {
+            // we are simulating going from step t-1 to t. In the first case this is going from t[0] to t[1]. 
             try {
-                this->simulator->initializeModel();
-                /*stream << "Global matrices created" << std::endl;
-                displayOnMATLAB(stream);*/
+                this->simulator->deltaT = timeVec[t] - timeVec[t - 1]; // set deltaT
+                // fluence rate is set based on parameters at time = t. This is because for single step
+                // the explicit portion was actually calculated during the previous call, or during initializeModel()
+                // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
+                this->simulator->setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
+                this->simulator->singleStep();
+                this->simulator->updateTemperatureSensors(t);
             }
             catch (const std::exception& e) {
-                stream << "MEX: Error in createKMF() " << std::endl;
+                stream << "MEX: Error in performTimeStepping() " << std::endl;
                 displayOnMATLAB(stream);
                 displayError(e.what());
                 return;
             }
-            stopTime = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-            stream << "MEX: Matrices Built:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
-            displayOnMATLAB(stream);
-        }
-
-
-        // Perform time stepping
-        try { //
-            this->simulator->multiStep(simDuration);
-            /*stream << "Time Stepping Complete" << std::endl;
-            displayOnMATLAB(stream);*/
-        }
-        catch (const std::exception& e) {
-            stream << "MEX: Error in performTimeStepping() " << std::endl;
-            displayOnMATLAB(stream);
-            displayError(e.what());
-            return;
         }
         stopTime = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
@@ -318,13 +356,19 @@ public:
         displayOnMATLAB(stream);
     }
 
-    /* This function makes sure that user has provided the proper inputs
-    * Inputs: T0, FluenceRate, tissueSize TC, VHC, MUA, HTC, boundaryConditions
-     */
+    /** @brief This function makes sure that user has provided the proper inputs
+    * 
+    * This function will check the number, dimensions, and type of each input to make sure they were passed in properly.
+    * Additionally, it will make sure the user is receiving the right number of outputs.
+    * 
+    * @param outputs - list of outputs matlab expects
+    * @param inputs - list of inputs matlab provideds
+    * 
+    */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        if (inputs.size() < 10) {
-            displayError("At least 10 inputs required: T0, NFR, tissueSize, simDuration,"
-                "deltaT tissueProperties, BC, Flux, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
+        if (inputs.size() < 11) {
+            displayError("At least 11 inputs required: T0, tissueSize,"
+                "tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -332,29 +376,13 @@ public:
         if (outputs.size() < 2) {
             displayError("Not enough outputs specified.");
         }
+        // Check Temp Input
         if (inputs[VarPlacement::TEMPERATURE].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("T0 must be an Array of type Single.");
-        }
-        if (inputs[VarPlacement::FLUENCE_RATE].getType() != matlab::data::ArrayType::SINGLE) {
-            displayError("NFR must be an Array of type Single.");
-        }
-        if (!((inputs[VarPlacement::FLUENCE_RATE].getDimensions()[0] == inputs[VarPlacement::TEMPERATURE].getDimensions()[0])
-            && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[1] == inputs[VarPlacement::TEMPERATURE].getDimensions()[1])
-            && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[2] == inputs[VarPlacement::TEMPERATURE].getDimensions()[2]))
-            &&
-            !((inputs[VarPlacement::FLUENCE_RATE].getDimensions()[0] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[0] - 1))
-                && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[1] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[1] - 1))
-                && (inputs[VarPlacement::FLUENCE_RATE].getDimensions()[2] == (inputs[VarPlacement::TEMPERATURE].getDimensions()[2] - 1)))) {
-            displayError("NFR must have either the same dimensions as Temp, or one less in each axis");
         }
         if ((inputs[VarPlacement::TISSUE_SIZE].getDimensions()[0] != 3) || (inputs[VarPlacement::TISSUE_SIZE].getDimensions()[1] != 1)) {
             displayError("Tissue Size must be 3 x 1");
         }
-        /* This Check Doesnt work
-        if (inputs[4][0] > inputs[3][0]) {
-            displayError("deltaT must be less than the final time");
-        }
-        */
         if ((inputs[VarPlacement::TISSUE_PROP].getDimensions()[0] != 4) || (inputs[VarPlacement::TISSUE_PROP].getDimensions()[1] != 1)) {
             displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
         }
@@ -366,6 +394,30 @@ public:
         }
         if ((inputs[VarPlacement::SENSOR_LOC].getDimensions()[1] != 3)) {
             displayError("Sensor Locations must be n x 3");
+        }
+        if ((inputs[VarPlacement::TIME].getDimensions()[0] != 1)) {
+            stream << "Time size in first dimension: " << inputs[VarPlacement::TIME].getDimensions()[0] << std::endl;
+            displayOnMATLAB(stream);
+            displayError("Time should be a row vector 1xn");
+        }
+        if ((inputs[VarPlacement::TIME].getDimensions()[1] < 2)) {
+            displayError("Time should have at least 2 elements");
+        }
+        if ((inputs[VarPlacement::LASER_POWER].getDimensions()[0] != 1)) {
+            displayError("LaserPower should be a row vector 1xn");
+        }
+        if ((inputs[VarPlacement::LASER_POWER].getDimensions()[1] < 2)) {
+            displayError("LaserPower should have at least 2 elements");
+        }
+        if ((inputs[VarPlacement::LASER_POSE].getDimensions()[0] != 6)) {
+            displayError("LaserPose should be a 6xn vector");
+        }
+        if ((inputs[VarPlacement::LASER_POSE].getDimensions()[1] < 2)) {
+            displayError("LaserPose should have at least 2 columns");
+        }
+        if ((inputs[VarPlacement::TIME].getDimensions()[1] != inputs[VarPlacement::LASER_POWER].getDimensions()[1]) ||
+            (inputs[VarPlacement::TIME].getDimensions()[1] != inputs[VarPlacement::LASER_POSE].getDimensions()[1])) {
+            displayError("Time vector, laserPower vector, and laserPose matrix should have the same number of columns");
         }
         if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
             useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
@@ -388,49 +440,5 @@ public:
         if (inputs.size() > VarPlacement::ALPHA) {
             this->simulator->alpha = inputs[VarPlacement::ALPHA][0];
         }
-        if (inputs.size() > VarPlacement::CREATE_MAT) {
-            // this parameter is primarily here for debugging and timing tests. Not really practical for someone
-            // to use this while they're running simulations
-            this->createAllMatrices = this->createAllMatrices || inputs[VarPlacement::CREATE_MAT][0];
-        }
-    }
-
-    bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& FluenceRate,
-        float tissueSize[3],float layerHeight, int elemsInLayer,int boundaryType[6]) {
-        // this function checks to see if we need to recreate the global element matrices
-        this->createAllMatrices = false;
-
-        // if the number of nodes in 1 dimension for an element changes, we need to reconstruct the matrices
-        if (this->simulator->Nn1d != Nn1d) {
-            this->createAllMatrices = true;
-        }
-        // if the size of our temperature vector changes, we need to reconstruct the matrices
-        if (T0.size() != this->simulator->nodesPerAxis[0]) this->createAllMatrices = true; 
-        if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
-        if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
-
-        // if our tissue size has changed we need to reconstruct all matrices because our jacobian has changed
-        if (tissueSize[0] != this->simulator->tissueSize[0]) this->createAllMatrices = true;
-        if (tissueSize[1] != this->simulator->tissueSize[1]) this->createAllMatrices = true;
-        if (tissueSize[2] != this->simulator->tissueSize[2]) this->createAllMatrices = true;
-
-        //if layer height or layer size changed then again we have a jacobian change
-        if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createAllMatrices = true;
-        if (elemsInLayer != elemsInLayer) this->createAllMatrices = true;
-
-        // check if any boundaries have changed
-        for (int b = 0; b < 6; b++) {
-            if (boundaryType[b] != this->simulator->boundaryType[b]) {
-                this->createAllMatrices = true;
-                break;
-            }
-        }
-
-        if (this->createAllMatrices) {
-            stream << "Need to recreate Matrices" << std::endl;
-            displayOnMATLAB(stream);
-        }
-
-        return this->createAllMatrices;
     }
 };

@@ -7,6 +7,7 @@ nodesPerAxis = [41,41,71];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
 deltaT = 0.05;
+alpha = 1/2;
 tFinal = single(0.05);
 w0 = 0.0168;
 focalPoint = 35;
@@ -26,7 +27,7 @@ I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(foca
 xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
 yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
 zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
-[X,Y,Z] = meshgrid(xLayer,yLayer,zLayer);
+[Y,X,Z] = meshgrid(yLayer,xLayer,zLayer); % left handed
 fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
@@ -34,21 +35,92 @@ BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 Flux = 0;
 
 %% Timing Tests
-numSamples = 100;
-timeVec = zeros(2,numSamples);
-for cc = 0:1
-    createMatrices = logical(cc);
-    for i = 1:numSamples
-        tic
-        if ~silentMode
-            fprintf("\n");
-        end
-        [TPrediction,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+nCases = 4;
+numTimeSteps = 100;
+
+durationVec = zeros(nCases,numTimeSteps);
+CaseSensorTemps = ones(nCases,size(sensorPositions,1),numTimeSteps+1)*20;
+
+%% CASE 1 - Repeated calls to MEX with rebuilding matrices
+caseNum = 1;
+createMatrices = true;
+TPrediction = T0;
+for i = 1:numTimeSteps
+    tic
+    [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,createMatrices);
-        timeVec(cc+1,i) = toc;
-    end
-    fprintf("CreateMatrices is %d\n", cc);
-    fprintf("Average time per run: %0.4f s\n", mean(timeVec(cc+1,:)));
-    fprintf("Total time for %d samples: %0.4f\n", numSamples, sum(timeVec(cc+1,:)));
+            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
+    durationVec(caseNum,i) = toc;
 end
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
+%% CASE 2 - Repeated calls to MEX without rebuilding matrices
+caseNum = 2;
+createMatrices = true; % create Matrices has to be true for first call to set proper params
+TPrediction = T0;
+for i = 1:numTimeSteps
+    tic
+    [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
+            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
+            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    createMatrices = false; % after first call it will always be false
+    CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
+    durationVec(caseNum,i) = toc;
+end
+fprintf("CASE %d: Total Time %0.3f s\n",caseNum, sum(durationVec(caseNum,:)));
+%% CASE 3 - Single call to MEX 
+caseNum = 3;
+createMatrices = true;
+tFinal = numTimeSteps*deltaT;
+TPrediction = T0;
+tic
+[TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
+        deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
+        silentMode,layerInfo,Nn1d,alpha,createMatrices);
+CaseSensorTemps(caseNum,:,:) = sensorTemps;
+durationVec(caseNum,end) = toc;
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
+%% CASE 4 - Single call to MEX multiStep 
+% Note that the point of multistep is to handle changing inputs without
+% multiple calls to mex, so it may not be the fastest, but it will be
+% faster than anything calling MEX multiple times. 
+
+caseNum = 4;
+createMatrices = true;
+time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
+laserPower = ones(1,length(time));
+TPrediction = T0;
+tic
+[~,sensorTemps] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
+    tissueProperties,BC,Flux,ambientTemp,sensorPositions,w0,time,...
+    laserPose,laserPower,useAllCPUs,...
+    silentMode,layerInfo,Nn1d,alpha);
+CaseSensorTemps(caseNum,:,:) = sensorTemps;
+durationVec(caseNum,end) = toc;
+fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
+%% Plot Sensor Temps to confirm the different methods produce the same result
+
+time = 0:deltaT:deltaT*numTimeSteps;
+figure(1);
+clf;
+tl = tiledlayout('flow');
+
+for ss = 1:size(sensorPositions,1)
+    ax = nexttile();
+    for cc = 1:nCases
+        hold on;
+        plot(time,reshape(CaseSensorTemps(cc,ss,:),size(time)),'LineWidth',2,'DisplayName',...
+            sprintf("Case %d",cc));
+        hold off
+    end
+    title(sprintf("Location (%g, %g, %g)",sensorPositions(ss,:)));
+    xlabel("Temperature (deg C)");
+    ylabel("Time (s)");
+    grid on;
+end
+leg = legend('Orientation','horizontal');
+leg.Layout.Tile = 'south';

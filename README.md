@@ -54,11 +54,6 @@ To construct a basic simulation object, you need the following information
 - ``HTC``: the heat transfer coefficient [ $\frac{\text{W}}{\text{cm}^2~^o\text{C}}$ ]
 - ``Nn1d``: the number of nodes along one dimension of an element. For linear basis functions use 2. For quadratic basis functions use 3. Some functionality may not be available with quadratic basis functions.
 
-To perform the spatial discretization, run the function ``FEM_Simulator::createKMF()`` and perform the time stepping using
-the function ``FEM_Simulator::performTimeStepping()``.
-If there are no changes to the tissue geometry, number of nodes, boundary conditions, or laser input, the matrices do not need to be rebuilt
-between subsequent calls to ``FEM_Simulator::performTimeStepping()``.
-
 By default the, simulator assumes all 6 faces of the cuboid are dirichlet boundaries (i.e. heat sinks). To change the boundary conditions 
 use the function 'FEM_Simulator::setBoundaryConditions(BC)'. The possible options are
 
@@ -78,21 +73,40 @@ These attributes allow the user to create a mesh with elements of varying length
 
 The remaining elements in the mesh will be used to represent the remaining block of tissue. 
 
-Other parameters that can be adjusted include the type of time integration. By default, we use a step size of 0.01 seconds
-and perform the time integration for 1 second. Both of these settings can be adjusted with ``deltaT`` and ``tFinal``. 
-By default we use the Crank-Nicolson which sets a term ``alpha`` equal to 0.5. 
-If backward Euler is desired, change ``alpha`` to 1. For forwad Euler, change ``alpha`` to 0. 
+Other parameters that can be adjusted include the type of time integration. By default, we use a step size of 0.01 seconds. 
+This can be adjusted by setting the attribute ``deltaT``. 
+By default we use the Crank-Nicolson which sets the attribute ``alpha`` equal to 0.5. 
+If backward Euler is desired, change ``alpha`` to 1. For forwad Euler, change ``alpha`` to 0. Note that there are no checks for
+stability when using Forward Euler. If your time step is too large the system may be unstable. 
 
-Additionally there is a setting to multi-thread for eigen, ``useAllCPUs``, and to remove print statements, ``silentMode``. 
+Additionally print statements can be controlled with the, ``silentMode`` attribute. If you would like to enable multi-threading,
+simply call ``Eigen::SetNbThreads()`` before running the simulator. 
+
+## Running the Simulator
+After all appropriate conditions have been set for the object, we can initialize and run the model. 
+To initialize the model, call the function ``FEM_Simulator::initializeModel()``. This will perform the spatial discretization and get the system ready
+to perform the time integration. Then call either ``FEM_Simulator::singleStep()`` or ``FEM_Simulator::multiStep()`` to simulate the time stepping. 
+If there are no changes to the tissue geometry, number of nodes, or boundary conditions the matrices do not need to be rebuilt
+between subsequent calls to ``FEM_Simulator::singleStep()`` or ``FEM_Simulator::multiStep()``. However, if one of those items changes, 
+``FEM_Simulator::initializeModel()`` will need to be rerun.
 
 
 ## MEX Usage
 The mex file can be called in MATALB as long as it is on the MATLAB Path. 
-Example usage can be found in the folder MexTesting/MexFileTest.m
+Example usage can be found in the folder MexTesting/MexFileTest.m. The mex file controls parellelization by
+setting the useAllCPUs variable. 
 
 ``[TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,
             deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,
             silentMode,layerInfo,Nn1d,createMatrices);``
+
+Alternatively, you can use the multi-step mex file which takes in a time series of inputs. This allows you to reduce the number
+of mex calls if you are simlating a multi-step process with changing inputs. 
+
+``[TpredMulti,sensorTempsMulti] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
+    tissueProperties,BC,flux,ambientTemp,sensorPositions,w0,time,...
+    laserPose,laserPower,useAllCPUs,...
+    silentMode,layerInfo,Nn1d,alpha);``
 
 
 # References

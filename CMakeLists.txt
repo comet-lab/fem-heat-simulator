@@ -4,8 +4,9 @@ project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
 # ──────────────────────────────────────────────────────────────
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
-option(BUILD_TESTING  "Build unit‑test runner"            OFF)
-option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" OFF)
+option(BUILD_TESTING  "Build unit‑test runner"            ON)
+option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" ON)
+
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
 set(CMAKE_CXX_STANDARD 23)
@@ -14,7 +15,7 @@ set(CMAKE_CXX_STANDARD 23)
 # ──────────────────────────────────────────────────────────────
 # Dependencies that come from the system or FetchContent
 # ──────────────────────────────────────────────────────────────
-find_package(Eigen3 3 CONFIG REQUIRED)
+find_package(Eigen3 3.4 CONFIG REQUIRED)
 find_package(OpenMP       REQUIRED)
 
 # Helper to add OpenMP to any target with one line
@@ -102,6 +103,24 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
             target_link_libraries(MEX_Heat_Simulation gomp)
         elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(MEX_Heat_Simulation PRIVATE /openmp)
+        endif()
+
+
+        matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
+            SRC src/MEX_Heat_Simulation_MultiStep.cpp
+        )
+        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::HeatSimulation)
+
+        set_target_properties(MEX_Heat_Simulation_MultiStep PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        )
+        # Manually add OpenMP compile flags (don't use helper function) because MEX requires plain linking
+        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE -fopenmp)
+            target_link_libraries(MEX_Heat_Simulation_MultiStep gomp)
+        elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE /openmp)
         endif()
     endif()
 endif()
