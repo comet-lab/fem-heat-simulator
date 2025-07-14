@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 23)
 # ──────────────────────────────────────────────────────────────
 # Dependencies that come from the system or FetchContent
 # ──────────────────────────────────────────────────────────────
-find_package(Eigen3 3 CONFIG REQUIRED)
+find_package(Eigen3 3.4 CONFIG REQUIRED)
 find_package(OpenMP       REQUIRED)
 
 # Helper to add OpenMP to any target with one line
