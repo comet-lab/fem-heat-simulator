@@ -39,7 +39,7 @@ public:
 
 	FEM_Simulator() = default;
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
-	FEM_Simulator(FEM_Simulator& inputSim);
+	FEM_Simulator(const FEM_Simulator& inputSim);
 	void multiStep(float duration); // simulates multiple steps of time integration
 	void singleStep(); // simulates a single step of time integration
 	void buildMatrices(); // creates global matrices and performs spatial discretization

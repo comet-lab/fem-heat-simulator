@@ -19,7 +19,7 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	
 }
 
-FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
+FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 {
 	for (int i = 0; i < 3; i++) {
 		this->elementsPerAxis[i] = inputSim.elementsPerAxis[i]; // Number of elements in x, y, and z [voxels]
