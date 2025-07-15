@@ -48,6 +48,8 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->fluenceUpdate = inputSim.fluenceUpdate;
 	
 	this->LHS = inputSim.LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
+	this->dVec = inputSim.dVec; // This is our discrete temperature at non-dirichlet nodes from Time-stepping
+	this->vVec = inputSim.vVec; // This is our discrete temperature velocity from Time-stepping
 
 	this->Kint = inputSim.Kint; // Conductivity matrix for non-dirichlet nodes
 	this->Kconv = inputSim.Kconv; //Conductivity matrix due to convection
@@ -132,7 +134,7 @@ void FEM_Simulator::singleStep() {
 		this->fluenceUpdate = false;
 
 		if (this->parameterUpdate) { // Happens only if parameters were updated
-			this->LHS = globM + this->alpha * this->deltaT * globK; // Create new left hand side 
+			this->LHS = this->globM + this->alpha * this->deltaT * this->globK; // Create new left hand side 
 			this->LHS.makeCompressed(); // compress it for potential speed improvements
 			this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
 			if (this->cgSolver.info() != Eigen::Success) {
@@ -164,7 +166,7 @@ void FEM_Simulator::singleStep() {
 		std::cout << "Iterations: " << this->cgSolver.iterations() << std::endl;
 	}*/
 	// Implicit Backward Step (only if alpha > 0) 
-	this->dVec = this->dVec + this->alpha * this->deltaT * vVec; // ... dTilde would also be on the righ-hand side here. 
+	this->dVec = this->dVec + this->alpha * this->deltaT * this->vVec; // ... dTilde would also be on the righ-hand side here. 
 
 	// Adjust our Temp with new d vector
 	this->Temp(validNodes) = this->dVec;
