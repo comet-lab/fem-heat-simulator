@@ -43,10 +43,17 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	this->boundaryType = inputSim.boundaryType; // Individual boundary type for each face: 0: heat sink. 1: Flux Boundary. 2: Convective Boundary
 	this->tempSensorLocations = inputSim.tempSensorLocations;
 	this->sensorTemps = inputSim.sensorTemps;
+
+	this->parameterUpdate = inputSim.parameterUpdate;
+	this->fluenceUpdate = inputSim.fluenceUpdate;
+	
+	this->LHS = inputSim.LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
+
 	this->Kint = inputSim.Kint; // Conductivity matrix for non-dirichlet nodes
 	this->Kconv = inputSim.Kconv; //Conductivity matrix due to convection
 	this->M = inputSim.M; // Row Major because we fill it in one row at a time for nodal build -- elemental it doesn't matter
 	// FirrElem = FirrElem*muA + Fconv*h + Fk*kappa + Fq
+	this->FirrMat = inputSim.FirrMat; // forcing function due to irradiance when multiplied by nodal fluence rate
 	this->FirrElem = inputSim.FirrElem; // forcing function due to irradiance
 	this->Fconv = inputSim.Fconv; // forcing functino due to convection
 	this->Fk = inputSim.Fk; // forcing function due conductivity matrix on dirichlet nodes
@@ -71,8 +78,18 @@ FEM_Simulator::FEM_Simulator(FEM_Simulator& inputSim)
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations.
 	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
-
 	this->silentMode = inputSim.silentMode;
+
+	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
+	try {
+		this->initializeTimeIntegration(); // insteady try and initializeTimeIntegration();
+	}
+	catch (...) {
+		// This block catches any other type of exception not caught by previous handlers
+		if (!silentMode) {
+			std::cout << "Failed to initialize cgSolver." << std::endl;
+		}
+	}
 }
 
 void FEM_Simulator::multiStep(float duration) {
