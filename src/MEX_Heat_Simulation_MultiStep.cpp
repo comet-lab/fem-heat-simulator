@@ -330,6 +330,8 @@ public:
                 displayError(e.what());
                 return;
             }
+            stream << "Step " << t << " of " << numSteps << std::endl;
+            displayOnMATLAB(stream);
         }
         stopTime = std::chrono::high_resolution_clock::now();
         duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
