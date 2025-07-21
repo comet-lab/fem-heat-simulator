@@ -83,15 +83,16 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	this->silentMode = inputSim.silentMode;
 
 	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
-	try {
-		this->initializeTimeIntegration(); // insteady try and initializeTimeIntegration();
-	}
-	catch (...) {
-		// This block catches any other type of exception not caught by previous handlers
-		if (!silentMode) {
-			std::cout << "Failed to initialize cgSolver." << std::endl;
-		}
-	}
+	/* Try-Catch block won't actually catch a faulty matrix multiplication in Eigen*/
+	//try {
+	//	this->initializeTimeIntegration(); // insteady try and initializeTimeIntegration();
+	//}
+	//catch (...) {
+	//	// This block catches any other type of exception not caught by previous handlers
+	//	if (!silentMode) {
+	//		std::cout << "Failed to initialize cgSolver." << std::endl;
+	//	}
+	//}
 }
 
 void FEM_Simulator::multiStep(float duration) {
@@ -1182,44 +1183,49 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
 {
 	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
-	float lambda = 10.6 * pow(10, -4); // wavelength of laser in cm
+	
+	// Precompute constants
+	const float pi = 3.14159265358979323846f;
+	const float lambda = 10.6e-4f;  // wavelength in cm
+	const int nx = this->nodesPerAxis[0];
+	const int ny = this->nodesPerAxis[1];
+	const int nz = this->nodesPerAxis[2];
 	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
 	//TODO: account for orientation shift on the laser
 	// I(x,y,z) = 2*P/(pi*w^2) * exp(-2*(x^2 + y^2)/w^2 - mua*z)
 
-	float irr = 0;
-	float width = 0; 
-	float xPos = -this->tissueSize[0] / 2;
-	float xStep = this->tissueSize[0] / this->elementsPerAxis[0];
-	float yPos = -this->tissueSize[1] / 2;
-	float yStep = this->tissueSize[1] / this->elementsPerAxis[1];
-	float zPos = 0;
-	float zStep = this->layerHeight / this->elemsInLayer;
+	const float mua = this->MUA;
+	const float xStart = -this->tissueSize[0] / 2.0f;
+	const float xStep = this->tissueSize[0] / this->elementsPerAxis[0];
+	const float yStart = -this->tissueSize[1] / 2.0f;
+	const float yStep = this->tissueSize[1] / this->elementsPerAxis[1];
+	const float zStep1 = this->layerHeight / this->elemsInLayer;
+	const float zStep2 = (this->tissueSize[2] - this->layerHeight) / (this->elementsPerAxis[2] - this->elemsInLayer);
 
-	for (int i = 0; i < this->nodesPerAxis[0]; i++) {
-		yPos = -this->tissueSize[1] / 2;
-		for (int j = 0; j < this->nodesPerAxis[1]; j++) {
-			zPos = 0;
-			zStep = this->layerHeight / this->elemsInLayer;
-			for (int k = 0; k < this->nodesPerAxis[2]; k++) {
-				if (k >= this->elemsInLayer) {
-					// if we have passed the layer size
-					zStep = (tissueSize[2] - this->layerHeight) / (this->elementsPerAxis[2] - this->elemsInLayer);
-				}
-				// calculate beam width at depth
-				width = beamWaist * std::sqrt(1 + pow((lambda * (zPos + laserPose[2]) / (std::acos(-1) * pow(beamWaist, 2))), 2));
-				// calculate laser irradiance
-				irr = 2 * laserPower / (std::acos(-1) * pow(width, 2)) * std::exp(-2 * (pow((xPos - laserPose[0]), 2) + pow((yPos - laserPose[1]), 2)) / pow(width,2) - this->MUA * zPos);
-				// set laser irradiance
-				this->FluenceRate(i + j * this->nodesPerAxis[0] + k * this->nodesPerAxis[0] * this->nodesPerAxis[1]) = irr;
-				// increase z pos
-				zPos = zPos + zStep;
+	for (int i = 0; i < nx; ++i) {
+		float x = xStart + i * xStep;
+		float xf = x - laserPose[0];// distance between node and laser focal point in x
+
+		for (int j = 0; j < ny; ++j) {
+			float y = yStart + j * yStep;
+			float yf = y - laserPose[1]; // distance between node and laser focal point in y
+
+			float z = 0.0f;
+			for (int k = 0; k < nz; ++k) {
+				float zf = z - laserPose[2]; // distance between node and laser focal point in x
+				float waist2 = beamWaist * beamWaist;
+				float width = beamWaist * std::sqrt(1.0f + ((lambda * zf) / (pi * waist2)) * ((lambda * zf) / (pi * waist2)));
+				float width2 = width * width;
+
+				float exponent = -2.0f * (xf * xf + yf * yf) / width2 - mua * z;
+				float irr = 2.0f * laserPower / (pi * width2) * std::exp(exponent);
+
+				int index = i + j * nx + k * nx * ny;
+				this->FluenceRate(index) = irr;
+
+				z += (k < this->elemsInLayer) ? zStep1 : zStep2;
 			}
-			// increase y pos
-			yPos = yPos + yStep;
 		}
-		// increase x pos 
-		xPos = xPos + xStep;
 	}
 
 	this->fluenceUpdate = true;
