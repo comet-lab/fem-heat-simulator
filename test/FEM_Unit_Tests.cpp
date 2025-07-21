@@ -716,6 +716,25 @@ TEST_F(BaseSim, testPositionToElement1) {
 	}
 }
 
+TEST_F(BaseSim, testSetFluenceRate) {
+
+	femSimLin->setLayer(0.05, 1);
+	float laserPose[6] = { 0,0,-20,0,0,0 };
+	float beamWaist = 0.0168;
+	float laserPower = 1; 
+	femSimLin->setFluenceRate(laserPose, laserPower, beamWaist);
+	Eigen::VectorXf fluenceTrue(27); // matrices are transformed into vectors using column major
+	fluenceTrue << 0.008097328938, 0.1785890066, 0.008097328938, 0.1785890066, 3.938833843, 0.1785890066, 0.008097328938, 0.1785890066, 0.008097328938,
+		0.007903577769, 0.1716547562, 0.007903577769, 0.1716547562, 3.728103424, 0.1716547562, 0.007903577769, 0.1716547562, 0.007903577769,
+		0.004799076444, 0.07942576033, 0.004799076444, 0.07942576033, 1.314513631, 0.07942576033, 0.004799076444, 0.07942576033, 0.004799076444;
+
+	int nNodes = femSimLin->nodesPerAxis[0] * femSimLin->nodesPerAxis[1] * femSimLin->nodesPerAxis[2];
+	for (int i = 0; i < nNodes; i++) {
+		//std::cout << "Simulator: " << femSimLin->FluenceRate(i) << " True Value: " << fluenceTrue(i) << std::endl;
+		ASSERT_TRUE(abs(femSimLin->FluenceRate(i) - fluenceTrue(i)) < 0.000001);
+	}
+}
+
 TEST(SecondaryTest, testPositionToElement2) {
 
 	// Multi Layer Test
