@@ -205,7 +205,7 @@ void FEM_Simulator::buildMatrices()
 
 	// Initialize matrices so that we don't have to resize them later
 	this->FirrElem = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
-	this->FirrMat = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes);
+	this->FirrMat = Eigen::SparseMatrix<float, Eigen::RowMajor>(nNodes - this->dirichletNodes.size(), nNodes);
 	this->FirrMat.reserve(Eigen::VectorXi::Constant(nNodes, pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	// TODO: make these three vectors sparse because they will only be non zero on the boundary nodes
 	this->Fconv = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
@@ -213,12 +213,12 @@ void FEM_Simulator::buildMatrices()
 	this->Fq = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
 
 	// M and K will be sparse matrices because nodes are shared by relatively few elements
-	this->M = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->M = Eigen::SparseMatrix<float, Eigen::RowMajor>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->M.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d*2 - 1),3))); // at most 27 non-zero entries per column
-	this->Kint = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->Kint = Eigen::SparseMatrix<float, Eigen::RowMajor>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kint.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
-	this->Kconv = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
+	this->Kconv = Eigen::SparseMatrix<float, Eigen::RowMajor>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kconv.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 	
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
@@ -369,7 +369,7 @@ void FEM_Simulator::createFirr()
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	// Initialize matrices so that we don't have to resize them later
 	this->FirrElem = Eigen::VectorXf::Zero(nNodes - this->dirichletNodes.size());
-	this->FirrMat = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes);
+	this->FirrMat = Eigen::SparseMatrix<float, Eigen::RowMajor>(nNodes - this->dirichletNodes.size(), nNodes);
 	this->FirrMat.reserve(Eigen::VectorXi::Constant(nNodes, pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
 
 	bool layerFlag = false;
@@ -435,6 +435,9 @@ void FEM_Simulator::applyParameters()
 		Firr = this->FirrMat * this->FluenceRate;
 	}
 	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+
+	this->globK.makeCompressed();
+	this->globM.makeCompressed();
 }
 
 void FEM_Simulator::initializeTimeIntegration()
@@ -456,7 +459,7 @@ void FEM_Simulator::initializeTimeIntegration()
 		// Perform the conjugate gradiant to compute the initial vVec value
 		// This is a bit odd because if the user hasn't specified the initial fluence rate it will be 0 initially. 
 		// And can mess up the first few timesteps
-		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
+		Eigen::ConjugateGradient<Eigen::SparseMatrix<float, Eigen::RowMajor>, Eigen::Lower | Eigen::Upper> initSolver;
 		initSolver.compute(this->globM);
 		Eigen::VectorXf RHSinit = (this->globF) - this->globK * this->dVec;
 		vVec = initSolver.solve(RHSinit);
