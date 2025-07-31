@@ -7,7 +7,7 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    int nodesPerAxis[3] = { 101,101,100 };
+    int nodesPerAxis[3] = { 41,41,50 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
     std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
@@ -25,7 +25,7 @@ int main()
 
     
     int Nn1d = 2;
-    float tissueSize[3] = { 5.0f,5.0f,1.0f };
+    float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
     FEM_Simulator simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
     simulator.alpha = 1;
@@ -38,7 +38,7 @@ int main()
     std::cout << "Object Created " << std::endl;
 
     simulator.deltaT = 0.05f;
-    int BC[6] = { 2,0,2,2,2,2 };
+    int BC[6] = { 2,0,0,0,0,0 };
     simulator.setBoundaryConditions(BC);
     simulator.setFlux(0.0f);
     simulator.setAmbientTemp(24);
@@ -56,26 +56,18 @@ int main()
     Eigen::setNbThreads(1);
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
 
-    float totalTime = 1.0f;
-    int numSteps = round(totalTime / simulator.deltaT);
+    float totalTime = 0.05f;
     simulator.silentMode = false;
     simulator.initializeModel();
-
-    // Perform Time Stepping
-    auto start = std::chrono::high_resolution_clock::now();
-    auto prev = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(prev - start);
-    for (int i = 0; i < numSteps; i++) {
-        simulator.setFluenceRate(laserPose, 0.8 + i/20.0f, 0.0168);
-        //simulator.multiStep(totalTime);
-        simulator.singleStep();
-        duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - prev);
-        std::cout << "Single Step: " << duration.count() / 1000000.0 << std::endl;
-        prev = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 1; i++) {
+        simulator.setFluenceRate(laserPose, 1, 0.0168);
+        simulator.multiStep(totalTime);
     }
-
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
     
     /* Printing Results*/
@@ -100,6 +92,6 @@ int main()
         std::cout << "Left Face Temp: " <<  simulator.Temp((nodesPerAxis[0]-1) / 2 + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
     }
 
-    //std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
+    std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
     
 }
