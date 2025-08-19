@@ -7,7 +7,7 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    int nodesPerAxis[3] = { 41,41,50 };
+    int nodesPerAxis[3] = { 101,101,100 };
 
     std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
     std::vector<std::vector<std::vector<float>>> FluenceRate(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
@@ -55,13 +55,13 @@ int main()
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
-
-    float totalTime = 0.05f;
+    simulator.useGPU = false;
+    float totalTime = 2.0f;
     simulator.silentMode = false;
     simulator.initializeModel();
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i <= round(totalTime/simulator.deltaT); i++) {
         simulator.setFluenceRate(laserPose, 1, 0.0168);
-        simulator.multiStep(totalTime);
+        simulator.singleStep();
     }
     
     auto end = std::chrono::high_resolution_clock::now();
@@ -90,6 +90,6 @@ int main()
         std::cout << "Left Face Temp: " <<  simulator.Temp((nodesPerAxis[0]-1) / 2 + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
     }
 
-    std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
+    // std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
     
 }

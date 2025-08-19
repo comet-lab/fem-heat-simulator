@@ -35,7 +35,7 @@ void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>&
     if (Ax) { AMGX_vector_destroy(Ax); Ax = nullptr; }
     if (Ab) { AMGX_vector_destroy(Ab); Ab = nullptr; }
 
-    std::cout << "Memory leak cleaned up" << std::endl;
+    // std::cout << "Memory leak cleaned up" << std::endl;
 
     /* Actual upload code*/
     Eigen::SparseMatrix<float, Eigen::RowMajor> Ac = A;
@@ -48,17 +48,17 @@ void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>&
     std::vector<int> col_idx(Ac.nonZeros());
     std::vector<float> values(Ac.nonZeros());
 
-    std::cout << "Vectors created" << std::endl;
+    // std::cout << "Vectors created" << std::endl;
 
     std::copy(Ac.outerIndexPtr(), Ac.outerIndexPtr() + Ac.rows() + 1, row_ptr.begin());
     std::copy(Ac.innerIndexPtr(), Ac.innerIndexPtr() + Ac.nonZeros(), col_idx.begin());
     std::copy(Ac.valuePtr(), Ac.valuePtr() + Ac.nonZeros(), values.begin());
 
-    std::cout << "Vectors copied" << std::endl;
+    // std::cout << "Vectors copied" << std::endl;
 
-    std::cout << "Creating AMGX Matrix" << std::endl;
+    // std::cout << "Creating AMGX Matrix" << std::endl;
     AMGX_matrix_create(&Amat, rsrc, AMGX_mode_dFFI);
-    std::cout << "Uploading AMGX Matrix" << std::endl;
+    // std::cout << "Uploading AMGX Matrix" << std::endl;
     AMGX_matrix_upload_all(Amat,
         n_rows,
         nnz,                // number of nonzeros
@@ -68,10 +68,7 @@ void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>&
         col_idx.data(),        // int*
         values.data(),         // float* or double* depending on AMGX_mode
         nullptr);   
-
-    // AMGX_matrix_upload_all(Amat, n, Ac.nonZeros(), 1,
-    //     row_ptr.data(), col_idx.data(), values.data(), nullptr);
-    std::cout << "Creating AMGX Vector" << std::endl;
+    // std::cout << "Creating AMGX Vector" << std::endl;
     AMGX_vector_create(&Ax, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ab, rsrc, AMGX_mode_dFFI);
 }
