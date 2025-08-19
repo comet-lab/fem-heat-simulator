@@ -9,6 +9,11 @@
 #include <chrono>
 #include <stdexcept>
 
+#ifdef USE_AMGX
+#include "AmgXSolver.hpp"
+#include <cuda_runtime.h>
+#endif
+
 class FEM_Simulator
 {
 public:
@@ -37,7 +42,7 @@ public:
 	//0 - heat sink, 1 - heatFlux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
-	FEM_Simulator() = default;
+	FEM_Simulator();
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(const FEM_Simulator& inputSim);
 	void multiStep(float duration); // simulates multiple steps of time integration
@@ -115,6 +120,11 @@ public:
 	by how they are created (e.g. conduction, laser, etc). These are saved as class attributes because
 	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
+#ifdef USE_AMGX
+	AmgXSolver* amgxSolver = nullptr;
+#endif
+	bool useGPU = false;
+
 	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kconv; //Conductivity matrix due to convection
@@ -177,6 +187,7 @@ public:
 
 	void ind2sub(int index, int size[3], int sub[3]); 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
+	bool gpuAvailable();
 };
 
 

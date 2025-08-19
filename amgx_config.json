@@ -1,0 +1,21 @@
+{
+  "config_version": 2,
+  "solver": {
+    "preconditioner": {
+      "class": "AMG",
+      "scope": "amg",
+      "max_iters": 1,
+      "cycle": "V",
+      "strength_threshold": 0.25,
+      "interp": "D2",
+      "max_levels": 10
+    },
+    "solver": "PCG",
+    "max_iters": 100,
+    "convergence": "RELATIVE_INI_CORE",
+    "tolerance": 1e-8,
+    "print_solve_stats": 1,
+    "print_grid_stats": 0,
+    "obtain_timings": 1
+  }
+}

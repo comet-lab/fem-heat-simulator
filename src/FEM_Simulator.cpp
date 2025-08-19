@@ -6,6 +6,10 @@
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
 
+FEM_Simulator::FEM_Simulator() {
+	this->useGPU = gpuAvailable();
+}
+
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
 {
 	this->Nn1d = Nn1d;
@@ -16,7 +20,8 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setVHC(VHC);
 	this->setMUA(MUA);
 	this->setHTC(HTC);
-	
+
+	this->useGPU = gpuAvailable();
 }
 
 FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
@@ -122,7 +127,7 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
-	
+
 
 	if (this->fluenceUpdate || this->parameterUpdate) {
 		// only happens if fluenceUpdate is true
@@ -131,21 +136,34 @@ void FEM_Simulator::singleStep() {
 			createFirr();
 		}
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
-		this->applyParameters(); 
+		this->applyParameters();
 		this->fluenceUpdate = false;
 
 		if (this->parameterUpdate) { // Happens only if parameters were updated
 			this->LHS = this->globM + this->alpha * this->deltaT * this->globK; // Create new left hand side 
 			this->LHS.makeCompressed(); // compress it for potential speed improvements
-			this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
-			if (this->cgSolver.info() != Eigen::Success) {
-				std::cout << "Decomposition Failed" << std::endl;
+
+
+#ifdef USE_AMGX
+			if (this->useGPU) {
+				this->amgxSolver->uploadMatrix(this->LHS);
+				this->amgxSolver->setup();
 			}
+			else
+
+#endif		
+			{
+				this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+				if (this->cgSolver.info() != Eigen::Success) {
+					std::cout << "Decomposition Failed" << std::endl;
+				}
+			}
+
 			this->parameterUpdate = false;
 		}
 	}
 
-	
+
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
 
@@ -158,10 +176,18 @@ void FEM_Simulator::singleStep() {
 	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
 	// Solve Ax = b using conjugate gradient
 	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
-	this->vVec = this->cgSolver.solveWithGuess(RHS,this->vVec);
-	//this->vVec = this->cgSolver.solve(RHS);
-	if (this->cgSolver.info() != Eigen::Success) {
-		std::cout << "Issue With Solver" << std::endl;
+#ifdef USE_AMGX
+	if (this->useGPU) {
+		this->amgxSolver->solve(RHS, this->vVec);
+	}
+	else
+#endif
+	{
+		this->vVec = this->cgSolver.solveWithGuess(RHS, this->vVec);
+		//this->vVec = this->cgSolver.solve(RHS);
+		if (this->cgSolver.info() != Eigen::Success) {
+			std::cout << "Issue With Solver" << std::endl;
+		}
 	}
 	/*if (!this->silentMode) {
 		std::cout << "Iterations: " << this->cgSolver.iterations() << std::endl;
@@ -468,12 +494,23 @@ void FEM_Simulator::initializeTimeIntegration()
 	// Prepare solver for future iterations
 	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
 	this->LHS.makeCompressed();
-	// These two steps form the cgSolver.compute() function. By calling them separately, we 
-	// only ever need to call factorize when the tissue properties change.
-	this->cgSolver.analyzePattern(this->LHS);
-	this->cgSolver.factorize(this->LHS);
-	if (this->cgSolver.info() != Eigen::Success) {
-		std::cout << "Decomposition Failed" << std::endl;
+	//// These two steps form the cgSolver.compute() function. By calling them separately, we 
+	//// only ever need to call factorize when the tissue properties change.
+
+	
+#ifdef USE_AMGX
+	if (this->useGPU) {
+		this->amgxSolver = new AmgXSolver("amgx_config.json");
+		this->amgxSolver->uploadMatrix(this->LHS);
+		this->amgxSolver->setup();
+	}else
+#endif
+	{
+		this->cgSolver.analyzePattern(this->LHS);
+		this->cgSolver.factorize(this->LHS);
+		if (this->cgSolver.info() != Eigen::Success) {
+			std::cout << "Decomposition Failed" << std::endl;
+		}
 	}
 	startTime = this->printDuration("Initial Matrix Factorization Completed in ", startTime);
 }
@@ -1457,4 +1494,26 @@ std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::st
 		
 	}
 	return startTime;
+}
+
+bool FEM_Simulator::gpuAvailable() {
+	bool useGPU = false;
+
+#ifdef USE_AMGX
+	int deviceCount = 0;
+	cudaError_t err = cudaGetDeviceCount(&deviceCount);
+	useGPU = (err == cudaSuccess && deviceCount > 0);
+
+
+	if (useGPU) {
+		std::cout << "GPU detected: using AmgX solver\n";
+		this->amgxSolver = new AmgXSolver("amgx_config.json")
+	}
+	else
+#endif 
+	{
+		std::cout << "No GPU: using Eigen solver\n";
+	}
+
+	return useGPU;
 }

@@ -6,6 +6,7 @@ project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" ON)
+option(USE_AMGX "Enable GPU solver using AmgX (requires CUDA)" ON)
 
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
@@ -22,6 +23,39 @@ find_package(OpenMP       REQUIRED)
 function(enable_openmp tgt)
     target_link_libraries(${tgt} PUBLIC OpenMP::OpenMP_CXX)
 endfunction()
+
+# ──────────────────────────────────────────────────────────────
+# Enabling GPU Support if possible
+# ──────────────────────────────────────────────────────────────
+if(USE_AMGX)
+    find_package(CUDAToolkit QUIET)
+    if(CUDAToolkit_FOUND)
+        message(STATUS "CUDA found, enabling AmgX support")
+        add_definitions(-DUSE_AMGX)
+
+        # On Linux: AmgX ships as amgxsh.so and amgx_c.h
+        # On Windows: amgxsh.dll + amgx.lib (import library)
+        # Adjust paths if needed, or set AMGX_ROOT manually
+        find_path(AMGX_INCLUDE_DIR amgx_c.h
+            HINTS ${CUDAToolkit_INCLUDE_DIRS}
+        )
+        find_library(AMGX_LIBRARY NAMES amgxsh
+            HINTS ${CUDAToolkit_LIBRARY_DIR}
+        )
+
+        if(AMGX_INCLUDE_DIR AND AMGX_LIBRARY)
+            message(STATUS "AmgX found at ${AMGX_LIBRARY}")
+            target_include_directories(HeatSimulation PUBLIC ${AMGX_INCLUDE_DIR})
+            target_link_libraries(HeatSimulation PUBLIC CUDA::cudart ${AMGX_LIBRARY})
+        else()
+            message(WARNING "AmgX not found, disabling GPU solver")
+            remove_definitions(-DUSE_AMGX)
+        endif()
+    else()
+        message(STATUS "CUDA not found, disabling AmgX")
+        set(USE_AMGX OFF)
+    endif()
+endif()
 
 # ──────────────────────────────────────────────────────────────
 # Library: HeatSimulation
