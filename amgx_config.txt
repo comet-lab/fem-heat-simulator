@@ -1,0 +1,16 @@
+# AMGX config file
+config_version=2
+
+solver(CG)=PCG
+CG:max_iters=100
+CG:convergence=RELATIVE_INI_CORE
+CG:tolerance=1e-8
+CG:print_solve_stats=0
+CG:print_grid_stats=0
+CG:obtain_timings=0
+
+CG:preconditioner(amg_1)=AMG
+amg_1:max_iters=1
+amg_1:cycle=V
+amg_1:strength_threshold=0.25
+amg_1:max_levels=10

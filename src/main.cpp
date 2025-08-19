@@ -21,9 +21,7 @@ int main()
             }
         }
     }
-    
-
-    
+        
     int Nn1d = 2;
     float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
@@ -45,7 +43,7 @@ int main()
 
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.95f}, {1,0,0}, {0,1,0},{0,0,1} };
     simulator.setSensorLocations(tempSensorLocations);
-    FEM_Simulator simCopy = FEM_Simulator(simulator);
+    // FEM_Simulator simCopy = FEM_Simulator(simulator);
     std::cout << "Running FEA" << std::endl;
 
 #ifdef _OPENMP

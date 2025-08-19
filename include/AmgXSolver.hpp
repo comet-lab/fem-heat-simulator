@@ -19,5 +19,5 @@ private:
     AMGX_solver_handle solver;
     AMGX_matrix_handle Amat;
     AMGX_vector_handle Ax, Ab;
-    int n;
+    int n_rows, n_cols, nnz;
 };

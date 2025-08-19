@@ -36,21 +36,26 @@ if(USE_AMGX)
         # On Linux: AmgX ships as amgxsh.so and amgx_c.h
         # On Windows: amgxsh.dll + amgx.lib (import library)
         # Adjust paths if needed, or set AMGX_ROOT manually
-        find_path(AMGX_INCLUDE_DIR amgx_c.h
-            HINTS ${CUDAToolkit_INCLUDE_DIRS}
-        )
-        find_library(AMGX_LIBRARY NAMES amgxsh
-            HINTS ${CUDAToolkit_LIBRARY_DIR}
+        # find_path(AMGX_INCLUDE_DIR amgx_c.h
+        #     HINTS ${CUDAToolkit_INCLUDE_DIRS}
+        # )
+        # find_library(AMGX_LIBRARY NAMES amgxsh
+        #     HINTS ${CUDAToolkit_LIBRARY_DIR}
+        # )
+        # Path to AmgX installation
+        set(AMGX_ROOT "/usr/local/amgx")  # or your CMAKE_INSTALL_PREFIX
+
+        # Find the include directory
+        find_path(AMGX_INCLUDE_DIR
+            NAMES amgx_c.h
+            PATHS ${AMGX_ROOT}/include
         )
 
-        if(AMGX_INCLUDE_DIR AND AMGX_LIBRARY)
-            message(STATUS "AmgX found at ${AMGX_LIBRARY}")
-            target_include_directories(HeatSimulation PUBLIC ${AMGX_INCLUDE_DIR})
-            target_link_libraries(HeatSimulation PUBLIC CUDA::cudart ${AMGX_LIBRARY})
-        else()
-            message(WARNING "AmgX not found, disabling GPU solver")
-            remove_definitions(-DUSE_AMGX)
-        endif()
+        # Find the library
+        find_library(AMGX_LIBRARY
+            NAMES amgx amgxsh
+            PATHS ${AMGX_ROOT}/lib
+        )
     else()
         message(STATUS "CUDA not found, disabling AmgX")
         set(USE_AMGX OFF)
@@ -62,10 +67,12 @@ endif()
 # ──────────────────────────────────────────────────────────────
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
+    src/AmgXSolver.cpp
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
+    include/AmgXSolver.hpp
 )
 
 add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
@@ -77,9 +84,29 @@ target_include_directories(HeatSimulation
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        ${AMGX_INCLUDE_DIR}
 )
-target_link_libraries(HeatSimulation PUBLIC Eigen3::Eigen)
+target_link_libraries(HeatSimulation 
+    PUBLIC 
+        Eigen3::Eigen 
+        CUDA::cudart 
+        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+        ${AMGX_LIBRARY} 
+        CUDA::cusparse
+        CUDA::cusolver
+        CUDA::cublas
+        dl
+)
 enable_openmp(HeatSimulation)
+
+if(AMGX_INCLUDE_DIR AND AMGX_LIBRARY)
+    message(STATUS "AmgX found at ${AMGX_LIBRARY}")
+    # target_include_directories(HeatSimulation PUBLIC ${AMGX_INCLUDE_DIR})
+    # target_link_libraries(HeatSimulation PUBLIC CUDA::cudart ${AMGX_LIBRARY})
+else()
+    message(WARNING "AmgX not found, disabling GPU solver")
+    remove_definitions(-DUSE_AMGX)
+endif()
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main

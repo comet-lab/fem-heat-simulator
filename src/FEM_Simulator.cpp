@@ -500,7 +500,7 @@ void FEM_Simulator::initializeTimeIntegration()
 	
 #ifdef USE_AMGX
 	if (this->useGPU) {
-		this->amgxSolver = new AmgXSolver("amgx_config.json");
+		// this->amgxSolver = new AmgXSolver("amgx_config.json");
 		this->amgxSolver->uploadMatrix(this->LHS);
 		this->amgxSolver->setup();
 	}else
@@ -1507,7 +1507,7 @@ bool FEM_Simulator::gpuAvailable() {
 
 	if (useGPU) {
 		std::cout << "GPU detected: using AmgX solver\n";
-		this->amgxSolver = new AmgXSolver("amgx_config.json")
+		this->amgxSolver = new AmgXSolver("../amgx_config.txt");
 	}
 	else
 #endif 
