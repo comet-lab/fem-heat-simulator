@@ -127,8 +127,6 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
-
-
 	if (this->fluenceUpdate || this->parameterUpdate) {
 		// only happens if fluenceUpdate is true
 		if (this->fluenceUpdate && this->elemNFR)
@@ -142,15 +140,13 @@ void FEM_Simulator::singleStep() {
 		if (this->parameterUpdate) { // Happens only if parameters were updated
 			this->LHS = this->globM + this->alpha * this->deltaT * this->globK; // Create new left hand side 
 			this->LHS.makeCompressed(); // compress it for potential speed improvements
-
-
 #ifdef USE_AMGX
 			if (this->useGPU) {
-				this->amgxSolver->uploadMatrix(this->LHS);
+				this->amgxSolver->updateMatrixValues(this->LHS);
+				// this->amgxSolver->uploadMatrix(this->LHS);
 				this->amgxSolver->setup();
 			}
 			else
-
 #endif		
 			{
 				this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
@@ -158,7 +154,6 @@ void FEM_Simulator::singleStep() {
 					std::cout << "Decomposition Failed" << std::endl;
 				}
 			}
-
 			this->parameterUpdate = false;
 		}
 	}
@@ -446,6 +441,7 @@ void FEM_Simulator::createFirr()
 
 void FEM_Simulator::applyParameters()
 {
+	auto startTime = std::chrono::steady_clock::now();
 	/* Here we assume constant tissue properties throughout the mesh. This allows us to
 	multiply by tissue specific properties after the element construction, which means we can change
 	tissue properties without having to reconstruct the matrices
@@ -453,6 +449,8 @@ void FEM_Simulator::applyParameters()
 	// Apply parameter specific multiplication for each global matrix.
 	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
 	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	this->globK.makeCompressed();
+	this->globM.makeCompressed();
 	Eigen::VectorXf Firr;
 	if (elemNFR) { // Using Element based NFR so we just use assignment
 		Firr = this->FirrElem;
@@ -461,6 +459,7 @@ void FEM_Simulator::applyParameters()
 		Firr = this->FirrMat * this->FluenceRate;
 	}
 	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+	startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
 }
 
 void FEM_Simulator::initializeTimeIntegration()
@@ -494,25 +493,27 @@ void FEM_Simulator::initializeTimeIntegration()
 	// Prepare solver for future iterations
 	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
 	this->LHS.makeCompressed();
-	//// These two steps form the cgSolver.compute() function. By calling them separately, we 
-	//// only ever need to call factorize when the tissue properties change.
-
+	startTime = this->printDuration("LHS created: ", startTime);
 	
 #ifdef USE_AMGX
 	if (this->useGPU) {
-		// this->amgxSolver = new AmgXSolver("amgx_config.json");
+		// Upload the matrix to the GPU and set up the solver
 		this->amgxSolver->uploadMatrix(this->LHS);
 		this->amgxSolver->setup();
+		startTime = this->printDuration("Matrices uploaded to GPU: ", startTime);
 	}else
 #endif
 	{
+		// These two steps form the cgSolver.compute() function. By calling them separately, we 
+		// only ever need to call factorize when the tissue properties change.
 		this->cgSolver.analyzePattern(this->LHS);
 		this->cgSolver.factorize(this->LHS);
 		if (this->cgSolver.info() != Eigen::Success) {
 			std::cout << "Decomposition Failed" << std::endl;
 		}
+		startTime = this->printDuration("Initial Matrix Factorization Completed: ", startTime);
 	}
-	startTime = this->printDuration("Initial Matrix Factorization Completed in ", startTime);
+	
 }
 
 void FEM_Simulator::initializeModel()

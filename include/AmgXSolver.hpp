@@ -10,6 +10,7 @@ public:
     ~AmgXSolver();
 
     void uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A);
+    void updateMatrixValues(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A);
     void setup();
     void solve(const Eigen::VectorXf& b, Eigen::VectorXf& x);
 

@@ -54,19 +54,33 @@ int main()
     Eigen::setNbThreads(1);
 #endif
     std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
-    auto start = std::chrono::high_resolution_clock::now();
+    
     simulator.useGPU = false;
-    float totalTime = 2.0f;
+    float totalTime = 0.05f;
     simulator.silentMode = false;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    simulator.setFluenceRate(laserPose, 1, 0.0168);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    start = end;
+    std::cout << "Time to calculate Fluence Rate: " << duration.count()/1000000.0 << std::endl;
+
     simulator.initializeModel();
-    for (int i = 0; i <= round(totalTime/simulator.deltaT); i++) {
-        simulator.setFluenceRate(laserPose, 1, 0.0168);
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    start = end;
+    std::cout << "Initialization Duration: " << duration.count()/1000000.0 << std::endl;
+
+    for (int i = 1; i <= round(totalTime/simulator.deltaT); i++) {
+        simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
+        simulator.parameterUpdate = true;
         simulator.singleStep();
     }
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "FEA Duration: " << duration.count()/1000000.0 << std::endl;
+    end = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Time-Stepping Duration: " << duration.count()/1000000.0 << std::endl;
     
     /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {

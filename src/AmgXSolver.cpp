@@ -27,6 +27,8 @@ AmgXSolver::~AmgXSolver() {
 
 void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {
 
+    /* A must come in compressed*/
+
     /* Guarding against memory leaking*/
     if (Amat) {
         AMGX_matrix_destroy(Amat);
@@ -38,21 +40,21 @@ void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>&
     // std::cout << "Memory leak cleaned up" << std::endl;
 
     /* Actual upload code*/
-    Eigen::SparseMatrix<float, Eigen::RowMajor> Ac = A;
-    Ac.makeCompressed();
-    n_rows = Ac.rows();
-    n_cols = Ac.cols();
-    nnz = Ac.nonZeros();
+    // Eigen::SparseMatrix<float, Eigen::RowMajor> Ac = A;
+    // A.makeCompressed();
+    n_rows = A.rows();
+    n_cols = A.cols();
+    nnz = A.nonZeros();
 
-    std::vector<int> row_ptr(Ac.rows() + 1);
-    std::vector<int> col_idx(Ac.nonZeros());
-    std::vector<float> values(Ac.nonZeros());
+    // std::vector<int> row_ptr(A.rows() + 1);
+    // std::vector<int> col_idx(A.nonZeros());
+    // std::vector<float> values(A.nonZeros());
 
     // std::cout << "Vectors created" << std::endl;
 
-    std::copy(Ac.outerIndexPtr(), Ac.outerIndexPtr() + Ac.rows() + 1, row_ptr.begin());
-    std::copy(Ac.innerIndexPtr(), Ac.innerIndexPtr() + Ac.nonZeros(), col_idx.begin());
-    std::copy(Ac.valuePtr(), Ac.valuePtr() + Ac.nonZeros(), values.begin());
+    // std::copy(A.outerIndexPtr(), A.outerIndexPtr() + A.rows() + 1, row_ptr.begin());
+    // std::copy(A.innerIndexPtr(), A.innerIndexPtr() + A.nonZeros(), col_idx.begin());
+    // std::copy(A.valuePtr(), A.valuePtr() + A.nonZeros(), values.begin());
 
     // std::cout << "Vectors copied" << std::endl;
 
@@ -64,13 +66,29 @@ void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>&
         nnz,                // number of nonzeros
         1,                 // block_dimx
         1,                // block_dimy
-        row_ptr.data(),        // int*
-        col_idx.data(),        // int*
-        values.data(),         // float* or double* depending on AMGX_mode
+        A.outerIndexPtr(),                  // row_ptr
+        A.innerIndexPtr(),                  // col_idx
+        A.valuePtr(),                       // values
         nullptr);   
     // std::cout << "Creating AMGX Vector" << std::endl;
     AMGX_vector_create(&Ax, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ab, rsrc, AMGX_mode_dFFI);
+}
+
+// Later, if only coefficients change (same sparsity pattern)
+void AmgXSolver::updateMatrixValues(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {
+   /* Assumes A is already compressed */
+
+    if (!Amat) {
+        throw std::runtime_error("AMGX matrix not initialized with upload_all!");
+    }
+
+    AMGX_matrix_replace_coefficients(
+        Amat,
+        A.rows(),          // number of rows
+        A.nonZeros(),      // number of nonzeros
+        A.valuePtr(),      // pointer to updated coefficients
+        nullptr);          // optional diag info (rarely needed)
 }
 
 void AmgXSolver::setup() {

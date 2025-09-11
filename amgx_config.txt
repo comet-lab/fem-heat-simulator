@@ -1,25 +1,15 @@
 # AMGX config file
 config_version=2
 
-
-solver(cg)=CG
-# Stop criteria & reporting similar to Eigen defaults
-cg:tolerance=1e-6
-cg:convergence=RELATIVE_INI_CORE
-cg:norm=L2
-cg:max_iters=1000
-cg:print_solve_stats=0
-cg:obtain_timings=0
-cg:monitor_residual=1
-cg:print_grid_stats=0
-
-#solver(CG)=PCG
-#CG:max_iters=100
-#CG:convergence=RELATIVE_INI_CORE
-#CG:tolerance=1e-7
-#CG:print_solve_stats=0
-#CG:print_grid_stats=0
-#CG:obtain_timings=0
+solver(CG)=CG
+CG:max_iters=100
+CG:convergence=RELATIVE_INI_CORE
+CG:tolerance=1e-6
+CG:print_solve_stats=0
+CG:print_grid_stats=0
+CG:obtain_timings=1
+CG:monitor_residual=1
+CG:norm=L2
 #CG:preconditioner(amg_1)=AMG
 #amg_1:max_iters=1
 #amg_1:cycle=V
