@@ -1,16 +1,17 @@
 ﻿cmake_minimum_required(VERSION 3.29)
-project(HeatSimulation VERSION 0.1 LANGUAGES CXX)
+project(HeatSimulation VERSION 3.2 LANGUAGES CXX CUDA)
 
 # ──────────────────────────────────────────────────────────────
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" ON)
+option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" OFF)
 option(USE_AMGX "Enable GPU solver using AmgX (requires CUDA)" ON)
 
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)              # CMAKE_CXX_STANDARD is 17 because we need to use GCC 9.4 and CUDA 12.8
+find_package(CUDAToolkit)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ──────────────────────────────────────────────────────────────
@@ -28,7 +29,6 @@ endfunction()
 # Enabling GPU Support if possible
 # ──────────────────────────────────────────────────────────────
 if(USE_AMGX)
-    find_package(CUDAToolkit QUIET)
     if(CUDAToolkit_FOUND)
         message(STATUS "CUDA found, enabling AmgX support")
         add_definitions(-DUSE_AMGX)
@@ -36,12 +36,12 @@ if(USE_AMGX)
         # On Linux: AmgX ships as amgxsh.so and amgx_c.h
         # On Windows: amgxsh.dll + amgx.lib (import library)
         # Adjust paths if needed, or set AMGX_ROOT manually
-        # find_path(AMGX_INCLUDE_DIR amgx_c.h
-        #     HINTS ${CUDAToolkit_INCLUDE_DIRS}
-        # )
-        # find_library(AMGX_LIBRARY NAMES amgxsh
-        #     HINTS ${CUDAToolkit_LIBRARY_DIR}
-        # )
+        find_path(AMGX_INCLUDE_DIR amgx_c.h
+            HINTS ${CUDAToolkit_INCLUDE_DIRS}
+        )
+        find_library(AMGX_LIBRARY NAMES amgxsh
+            HINTS ${CUDAToolkit_LIBRARY_DIR}
+        )
         # Path to AmgX installation
         set(AMGX_ROOT "/usr/local/amgx")  # or your CMAKE_INSTALL_PREFIX
 
@@ -65,48 +65,64 @@ endif()
 # ──────────────────────────────────────────────────────────────
 # Library: HeatSimulation
 # ──────────────────────────────────────────────────────────────
+# Enable CUDA separable compilation (needed if multiple .cu files call each other)
+# set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+
+# Library sources
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
     src/AmgXSolver.cpp
+    src/GPUSolver.cu   # CUDA source
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
     include/AmgXSolver.hpp
+    include/GPUSolver.cuh
 )
 
+# Create the library with CUDA support
 add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
 add_library(HeatSimulation::HeatSimulation ALIAS HeatSimulation)
+set_target_properties(HeatSimulation PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
-target_compile_options(HeatSimulation PUBLIC -fPIC) # This is needed because linux treats mex files as libraries
-#target_compile_features(HeatSimulation PUBLIC cxx_std_23)
+# Enable PIC
+target_compile_options(HeatSimulation PUBLIC -fPIC)
+
+# Include directories
 target_include_directories(HeatSimulation
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-        ${AMGX_INCLUDE_DIR}
+        ${AMGX_INCLUDE_DIR} 
 )
-target_link_libraries(HeatSimulation 
-    PUBLIC 
-        Eigen3::Eigen 
-        CUDA::cudart 
-        ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-        ${AMGX_LIBRARY} 
+
+# Compile definitions
+if(USE_AMGX)
+    target_compile_definitions(HeatSimulation PUBLIC USE_AMGX)
+endif()
+
+# Link libraries
+target_link_libraries(HeatSimulation
+    PUBLIC
+        Eigen3::Eigen
+        CUDA::cudart
+        ${AMGX_LIBRARY}
         CUDA::cusparse
         CUDA::cusolver
         CUDA::cublas
         dl
 )
+
+# Enable OpenMP
 enable_openmp(HeatSimulation)
 
-if(AMGX_INCLUDE_DIR AND AMGX_LIBRARY)
-    message(STATUS "AmgX found at ${AMGX_LIBRARY}")
-    # target_include_directories(HeatSimulation PUBLIC ${AMGX_INCLUDE_DIR})
-    # target_link_libraries(HeatSimulation PUBLIC CUDA::cudart ${AMGX_LIBRARY})
-else()
-    message(WARNING "AmgX not found, disabling GPU solver")
-    remove_definitions(-DUSE_AMGX)
-endif()
+# Set CUDA standard explicitly (optional but recommended)
+set_target_properties(HeatSimulation PROPERTIES
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+)
+
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main
@@ -139,8 +155,19 @@ if(BUILD_TESTING)
             GTest::gtest_main
     )
 
+    add_executable(GPUSolver_Unit_Tests
+        test/GPUSolver_Unit_Tests.cpp
+        test/BaseGPU.cpp
+    )
+    target_link_libraries(GPUSolver_Unit_Tests
+        PRIVATE
+            HeatSimulation::HeatSimulation
+            GTest::gtest_main
+    )
+
     include(GoogleTest)
     gtest_discover_tests(FEM_Unit_Tests)
+    gtest_discover_tests(GPUSolver_Unit_Tests)
 endif()
 
 # ──────────────────────────────────────────────────────────────

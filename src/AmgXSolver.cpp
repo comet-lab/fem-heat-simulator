@@ -3,8 +3,16 @@
 #include <iostream>
 
 AmgXSolver::AmgXSolver(const std::string& configFile) {
-    AMGX_initialize();
-    // AMGX_initialize_plugins();
+    static bool amgx_initialized = false;
+    if (!amgx_initialized) {
+        AMGX_initialize();
+        // AMGX_initializePlugins(); // optional, if you need plugins
+        amgx_initialized = true;
+        // std::cout << "Initialized AMGX" << std::endl;
+    }
+    // else {
+    //     std::cout << "Did not initialize AMGX" << std::endl;
+    // }
     AMGX_config_create_from_file(&cfg, configFile.c_str());
     AMGX_resources_create_simple(&rsrc, cfg);
     AMGX_solver_create(&solver, rsrc, AMGX_mode_dFFI, cfg);
@@ -15,64 +23,49 @@ AmgXSolver::AmgXSolver(const std::string& configFile) {
 }
 
 AmgXSolver::~AmgXSolver() {
-    AMGX_solver_destroy(solver);
-    AMGX_matrix_destroy(Amat);
-    AMGX_vector_destroy(Ax);
-    AMGX_vector_destroy(Ab);
-    AMGX_resources_destroy(rsrc);
-    AMGX_config_destroy(cfg);
-    AMGX_finalize_plugins();
-    AMGX_finalize();
+    if (solver) AMGX_solver_destroy(solver);
+    if (Amat) AMGX_matrix_destroy(Amat);
+    if (Ax)   AMGX_vector_destroy(Ax);
+    if (Ab)   AMGX_vector_destroy(Ab);
+    if (rsrc) AMGX_resources_destroy(rsrc);
+    if (cfg)  AMGX_config_destroy(cfg);
+    // AMGX_finalize();
 }
 
 void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {
 
-    /* A must come in compressed*/
+    this->uploadMatrix(A.rows(),A.cols(),A.nonZeros(),A.valuePtr(),A.outerIndexPtr(), A.innerIndexPtr());
+}
 
+void AmgXSolver::uploadMatrix(int rows, int cols, int nnz,const float* data,const int* rowPtr,const int* colIdx) {
     /* Guarding against memory leaking*/
-    if (Amat) {
-        AMGX_matrix_destroy(Amat);
-        Amat = nullptr;
+    this->rows = rows;
+    this->cols = cols;
+    this->nnz = nnz;
+    if (this->Amat) {
+        AMGX_matrix_destroy(this->Amat);
+        this->Amat = nullptr;
     }
-    if (Ax) { AMGX_vector_destroy(Ax); Ax = nullptr; }
-    if (Ab) { AMGX_vector_destroy(Ab); Ab = nullptr; }
+    if (this->Ax) { AMGX_vector_destroy(this->Ax); this->Ax = nullptr; }
+    if (this->Ab) { AMGX_vector_destroy(this->Ab); this->Ab = nullptr; }
 
     // std::cout << "Memory leak cleaned up" << std::endl;
 
-    /* Actual upload code*/
-    // Eigen::SparseMatrix<float, Eigen::RowMajor> Ac = A;
-    // A.makeCompressed();
-    n_rows = A.rows();
-    n_cols = A.cols();
-    nnz = A.nonZeros();
-
-    // std::vector<int> row_ptr(A.rows() + 1);
-    // std::vector<int> col_idx(A.nonZeros());
-    // std::vector<float> values(A.nonZeros());
-
-    // std::cout << "Vectors created" << std::endl;
-
-    // std::copy(A.outerIndexPtr(), A.outerIndexPtr() + A.rows() + 1, row_ptr.begin());
-    // std::copy(A.innerIndexPtr(), A.innerIndexPtr() + A.nonZeros(), col_idx.begin());
-    // std::copy(A.valuePtr(), A.valuePtr() + A.nonZeros(), values.begin());
-
-    // std::cout << "Vectors copied" << std::endl;
-
     // std::cout << "Creating AMGX Matrix" << std::endl;
-    AMGX_matrix_create(&Amat, rsrc, AMGX_mode_dFFI);
+    AMGX_matrix_create(&(this->Amat), rsrc, AMGX_mode_dFFI);
     // std::cout << "Uploading AMGX Matrix" << std::endl;
-    AMGX_matrix_upload_all(Amat,
-        n_rows,
-        nnz,                // number of nonzeros
+    AMGX_matrix_upload_all(this->Amat,
+        this->rows,
+        this->nnz,                // number of nonzeros
         1,                 // block_dimx
         1,                // block_dimy
-        A.outerIndexPtr(),                  // row_ptr
-        A.innerIndexPtr(),                  // col_idx
-        A.valuePtr(),                       // values
+        rowPtr,                  // row_ptr
+        colIdx,                  // col_idx
+        data,                       // values
         nullptr);   
     // std::cout << "Creating AMGX Vector" << std::endl;
-    AMGX_vector_create(&Ax, rsrc, AMGX_mode_dFFI);
-    AMGX_vector_create(&Ab, rsrc, AMGX_mode_dFFI);
+    AMGX_vector_create(&(this->Ax), rsrc, AMGX_mode_dFFI);
+    AMGX_vector_create(&(this->Ab), rsrc, AMGX_mode_dFFI);
 }
 
 // Later, if only coefficients change (same sparsity pattern)
@@ -96,12 +89,17 @@ void AmgXSolver::setup() {
 }
 
 void AmgXSolver::solve(const Eigen::VectorXf& b, Eigen::VectorXf& x) {
-    if (x.size() != n_rows) x.resize(n_rows);
+    if (x.size() != this->rows) x.resize(this->rows);
 
-    AMGX_vector_upload(Ab, n_rows, 1, b.data());
-    AMGX_vector_upload(Ax, n_rows, 1, x.data());
+    this->solve(b.data(), x.data());
+}
 
-    AMGX_solver_solve(solver, Ab, Ax);
+void AmgXSolver::solve(const float* b, float * x) {
+    
+    AMGX_vector_upload(this->Ab, rows, 1, b);
+    AMGX_vector_upload(this->Ax, rows, 1, x);
 
-    AMGX_vector_download(Ax, x.data());
+    AMGX_solver_solve(solver, this->Ab, this->Ax);
+
+    AMGX_vector_download(this->Ax, x);
 }

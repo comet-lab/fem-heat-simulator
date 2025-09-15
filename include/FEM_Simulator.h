@@ -8,11 +8,7 @@
 #include <Eigen/IterativeLinearSolvers>
 #include <chrono>
 #include <stdexcept>
-
-#ifdef USE_AMGX
-#include "AmgXSolver.hpp"
-#include <cuda_runtime.h>
-#endif
+#include "GPUSolver.cuh"
 
 class FEM_Simulator
 {
@@ -120,9 +116,6 @@ public:
 	by how they are created (e.g. conduction, laser, etc). These are saved as class attributes because
 	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
-#ifdef USE_AMGX
-	AmgXSolver* amgxSolver = nullptr;
-#endif
 	bool useGPU = false;
 
 	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
@@ -188,6 +181,11 @@ public:
 	void ind2sub(int index, int size[3], int sub[3]); 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
 	bool gpuAvailable();
+
+	void applyParametersGPU(GPUSolver& gpu);
+	void initializeDVGPU(GPUSolver& gpu);
+	void setupGPU(GPUSolver& gpu);
+	void singleStepGPU(GPUSolver& gpu);
 };
 
 

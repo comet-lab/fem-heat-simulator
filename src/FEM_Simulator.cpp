@@ -1,7 +1,4 @@
 #include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
@@ -121,7 +118,6 @@ void FEM_Simulator::multiStep(float duration) {
 	startTime = this->printDuration("Time Stepping Completed in ", startTime);
 }
 
-
 void FEM_Simulator::singleStep() {
 	/* Simulates a single step of the heat equation. A single step is given by the duration deltaT. To run single step,
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
@@ -140,19 +136,9 @@ void FEM_Simulator::singleStep() {
 		if (this->parameterUpdate) { // Happens only if parameters were updated
 			this->LHS = this->globM + this->alpha * this->deltaT * this->globK; // Create new left hand side 
 			this->LHS.makeCompressed(); // compress it for potential speed improvements
-#ifdef USE_AMGX
-			if (this->useGPU) {
-				this->amgxSolver->updateMatrixValues(this->LHS);
-				// this->amgxSolver->uploadMatrix(this->LHS);
-				this->amgxSolver->setup();
-			}
-			else
-#endif		
-			{
-				this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
-				if (this->cgSolver.info() != Eigen::Success) {
-					std::cout << "Decomposition Failed" << std::endl;
-				}
+			this->cgSolver.factorize(this->LHS); // Perform factoriziation based on analysis which should have been called with initializeModel();
+			if (this->cgSolver.info() != Eigen::Success) {
+				std::cout << "Decomposition Failed" << std::endl;
 			}
 			this->parameterUpdate = false;
 		}
@@ -171,18 +157,10 @@ void FEM_Simulator::singleStep() {
 	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
 	// Solve Ax = b using conjugate gradient
 	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
-#ifdef USE_AMGX
-	if (this->useGPU) {
-		this->amgxSolver->solve(RHS, this->vVec);
-	}
-	else
-#endif
-	{
-		this->vVec = this->cgSolver.solveWithGuess(RHS, this->vVec);
-		//this->vVec = this->cgSolver.solve(RHS);
-		if (this->cgSolver.info() != Eigen::Success) {
-			std::cout << "Issue With Solver" << std::endl;
-		}
+	this->vVec = this->cgSolver.solveWithGuess(RHS, this->vVec);
+	//this->vVec = this->cgSolver.solve(RHS);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Issue With Solver" << std::endl;
 	}
 	/*if (!this->silentMode) {
 		std::cout << "Iterations: " << this->cgSolver.iterations() << std::endl;
@@ -495,24 +473,14 @@ void FEM_Simulator::initializeTimeIntegration()
 	this->LHS.makeCompressed();
 	startTime = this->printDuration("LHS created: ", startTime);
 	
-#ifdef USE_AMGX
-	if (this->useGPU) {
-		// Upload the matrix to the GPU and set up the solver
-		this->amgxSolver->uploadMatrix(this->LHS);
-		this->amgxSolver->setup();
-		startTime = this->printDuration("Matrices uploaded to GPU: ", startTime);
-	}else
-#endif
-	{
-		// These two steps form the cgSolver.compute() function. By calling them separately, we 
-		// only ever need to call factorize when the tissue properties change.
-		this->cgSolver.analyzePattern(this->LHS);
-		this->cgSolver.factorize(this->LHS);
-		if (this->cgSolver.info() != Eigen::Success) {
-			std::cout << "Decomposition Failed" << std::endl;
-		}
-		startTime = this->printDuration("Initial Matrix Factorization Completed: ", startTime);
+	// These two steps form the cgSolver.compute() function. By calling them separately, we 
+	// only ever need to call factorize when the tissue properties change.
+	this->cgSolver.analyzePattern(this->LHS);
+	this->cgSolver.factorize(this->LHS);
+	if (this->cgSolver.info() != Eigen::Success) {
+		std::cout << "Decomposition Failed" << std::endl;
 	}
+	startTime = this->printDuration("Initial Matrix Factorization Completed: ", startTime);
 	
 }
 
@@ -1508,7 +1476,6 @@ bool FEM_Simulator::gpuAvailable() {
 
 	if (useGPU) {
 		std::cout << "GPU detected: using AmgX solver\n";
-		this->amgxSolver = new AmgXSolver("../amgx_config.txt");
 	}
 	else
 #endif 
@@ -1517,4 +1484,44 @@ bool FEM_Simulator::gpuAvailable() {
 	}
 
 	return useGPU;
+}
+
+void FEM_Simulator::applyParametersGPU(GPUSolver& gpu) {
+	auto start = std::chrono::steady_clock::now();
+    gpu.uploadAllMatrices(this->Kint,this->Kconv,this->M,this->FirrMat,
+		this->FluenceRate,this->Fq,this->Fconv,this->Fk,this->FirrElem
+	);
+	start = printDuration("Uploaded Matrices to GPU: ", start);
+	gpu.applyParameters(this->TC,this->HTC,this->VHC,this->MUA,elemNFR);
+	start = printDuration("Parameter application: ", start);
+}
+
+
+void FEM_Simulator::initializeDVGPU(GPUSolver& gpu) {
+	auto start = std::chrono::steady_clock::now();
+	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
+	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
+	// Initialize d, v, and dTilde vectors
+	this->dVec.resize(nNodes - dirichletNodes.size());
+	this->vVec = Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
+
+	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
+	this->dVec = this->Temp(validNodes);
+
+    gpu.initializeDV(this->dVec,this->vVec);
+	printDuration("Initalized D and V Vectors GPU: ", start);
+}
+
+void FEM_Simulator::setupGPU(GPUSolver &gpu)
+{
+	auto start = std::chrono::steady_clock::now();
+	gpu.setup(this->alpha, this->deltaT);
+	printDuration("Setup on GPU: ", start);
+}
+
+void FEM_Simulator::singleStepGPU(GPUSolver &gpu)
+{
+	auto start = std::chrono::steady_clock::now();
+	gpu.setup(this->alpha, this->deltaT);
+	printDuration("Single Step on GPU: ", start);
 }
