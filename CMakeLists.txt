@@ -158,6 +158,7 @@ if(BUILD_TESTING)
     add_executable(GPUSolver_Unit_Tests
         test/GPUSolver_Unit_Tests.cpp
         test/BaseGPU.cpp
+        test/TestHelpers.hpp
     )
     target_link_libraries(GPUSolver_Unit_Tests
         PRIVATE

@@ -38,15 +38,25 @@ void GPUSolver::applyParameters(
 void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR){
     int threads = 256;
 
+    // These variables get set in here so we want to make sure they are free
+    freeCSR(this->globK_d);
+    freeCSR(this->globM_d);
+    CHECK_CUDA(cudaFree(this->globF_d));
+
     // ---------------- Step 1: Compute globK ----------------
     // This will perform Kint*TC + Kconv*HTC = globK
-    addSparse(this->Kint_d, TC, this->Kconv_d, HTC, this->globK_d);
+    // std::cout << "Apply Parameters Step 1" << std::endl;
+    addSparse(this->Kint_d, TC, this->Kconv_d, HTC, this->globK_d); 
+    // addSparse naturally will define this->globK_d properly as a DeviceCSR
 
     // ---------------- Step 2: Set globM ----------------
     // this will perform M*VHC + M*0 = globM
+    // std::cout << "Apply Parameters Step 2" << std::endl;
     addSparse(this->M_d, VHC, this->M_d, 0, this->globM_d); ; // Already scaled
+    // addSparse naturally will define this->globM_d properly as a DeviceCSR
 
     // ---------------- Step 3: Compute Firr ----------------
+    // std::cout << "Apply Parameters Step 3" << std::endl;
     float* Firr_d = nullptr;
     if (elemNFR) {
         Firr_d = this->FirrElem_d.data;
@@ -56,20 +66,27 @@ void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool 
     }
 
     // ---------------- Step 4: Compute globF ----------------
+    // std::cout << "Apply Parameters Step 4" << std::endl;
+    // Firr = Firr*MUA;
     scaleVector(Firr_d, MUA, this->FirrMat_d.rows);
 
     if (!this->globF_d)
         CHECK_CUDA(cudaMalloc((void**)&this->globF_d, this->FirrMat_d.rows * sizeof(float)));
 
+    // globF = Firr*MUA
     CHECK_CUDA(cudaMemcpy(this->globF_d, Firr_d, this->FirrMat_d.rows * sizeof(float),
                           cudaMemcpyDeviceToDevice));
 
-    addVectors(this->globF_d, this->Fconv_d.data, this->globF_d, this->FirrMat_d.rows, 1);
+    // globF = Firr*MUA + Fconv*HTC
+    addVectors(this->globF_d, this->Fconv_d.data, this->globF_d, this->FirrMat_d.rows, HTC);
+    // globF = Firr*MUA + Fconv*HTC + F_q
     addVectors(this->globF_d, this->Fq_d.data, this->globF_d, this->FirrMat_d.rows, 1);
-    addVectors(this->globF_d, this->Fk_d.data, this->globF_d, this->FirrMat_d.rows, 1);
+    // globF = Firr*MUA + Fconv*HTC + F_q + Fk*TC
+    addVectors(this->globF_d, this->Fk_d.data, this->globF_d, this->FirrMat_d.rows, TC);
 
     // ---------------- Step 5: Free temporary GPU vectors ----------------
-    if (elemNFR) CHECK_CUDA(cudaFree(Firr_d));
+    // std::cout << "Apply Parameters Step 5" << std::endl;
+    if (!elemNFR) CHECK_CUDA(cudaFree(Firr_d));
 }
 
 void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
@@ -78,28 +95,28 @@ void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec
     simply passed in, and the v vector is assigned through the equation M*v = (F - K*d).
     */
     // -- Step 0: Upload dVec to GPU and save as attribute -- 
-    int nRows = dVec.rows();
+    int nRows = dVec.size();
     this->uploadVector(dVec,this->dVec_d);
-
     // -- Step1: Construct Right Hand Side of Ax = b
     // In this case b = (F - K*d);
+    // std::cout << "InitializeDV Step 1" << std::endl;
     float* b_d;
-    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ) // allocate memory for RHS
-    this->multiplySparseVector(this->globK_d, this->dVec_d, b_d); 
-    this->addVectors(this->globF_d, b_d, b_d, nRows, -1); // scale is negative one to subtract v2 from v1
+    this->calculateRHS(b_d, nRows);
 
     // -- Step 2: construct Left Hand Side of Ax = b
-    // In this case it is just A = M so we don't have to do anything
-    
-    // -- Step 3: Solve using AMGX so we can have a linear solver
+    // In this case it is just A = M so we run setup with alpha = 0 and dt = 0;
+    // std::cout << "InitializeDV Step 2" << std::endl;
     this->setup(0,0); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
-   
+
+    // -- Step 3: Solve using AMGX so we can have a linear solver
+    // std::cout << "InitializeDV Step 3" << std::endl;
     float* x_d; // where we will store our temporary solution to v
     cudaMalloc(&x_d, sizeof(float) * this->globM_d.cols);
 
     this->amgxSolver->solve(b_d,x_d);
 
     // -- Step 4: Assign attribute to solution and return to eigen
+    // std::cout << "InitializeDV Step 4" << std::endl;
     CHECK_CUDA( cudaMemcpy(vVec.data(), x_d, nRows*sizeof(float),cudaMemcpyDeviceToHost) )
     // We aren't using upload vector here because upload vector assumes host-to-device copy
     // we don't want to free this data after either because it is a class attribute
@@ -184,6 +201,14 @@ void GPUSolver::singleStep(float alpha, float deltaT){
     CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
 }
 
+void GPUSolver::calculateRHS(float* &b_d, int nRows){
+    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ) // allocate memory for RHS
+    // Perform b_d = K*d
+    this->multiplySparseVector(this->globK_d, this->dVec_d, b_d); 
+    // Perform b_d = F - K*d
+    this->addVectors(this->globF_d, b_d, b_d, nRows, -1); // scale is negative one to subtract v2 from v1
+}
+
 // =====================
 // Upload utilities
 // =====================
@@ -225,17 +250,12 @@ void GPUSolver::uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMaj
 void GPUSolver::uploadSparseMatrix(int numRows, int numCols, int nnz, const int* rowPtr, const int* columnIdx, const float* values, DeviceCSR& dA){
     // Just in case it wasn't passed in compressed.
     //uploads a sparse matrix with individual components instead of Eigen matrix
+    freeCSR(dA);
 
     // set DeviceCSR parameters
     dA.rows = numRows;
     dA.cols = numCols;
     dA.nnz = nnz;
-    
-
-    // Freeing old memory in case
-    CHECK_CUDA( cudaFree(dA.rowPtr_d) ) 
-    CHECK_CUDA( cudaFree(dA.colIdx_d) )
-    CHECK_CUDA( cudaFree(dA.data_d) )
 
     // -- Step 1: Allocating new memory
     CHECK_CUDA( cudaMalloc((void**) &dA.rowPtr_d, (numRows + 1) * sizeof(int))    )
@@ -286,6 +306,14 @@ void GPUSolver::downloadVector(Eigen::VectorXf &v,const float *dv)
 
 void GPUSolver::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)
 {
+    // -- Make sure receiving matrix has an appropriate amount of space
+    outMat.resize(source.rows, source.cols);
+    // allocate nnz slots
+    outMat.reserve(source.nnz);
+    // finalize CSR structure to allocate value/inner arrays
+    outMat.makeCompressed();
+
+    // -- Copy the necessary components
     CHECK_CUDA( cudaMemcpy(outMat.outerIndexPtr(), source.rowPtr_d,
                            (source.rows + 1) * sizeof(int),
                            cudaMemcpyDeviceToHost) )
@@ -299,25 +327,45 @@ void GPUSolver::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>&
 
 
 void GPUSolver::freeCSR(DeviceCSR& dA) {
-    CHECK_CUDA(cudaFree(dA.rowPtr_d));
-    CHECK_CUDA(cudaFree(dA.colIdx_d));
-    CHECK_CUDA(cudaFree(dA.data_d));
-    dA.rowPtr_d = nullptr;
-    dA.colIdx_d = nullptr;
-    dA.data_d   = nullptr;
-    cusparseDestroySpMat(dA.spMatDescr);
+    if (dA.rowPtr_d) {
+        CHECK_CUDA(cudaFree(dA.rowPtr_d));
+        dA.rowPtr_d = nullptr;
+    }
+    if (dA.colIdx_d) {
+        CHECK_CUDA(cudaFree(dA.colIdx_d));
+        dA.colIdx_d = nullptr;
+    }
+    if (dA.data_d) {
+        CHECK_CUDA(cudaFree(dA.data_d));
+        dA.data_d = nullptr;
+    }
+    if (dA.spMatDescr) {
+        cusparseDestroySpMat(dA.spMatDescr);
+        dA.spMatDescr = nullptr;
+    }
+    dA.rows = 0;
+    dA.cols = 0;
+    dA.nnz  = 0;
 }
 
 void GPUSolver::freeDeviceVec(DeviceVec& vec) {
-    CHECK_CUDA(cudaFree(vec.data) )
-    cusparseDestroyDnVec(vec.vecHandle);
+    if (vec.data){
+        CHECK_CUDA(cudaFree(vec.data) )
+        vec.data = nullptr;
+    }
+    if (vec.vecHandle){
+        cusparseDestroyDnVec(vec.vecHandle);
+        vec.vecHandle = nullptr;
+    }
 }
 
 void GPUSolver::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, float beta, DeviceCSR& C) {
      // Matrix A and B should already be uploaded into the system. C is where we will store the solution
     // need to upload the location of our solution which should be initially empty
-    uploadSparseMatrix(A.rows, B.cols, 0, nullptr, nullptr, nullptr, C);
     
+    freeCSR(C); // Just to make sure it is cleaned before we write into it. 
+
+    CHECK_CUDA(cudaMalloc((void**)&C.rowPtr_d, sizeof(int) * (A.rows + 1)));
     // create the legacy MatDescr
     cusparseMatDescr_t descrA, descrB, descrC;
     cusparseCreateMatDescr(&descrA);
@@ -337,7 +385,7 @@ void GPUSolver::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, f
             descrA, A.nnz, A.data_d, A.rowPtr_d, A.colIdx_d,
             &beta,
             descrB, B.nnz, B.data_d, B.rowPtr_d, B.colIdx_d,
-            descrC, C.data_d, C.rowPtr_d, C.colIdx_d,
+            descrC, nullptr, C.rowPtr_d, nullptr,
             &bufferSize1)
          )
 
@@ -378,6 +426,16 @@ void GPUSolver::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, f
         descrC, C.data_d, C.rowPtr_d, C.colIdx_d,
         dBuffer1)
     )
+
+    C.rows = A.rows;
+    C.cols = A.cols;
+    CHECK_CUSPARSE(cusparseCreateCsr(&C.spMatDescr,
+                                     A.rows, A.cols, C.nnz,
+                                     C.rowPtr_d, C.colIdx_d, C.data_d,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_32I,
+                                     CUSPARSE_INDEX_BASE_ZERO,
+                                     CUDA_R_32F));
 
     // --- Cleanup ---
     cudaFree(dBuffer1);

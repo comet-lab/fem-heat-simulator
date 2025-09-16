@@ -72,12 +72,12 @@ int main()
     start = end;
     std::cout << "Initialization Duration: " << duration.count()/1000000.0 << std::endl;
 
-    // for (int i = 1; i <= round(totalTime/simulator.deltaT); i++) {
-    //     // simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
-    //     simulator.parameterUpdate = true;
-    //     simulator.fluenceUpdate = true;
-    //     simulator.singleStep();
-    // }
+    for (int i = 1; i <= round(totalTime/simulator.deltaT); i++) {
+        // simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
+        simulator.parameterUpdate = true;
+        simulator.fluenceUpdate = true;
+        simulator.singleStep();
+    }
     
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -87,6 +87,7 @@ int main()
     std::cout << "Top Face Temp: " <<   simulator.Temp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0]) << std::endl;
     /* -------- GPU Testing ------------------------*/
     GPUSolver gpu = GPUSolver();
+    simulator.silentMode = true;
     simulator.applyParametersGPU(gpu);
     simulator.initializeDVGPU(gpu);
     start = std::chrono::high_resolution_clock::now();

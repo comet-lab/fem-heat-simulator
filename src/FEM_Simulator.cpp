@@ -462,7 +462,7 @@ void FEM_Simulator::initializeTimeIntegration()
 		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 		initSolver.compute(this->globM);
 		Eigen::VectorXf RHSinit = (this->globF) - this->globK * this->dVec;
-		vVec = initSolver.solve(RHSinit);
+		this->vVec = initSolver.solve(RHSinit);
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
@@ -1522,6 +1522,6 @@ void FEM_Simulator::setupGPU(GPUSolver &gpu)
 void FEM_Simulator::singleStepGPU(GPUSolver &gpu)
 {
 	auto start = std::chrono::steady_clock::now();
-	gpu.setup(this->alpha, this->deltaT);
+	gpu.singleStep(this->alpha, this->deltaT);
 	printDuration("Single Step on GPU: ", start);
 }

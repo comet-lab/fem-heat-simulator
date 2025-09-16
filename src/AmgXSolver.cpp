@@ -10,7 +10,7 @@ AmgXSolver::AmgXSolver(const std::string& configFile) {
         amgx_initialized = true;
         // std::cout << "Initialized AMGX" << std::endl;
     }
-    // else {
+    //  else {
     //     std::cout << "Did not initialize AMGX" << std::endl;
     // }
     AMGX_config_create_from_file(&cfg, configFile.c_str());

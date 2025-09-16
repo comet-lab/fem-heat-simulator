@@ -14,7 +14,7 @@ struct DeviceCSR {
         int *rowPtr_d = nullptr;
         int *colIdx_d = nullptr;
         float *data_d = nullptr;
-        cusparseSpMatDescr_t spMatDescr;
+        cusparseSpMatDescr_t spMatDescr = nullptr;
     };
 
 struct DeviceVec {
@@ -57,6 +57,9 @@ public:
     void initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
     void setup(float alpha, float deltaT);
     void singleStep(float alpha, float deltaT);
+
+    void calculateRHS(float* &b_d, int nRows);
+    // void calculateLHS(float* b_d, int nRows);
 
     void uploadAllMatrices(
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
