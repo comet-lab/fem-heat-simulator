@@ -6,12 +6,11 @@ project(HeatSimulation VERSION 3.2 LANGUAGES CXX CUDA)
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" OFF)
-option(USE_AMGX "Enable GPU solver using AmgX (requires CUDA)" ON)
+option(USE_CUDA "Enable GPU solver using AmgX (requires CUDA)" ON)
 
 
 include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
 set(CMAKE_CXX_STANDARD 17)              # CMAKE_CXX_STANDARD is 17 because we need to use GCC 9.4 and CUDA 12.8
-find_package(CUDAToolkit)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ──────────────────────────────────────────────────────────────
@@ -25,61 +24,79 @@ function(enable_openmp tgt)
     target_link_libraries(${tgt} PUBLIC OpenMP::OpenMP_CXX)
 endfunction()
 
+cmake_minimum_required(VERSION 3.29)
+project(HeatSimulation VERSION 3.2 LANGUAGES CXX CUDA)
+
 # ──────────────────────────────────────────────────────────────
-# Enabling GPU Support if possible
+# Options & global settings
 # ──────────────────────────────────────────────────────────────
-if(USE_AMGX)
+option(BUILD_TESTING  "Build unit‑test runner"            ON)
+option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" OFF)
+option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" ON)
+
+include(GNUInstallDirs)
+set(CMAKE_CXX_STANDARD 17)
+
+# ──────────────────────────────────────────────────────────────
+# Dependencies
+# ──────────────────────────────────────────────────────────────
+find_package(Eigen3 3.4 CONFIG REQUIRED)
+find_package(OpenMP REQUIRED)
+
+# Helper to add OpenMP to a target
+function(enable_openmp tgt)
+    target_link_libraries(${tgt} PUBLIC OpenMP::OpenMP_CXX)
+endfunction()
+
+# ──────────────────────────────────────────────────────────────
+# CUDA / AmgX support
+# ──────────────────────────────────────────────────────────────
+if(USE_CUDA)
+    find_package(CUDAToolkit)
     if(CUDAToolkit_FOUND)
-        message(STATUS "CUDA found, enabling AmgX support")
-        add_definitions(-DUSE_AMGX)
+        message(STATUS "CUDA found, enabling GPU and AmgX support")
+        add_definitions(-DUSE_CUDA)
 
-        # On Linux: AmgX ships as amgxsh.so and amgx_c.h
-        # On Windows: amgxsh.dll + amgx.lib (import library)
-        # Adjust paths if needed, or set AMGX_ROOT manually
-        find_path(AMGX_INCLUDE_DIR amgx_c.h
-            HINTS ${CUDAToolkit_INCLUDE_DIRS}
-        )
-        find_library(AMGX_LIBRARY NAMES amgxsh
-            HINTS ${CUDAToolkit_LIBRARY_DIR}
-        )
-        # Path to AmgX installation
-        set(AMGX_ROOT "/usr/local/amgx")  # or your CMAKE_INSTALL_PREFIX
+        # AmgX paths
+        set(AMGX_ROOT "/usr/local/amgx")  # adjust if needed
 
-        # Find the include directory
         find_path(AMGX_INCLUDE_DIR
             NAMES amgx_c.h
             PATHS ${AMGX_ROOT}/include
         )
-
-        # Find the library
         find_library(AMGX_LIBRARY
             NAMES amgx amgxsh
             PATHS ${AMGX_ROOT}/lib
         )
     else()
-        message(STATUS "CUDA not found, disabling AmgX")
-        set(USE_AMGX OFF)
+        set(USE_CUDA OFF)
+        message(STATUS "CUDA not found, disabling GPU support")
     endif()
 endif()
 
 # ──────────────────────────────────────────────────────────────
 # Library: HeatSimulation
 # ──────────────────────────────────────────────────────────────
-# Enable CUDA separable compilation (needed if multiple .cu files call each other)
-# set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
 
-# Library sources
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
-    src/AmgXSolver.cpp
-    src/GPUSolver.cu   # CUDA source
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
-    include/AmgXSolver.hpp
-    include/GPUSolver.cuh
 )
+
+# GPU sources (conditionally)
+if(USE_CUDA)
+    list(APPEND HEATSIM_SRC
+        src/GPUSolver.cu
+        src/AmgXSolver.cpp
+    )
+    list(APPEND HEATSIM_HEADERS
+        include/GPUSolver.cuh
+        include/AmgXSolver.hpp
+    )
+endif()
 
 # Create the library with CUDA support
 add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
@@ -94,25 +111,30 @@ target_include_directories(HeatSimulation
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-        ${AMGX_INCLUDE_DIR} 
+        $<$<BOOL:${USE_CUDA}>:${AMGX_INCLUDE_DIR}>
 )
 
 # Compile definitions
-if(USE_AMGX)
-    target_compile_definitions(HeatSimulation PUBLIC USE_AMGX)
+if(USE_CUDA)
+    target_compile_definitions(HeatSimulation PUBLIC USE_CUDA)
 endif()
 
-# Link libraries
-target_link_libraries(HeatSimulation
-    PUBLIC
-        Eigen3::Eigen
-        CUDA::cudart
-        ${AMGX_LIBRARY}
+# Libraries
+set(HEATSIM_LIBS
+    Eigen3::Eigen
+)
+
+if(USE_CUDA)
+    list(APPEND HEATSIM_LIBS
+        CUDA::cudart    
+        ${AMGX_LIBRARY}    
         CUDA::cusparse
         CUDA::cusolver
-        CUDA::cublas
+        CUDA::cublas    
         dl
-)
+    )
+endif()
+target_link_libraries(HeatSimulation PUBLIC ${HEATSIM_LIBS})
 
 # Enable OpenMP
 enable_openmp(HeatSimulation)
@@ -122,7 +144,6 @@ set_target_properties(HeatSimulation PROPERTIES
     CUDA_STANDARD 17
     CUDA_STANDARD_REQUIRED ON
 )
-
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main
@@ -155,20 +176,24 @@ if(BUILD_TESTING)
             GTest::gtest_main
     )
 
-    add_executable(GPUSolver_Unit_Tests
-        test/GPUSolver_Unit_Tests.cpp
-        test/BaseGPU.cpp
-        test/TestHelpers.hpp
-    )
-    target_link_libraries(GPUSolver_Unit_Tests
-        PRIVATE
-            HeatSimulation::HeatSimulation
-            GTest::gtest_main
-    )
+    if (USE_CUDA)
+        add_executable(GPUSolver_Unit_Tests
+            test/GPUSolver_Unit_Tests.cpp
+            test/BaseGPU.cpp
+            test/TestHelpers.hpp
+        )
+        target_link_libraries(GPUSolver_Unit_Tests
+            PRIVATE
+                HeatSimulation::HeatSimulation
+                GTest::gtest_main
+        )
+    endif()
 
     include(GoogleTest)
     gtest_discover_tests(FEM_Unit_Tests)
-    gtest_discover_tests(GPUSolver_Unit_Tests)
+    if (USE_CUDA)
+        gtest_discover_tests(GPUSolver_Unit_Tests)
+    endif()
 endif()
 
 # ──────────────────────────────────────────────────────────────
