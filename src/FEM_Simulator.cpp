@@ -1468,7 +1468,7 @@ std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::st
 bool FEM_Simulator::gpuAvailable() {
 	bool useGPU = false;
 
-#ifdef USE_AMGX
+#ifdef USE_CUDA
 	int deviceCount = 0;
 	cudaError_t err = cudaGetDeviceCount(&deviceCount);
 	useGPU = (err == cudaSuccess && deviceCount > 0);
@@ -1486,6 +1486,7 @@ bool FEM_Simulator::gpuAvailable() {
 	return useGPU;
 }
 
+#ifdef USE_CUDA
 void FEM_Simulator::applyParametersGPU(GPUSolver& gpu) {
 	auto start = std::chrono::steady_clock::now();
     gpu.uploadAllMatrices(this->Kint,this->Kconv,this->M,this->FirrMat,
@@ -1525,3 +1526,4 @@ void FEM_Simulator::singleStepGPU(GPUSolver &gpu)
 	gpu.singleStep(this->alpha, this->deltaT);
 	printDuration("Single Step on GPU: ", start);
 }
+#endif

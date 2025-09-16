@@ -70,8 +70,10 @@ if(USE_CUDA)
         )
     else()
         set(USE_CUDA OFF)
-        message(STATUS "CUDA not found, disabling GPU support")
+        message(STATUS "-DUSE_CUDA=OFF -- CUDA not found, disabling GPU support")
     endif()
+else()
+    message(STATUS "CUDA won't be compiled")
 endif()
 
 # ──────────────────────────────────────────────────────────────

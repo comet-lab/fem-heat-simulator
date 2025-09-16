@@ -86,6 +86,7 @@ int main()
 
     std::cout << "Top Face Temp: " <<   simulator.Temp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0]) << std::endl;
     /* -------- GPU Testing ------------------------*/
+#ifdef USE_CUDA
     GPUSolver gpu = GPUSolver();
     simulator.silentMode = true;
     simulator.applyParametersGPU(gpu);
@@ -101,7 +102,7 @@ int main()
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "GPU Time Stepping time: " << duration.count()/1000000.0 << std::endl;
-
+#endif
     
     /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {
