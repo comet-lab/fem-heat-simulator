@@ -26,7 +26,7 @@ int main()
     float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
     FEM_Simulator simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
-    simulator.alpha = 1;
+    simulator.alpha = 0.5f;
     simulator.setLayer(0.05f, 30);
     std::cout << "Number of nodes: " << simulator.nodesPerAxis[0] * simulator.nodesPerAxis[1] * simulator.nodesPerAxis[2] << std::endl;
     std::cout << "Number of elems: " << simulator.elementsPerAxis[0] * simulator.elementsPerAxis[1] * simulator.elementsPerAxis[2] << std::endl;
@@ -71,11 +71,9 @@ int main()
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     start = end;
     std::cout << "Initialization Duration: " << duration.count()/1000000.0 << std::endl;
-
     for (int i = 1; i <= round(totalTime/simulator.deltaT); i++) {
-        // simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
+        simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
         simulator.parameterUpdate = true;
-        simulator.fluenceUpdate = true;
         simulator.singleStep();
     }
     
@@ -83,26 +81,6 @@ int main()
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << "Time-Stepping Duration: " << duration.count()/1000000.0 << std::endl;
     start = end;
-
-    std::cout << "Top Face Temp: " <<   simulator.Temp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0]) << std::endl;
-    /* -------- GPU Testing ------------------------*/
-#ifdef USE_CUDA
-    GPUSolver gpu = GPUSolver();
-    simulator.silentMode = true;
-    simulator.applyParametersGPU(gpu);
-    simulator.initializeDVGPU(gpu);
-    start = std::chrono::high_resolution_clock::now();
-    for (int i = 1; i <= round(totalTime/simulator.deltaT); i++) {
-        simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
-        simulator.setupGPU(gpu);
-        simulator.singleStepGPU(gpu);
-    }
-    gpu.downloadVector(simulator.dVec,gpu.dVec_d.data);
-    simulator.Temp(simulator.validNodes) = simulator.dVec;
-    end = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "GPU Time Stepping time: " << duration.count()/1000000.0 << std::endl;
-#endif
     
     /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {

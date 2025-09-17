@@ -38,8 +38,8 @@ protected:
 
         femSim->setFluenceRate(laserPose, laserPower, beamWaist);
         femSim->buildMatrices();
-        // femSim->applyParameters();
-        // femSim->initializeTimeIntegration();
+        // femSim->applyParametersCPU();
+        // femSim->initializeTimeIntegrationCPU();
 
         gpu.uploadAllMatrices(femSim->Kint,femSim->Kconv,femSim->M,femSim->FirrMat,
 		femSim->FluenceRate,femSim->Fq,femSim->Fconv,femSim->Fk,femSim->FirrElem);

@@ -87,7 +87,7 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
 	/* Try-Catch block won't actually catch a faulty matrix multiplication in Eigen*/
 	//try {
-	//	this->initializeTimeIntegration(); // insteady try and initializeTimeIntegration();
+	//	this->initializeTimeIntegrationCPU(); // insteady try and initializeTimeIntegrationCPU();
 	//}
 	//catch (...) {
 	//	// This block catches any other type of exception not caught by previous handlers
@@ -101,7 +101,7 @@ void FEM_Simulator::multiStep(float duration) {
 	/* This function simulates multiple steps of the heat equation. A single step duration is given by deltaT. If the total
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
-	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
+	It repeatedly calls to singleStepCPU(). This function will also update the temperature sensors vector.  */ 
 	auto startTime = std::chrono::steady_clock::now();
 	int numSteps = round(duration / this->deltaT);
 	this->initializeSensorTemps(numSteps);
@@ -111,7 +111,7 @@ void FEM_Simulator::multiStep(float duration) {
 	}
 
 	for (int t = 1; t <= numSteps; t++) {
-		this->singleStep();
+		this->singleStepCPU();
 		this->updateTemperatureSensors(t);
 	}
 
@@ -119,7 +119,21 @@ void FEM_Simulator::multiStep(float duration) {
 }
 
 void FEM_Simulator::singleStep() {
-	/* Simulates a single step of the heat equation. A single step is given by the duration deltaT. To run single step,
+	/* 
+	Performs either the GPU single step or the CPU single step
+	*/
+#ifdef USE_CUDA
+	if (this->useGPU){
+		this->singleStepGPU();
+	} else
+#endif
+	{
+		this->singleStepCPU();
+	}
+}
+
+void FEM_Simulator::singleStepCPU() {
+	/* Simulates a single step of the heat equation using CPU. A single step is given by the duration deltaT. To run single step,
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
 
@@ -130,7 +144,7 @@ void FEM_Simulator::singleStep() {
 			createFirr();
 		}
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
-		this->applyParameters();
+		this->applyParametersCPU();
 		this->fluenceUpdate = false;
 
 		if (this->parameterUpdate) { // Happens only if parameters were updated
@@ -143,7 +157,6 @@ void FEM_Simulator::singleStep() {
 			this->parameterUpdate = false;
 		}
 	}
-
 
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
@@ -219,7 +232,7 @@ void FEM_Simulator::buildMatrices()
 	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
 	this->Kconv = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kconv.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
-	
+
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -329,6 +342,14 @@ void FEM_Simulator::buildMatrices()
 	this->M.makeCompressed();
 	this->FirrMat.makeCompressed();
 
+#ifdef USE_CUDA
+	/* After building the matrices, if we are using a GPU we need to upload them.*/
+	if (this->useGPU){
+		this->gpuHandle->uploadAllMatrices(this->Kint,this->Kconv,this->M,this->FirrMat,
+			this->FluenceRate,this->Fq,this->Fconv,this->Fk,this->FirrElem);
+	}
+#endif
+
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
@@ -417,13 +438,16 @@ void FEM_Simulator::createFirr()
 	}
 }
 
-void FEM_Simulator::applyParameters()
+void FEM_Simulator::applyParametersCPU()
 {
-	auto startTime = std::chrono::steady_clock::now();
-	/* Here we assume constant tissue properties throughout the mesh. This allows us to
+	/* 
+	Applying MUA, TC, HTC, VHC, and the fluence rate to the matrices we built on the CPU.
+	Here we assume constant tissue properties throughout the mesh. This allows us to
 	multiply by tissue specific properties after the element construction, which means we can change
 	tissue properties without having to reconstruct the matrices
 	*/
+	auto startTime = std::chrono::steady_clock::now();
+	
 	// Apply parameter specific multiplication for each global matrix.
 	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
 	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
@@ -440,10 +464,15 @@ void FEM_Simulator::applyParameters()
 	startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
 }
 
-void FEM_Simulator::initializeTimeIntegration()
+void FEM_Simulator::initializeTimeIntegrationCPU()
 {
+	/* 
+	Creates the d and v vectors used for time integration. V vector is created by solving the 
+	linear system M*v = (F-K*d). Then the Eigen conjugate gradient solver is initialized with the 
+	left-hand-side of the system (M + alpha*dt*K)*v = (F - K*d). 
+	*/
 	auto startTime = std::chrono::steady_clock::now();
-	this->applyParameters();
+	this->applyParametersCPU();
 	this->parameterUpdate = false;
 
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
@@ -491,12 +520,20 @@ void FEM_Simulator::initializeModel()
 	conditions, changing the layers in the mesh, etc. This function also needs to be called if alpha or the time step 
 	changes. 
 	
-	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
-	like */
+	This function does not need to be called if we are only changing the fluenceRate, or the value of tissue properties
+	*/
 	this->buildMatrices();
 	this->fluenceUpdate = false;
 
-	this->initializeTimeIntegration();
+#ifdef USE_CUDA
+	if (this->useGPU){
+		this->applyParametersGPU();
+		this->initializeDVGPU();
+	} else
+#endif
+	{
+		this->initializeTimeIntegrationCPU();
+	}
 	// We are now ready to call single step
 }
 
@@ -1149,46 +1186,55 @@ std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
 	return TempOut;
 }
 
-void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> FluenceRate)
-{
-	this->FluenceRate = Eigen::VectorXf::Zero(FluenceRate.size() * FluenceRate[0].size() * FluenceRate[0][0].size());
-	// Convert nested vectors into a single column Eigen Vector. 
-	for (int i = 0; i < FluenceRate.size(); i++) // associated with x and is columns of matlab matrix
-	{
-		for (int j = 0; j < FluenceRate[0].size(); j++) // associated with y and is rows of matlab matrix
-		{
-			for (int k = 0; k < FluenceRate[0][0].size(); k++) // associated with z and is depth of matlab matrix
-			{
-				this->FluenceRate(i + j * FluenceRate.size() + k * FluenceRate.size() * FluenceRate[0].size()) = FluenceRate[i][j][k];
-			}
-		}
-	}
-
-	if ((FluenceRate.size() == this->elementsPerAxis[0]) && (FluenceRate[0].size() == this->elementsPerAxis[1]) && (FluenceRate[0][0].size() == this->elementsPerAxis[2])) {
-		this->elemNFR = true;
-	}
-	else if ((FluenceRate.size() == this->nodesPerAxis[0]) && (FluenceRate[0].size() == this->nodesPerAxis[1]) && (FluenceRate[0][0].size() == this->nodesPerAxis[2])) {
+void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
+{	/* 
+	Main function to set the fluence rate of the laser. All other setFluenceRate() functions will call this one in the end. 
+	*/
+	this->FluenceRate = FluenceRate;
+	
+	// -- Checking size of vector to make sure it is appropriate
+	if (this->FluenceRate.size() == (nodesPerAxis[0]*nodesPerAxis[1]*nodesPerAxis[2])){
 		this->elemNFR = false;
-	}
-	else {
+	} else if (this->FluenceRate.size() == (elementsPerAxis[0]*elementsPerAxis[1]*elementsPerAxis[2])){
+		this->elemNFR = true;
+	} else {
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
-
+	// -- setting flag that fluence has been updated
 	this->fluenceUpdate = true;
+
+	// Uploading fluence rate to GPU if enabled
+#ifdef USE_CUDA
+	if (this->useGPU){
+		this->gpuHandle->uploadVector(this->FluenceRate, this->gpuHandle->FluenceRate_d);
+	}
+#endif
 }
 
-void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
+void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> inputFluence)
 {
-	this->FluenceRate = FluenceRate;
-	//TODO Check for element or nodal FluenceRate;
-	this->elemNFR = false;
-	this->fluenceUpdate = true;
+	int xNumNodes = inputFluence.size();
+	int yNumNodes = inputFluence[0].size();
+	int zNumNodes = inputFluence[0][0].size();
+	Eigen::VectorXf FR = Eigen::VectorXf::Zero(xNumNodes * yNumNodes * zNumNodes);
+	// Convert nested vectors into a single column Eigen Vector. 
+	for (int i = 0; i < xNumNodes; i++) // associated with x and is columns of matlab matrix
+	{
+		for (int j = 0; j < yNumNodes; j++) // associated with y and is rows of matlab matrix
+		{
+			for (int k = 0; k < zNumNodes; k++) // associated with z and is depth of matlab matrix
+			{
+				FR(i + j * xNumNodes + k * xNumNodes * yNumNodes) = inputFluence[i][j][k];
+			}
+		}
+	}
+	this->setFluenceRate(FR);
 }
 
 void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
 {
-	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
+	Eigen::VectorXf FR = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
 	
 	// Precompute constants
 	const float pi = 3.14159265358979323846f;
@@ -1227,14 +1273,14 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 				float irr = 2.0f * laserPower / (pi * width2) * std::exp(exponent);
 
 				int index = i + j * nx + k * nx * ny;
-				this->FluenceRate(index) = irr;
+				FR(index) = irr;
 
 				z += (k < this->elemsInLayer) ? zStep1 : zStep2;
 			}
 		}
 	}
 
-	this->fluenceUpdate = true;
+	this->setFluenceRate(FR);
 }
 
 void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float laserPower, float beamWaist)
@@ -1244,7 +1290,6 @@ void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float lase
 		laserPoseVec[i] = laserPose(i);
 	}
 	this->setFluenceRate(laserPoseVec, laserPower, beamWaist);
-	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setDeltaT(float deltaT)
@@ -1471,11 +1516,12 @@ bool FEM_Simulator::gpuAvailable() {
 #ifdef USE_CUDA
 	int deviceCount = 0;
 	cudaError_t err = cudaGetDeviceCount(&deviceCount);
-	useGPU = (err == cudaSuccess && deviceCount > 0);
+	this->useGPU = (err == cudaSuccess && deviceCount > 0);
 
 
-	if (useGPU) {
+	if (this->useGPU) {
 		std::cout << "GPU detected: using AmgX solver\n";
+		gpuHandle = new GPUSolver();
 	}
 	else
 #endif 
@@ -1487,18 +1533,16 @@ bool FEM_Simulator::gpuAvailable() {
 }
 
 #ifdef USE_CUDA
-void FEM_Simulator::applyParametersGPU(GPUSolver& gpu) {
+void FEM_Simulator::applyParametersGPU() {
 	auto start = std::chrono::steady_clock::now();
-    gpu.uploadAllMatrices(this->Kint,this->Kconv,this->M,this->FirrMat,
-		this->FluenceRate,this->Fq,this->Fconv,this->Fk,this->FirrElem
-	);
-	start = printDuration("Uploaded Matrices to GPU: ", start);
-	gpu.applyParameters(this->TC,this->HTC,this->VHC,this->MUA,elemNFR);
+	// GPU apply parameters 
+	gpuHandle->applyParameters(this->TC,this->HTC,this->VHC,this->MUA,elemNFR);
 	start = printDuration("Parameter application: ", start);
+	// Once applied parameters is called on the GPU, as far as its concerned, the fluence has been updated
 }
 
 
-void FEM_Simulator::initializeDVGPU(GPUSolver& gpu) {
+void FEM_Simulator::initializeDVGPU() {
 	auto start = std::chrono::steady_clock::now();
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
@@ -1509,21 +1553,39 @@ void FEM_Simulator::initializeDVGPU(GPUSolver& gpu) {
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
 
-    gpu.initializeDV(this->dVec,this->vVec);
+    gpuHandle->initializeDV(this->dVec,this->vVec);
 	printDuration("Initalized D and V Vectors GPU: ", start);
+	// run final call to setupGPU() so that the GPU is ready to just perform repeated forward steps. 
+	this->setupGPU();
+	this->fluenceUpdate = false;
+	this->parameterUpdate = false;
 }
 
-void FEM_Simulator::setupGPU(GPUSolver &gpu)
+void FEM_Simulator::setupGPU()
 {
 	auto start = std::chrono::steady_clock::now();
-	gpu.setup(this->alpha, this->deltaT);
+	gpuHandle->setup(this->alpha, this->deltaT);
 	printDuration("Setup on GPU: ", start);
 }
 
-void FEM_Simulator::singleStepGPU(GPUSolver &gpu)
+void FEM_Simulator::singleStepGPU()
 {
 	auto start = std::chrono::steady_clock::now();
-	gpu.singleStep(this->alpha, this->deltaT);
+	if (this->fluenceUpdate || this->parameterUpdate){
+		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
+		this->applyParametersGPU();
+		this->fluenceUpdate = false;
+		if (this->parameterUpdate)
+			this->setupGPU();
+		this->parameterUpdate = false;
+	}
+
+	// we don't need to reupload dVec because gpuHandle has its own copy of it that it updates. 
+	// If a user wants to switch between GPU and CPU they'll have to call initializeModel() again. 
+	gpuHandle->singleStep(this->alpha, this->deltaT);
+	// After Single Step we get the dVector to the system and assign it to T
+	gpuHandle->downloadVector(this->dVec,gpuHandle->dVec_d.data);
+    this->Temp(this->validNodes) = this->dVec;
 	printDuration("Single Step on GPU: ", start);
 }
 #endif

@@ -277,7 +277,7 @@ TEST_F(BaseGPU, Test_applyParameters)
     int nCols = femSim->Kconv.cols();
 
     // std::cout << "FEM Apply Parameters: " << std::endl;
-    femSim->applyParameters();
+    femSim->applyParametersCPU();
     // std::cout << "GPU Apply Parameters: " << std::endl;
     gpu.applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
     
@@ -315,7 +315,7 @@ TEST_F(BaseGPU, Test_calculateRHS)
     int nCols = femSim->Kconv.cols();
 
     // Perform Ground truth
-    femSim->initializeTimeIntegration(); // performs applyParameters() internally
+    femSim->initializeTimeIntegrationCPU(); // performs applyParametersCPU() internally
     // Calculate RHS using stored matrices
     Eigen::VectorXf bTrue = (femSim->globF - femSim->globK*femSim->dVec);
     Eigen::VectorXf bPartial = femSim->globK*femSim->dVec;
@@ -375,7 +375,7 @@ TEST_F(BaseGPU, Test_initializeDV)
     int nCols = femSim->Kconv.cols();
 
     // Perform Ground truth
-    femSim->initializeTimeIntegration();
+    femSim->initializeTimeIntegrationCPU();
     
     // Apply GPU 
     Eigen::VectorXf outputD_d(nRows), outputV_d(nRows);

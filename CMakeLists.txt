@@ -1,5 +1,5 @@
 ﻿cmake_minimum_required(VERSION 3.29)
-project(HeatSimulation VERSION 3.2 LANGUAGES CXX CUDA)
+project(HeatSimulation VERSION 4.0 LANGUAGES CXX CUDA)
 
 # ──────────────────────────────────────────────────────────────
 # Options & global settings
@@ -70,10 +70,10 @@ if(USE_CUDA)
         )
     else()
         set(USE_CUDA OFF)
-        message(STATUS "-DUSE_CUDA=OFF -- CUDA not found, disabling GPU support")
+        message(STATUS "CUDA not found, disabling GPU support")
     endif()
 else()
-    message(STATUS "CUDA won't be compiled")
+    message(STATUS "-DUSE_CUDA=OFF -- CUDA won't be compiled")
 endif()
 
 # ──────────────────────────────────────────────────────────────

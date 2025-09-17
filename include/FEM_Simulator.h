@@ -43,22 +43,24 @@ public:
 	//0 - heat sink, 1 - heatFlux boundary, 2 - convection boundary
 	enum boundaryCond { HEATSINK, FLUX, CONVECTION };
 
+	// -- Main Function calls for use -- 
 	FEM_Simulator();
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(const FEM_Simulator& inputSim);
 	void multiStep(float duration); // simulates multiple steps of time integration
-	void singleStep(); // simulates a single step of time integration
+	void singleStep();
+	void singleStepCPU(); // simulates a single step of time integration
 	void buildMatrices(); // creates global matrices and performs spatial discretization
 	void createFirr(); // creates only the Forcing vector for the fluence rate
-	void applyParameters();
-	void initializeTimeIntegration();
+	void applyParametersCPU();
+	void initializeTimeIntegrationCPU();
 	void initializeModel();
 	void initializeSensorTemps(int numSteps); // initialize sensor temps vec with 0s
 	void updateTemperatureSensors(int timeIdx); // update sensor temp vec
 	std::array<int, 3> positionToElement(std::array<float, 3>& position, float xi[3]); // Convert a 3D position into an element that contains that position
 	
 
-	// Setters and Getters
+	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
 	std::vector<std::vector<std::vector<float>>> getTemp();
@@ -122,6 +124,9 @@ public:
 	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
 	bool useGPU = false;
+#ifdef USE_CUDA
+	GPUSolver* gpuHandle;
+#endif
 
 	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes
@@ -164,6 +169,7 @@ public:
 	// This maps the face on an element to the local node numbers on that face: top,bot,front,right,back,left
 	std::array<std::vector<int>, 6> elemNodeSurfaceMap;
 
+	// -- Functions to help with matrix construction --
 	void initializeBoundaryNodes(); // goes through each node and labels them if they are on the boundary
 	void initializeElementNodeSurfaceMap(); // For an arbitrary element, maps what nodes could belong to which faces of the cuboid
 	void initializeElementMatrices(int layer);  // sets the Ke, Me, etc matrices 
@@ -183,15 +189,16 @@ public:
 	float calcFconvA(float xi[3], int Ai, int dim); // function that is integrated for Fconv
 	float calcKconvAB(float xi[3], int Ai, int dim); // function that is integrated for Kconv
 
+	// -- Miscenallenous helper Functions 
 	void ind2sub(int index, int size[3], int sub[3]); 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
 	bool gpuAvailable();
-	
+
 #ifdef USE_CUDA
-	void applyParametersGPU(GPUSolver& gpu);
-	void initializeDVGPU(GPUSolver& gpu);
-	void setupGPU(GPUSolver& gpu);
-	void singleStepGPU(GPUSolver& gpu);
+	void applyParametersGPU();
+	void initializeDVGPU();
+	void setupGPU();
+	void singleStepGPU();
 #endif
 };
 

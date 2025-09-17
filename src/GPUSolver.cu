@@ -41,7 +41,10 @@ void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool 
     // These variables get set in here so we want to make sure they are free
     freeCSR(this->globK_d);
     freeCSR(this->globM_d);
-    CHECK_CUDA(cudaFree(this->globF_d));
+    if (this->globF_d) {
+        CHECK_CUDA(cudaFree(this->globF_d));
+        this->globF_d = nullptr;  // <--- IMPORTANT
+    }
 
     // ---------------- Step 1: Compute globK ----------------
     // This will perform Kint*TC + Kconv*HTC = globK

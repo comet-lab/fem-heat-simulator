@@ -321,7 +321,7 @@ public:
                 // the explicit portion was actually calculated during the previous call, or during initializeModel()
                 // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
                 this->simulator->setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
-                this->simulator->singleStep();
+                this->simulator->singleStepCPU();
                 this->simulator->updateTemperatureSensors(t);
             }
             catch (const std::exception& e) {
