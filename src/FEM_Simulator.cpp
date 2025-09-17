@@ -97,6 +97,12 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	//}
 }
 
+FEM_Simulator::~FEM_Simulator(){
+#ifdef USE_CUDA
+    delete gpuHandle;  // safe even if nullptr
+#endif
+}
+
 void FEM_Simulator::multiStep(float duration) {
 	/* This function simulates multiple steps of the heat equation. A single step duration is given by deltaT. If the total
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
@@ -111,7 +117,7 @@ void FEM_Simulator::multiStep(float duration) {
 	}
 
 	for (int t = 1; t <= numSteps; t++) {
-		this->singleStepCPU();
+		this->singleStep();
 		this->updateTemperatureSensors(t);
 	}
 
@@ -446,7 +452,7 @@ void FEM_Simulator::applyParametersCPU()
 	multiply by tissue specific properties after the element construction, which means we can change
 	tissue properties without having to reconstruct the matrices
 	*/
-	auto startTime = std::chrono::steady_clock::now();
+	// auto startTime = std::chrono::steady_clock::now();
 	
 	// Apply parameter specific multiplication for each global matrix.
 	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
@@ -461,7 +467,7 @@ void FEM_Simulator::applyParametersCPU()
 		Firr = this->FirrMat * this->FluenceRate;
 	}
 	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
-	startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
+	// startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
 }
 
 void FEM_Simulator::initializeTimeIntegrationCPU()
@@ -1520,8 +1526,10 @@ bool FEM_Simulator::gpuAvailable() {
 
 
 	if (this->useGPU) {
-		std::cout << "GPU detected: using AmgX solver\n";
+		// if (!this->silentMode)
+		// 	std::cout << "GPU detected: using AmgX solver\n";
 		gpuHandle = new GPUSolver();
+		useGPU = true;
 	}
 	else
 #endif 
@@ -1570,7 +1578,7 @@ void FEM_Simulator::setupGPU()
 
 void FEM_Simulator::singleStepGPU()
 {
-	auto start = std::chrono::steady_clock::now();
+	// auto start = std::chrono::steady_clock::now();
 	if (this->fluenceUpdate || this->parameterUpdate){
 		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
 		this->applyParametersGPU();
@@ -1586,6 +1594,6 @@ void FEM_Simulator::singleStepGPU()
 	// After Single Step we get the dVector to the system and assign it to T
 	gpuHandle->downloadVector(this->dVec,gpuHandle->dVec_d.data);
     this->Temp(this->validNodes) = this->dVec;
-	printDuration("Single Step on GPU: ", start);
+	// printDuration("Single Step on GPU: ", start);
 }
 #endif

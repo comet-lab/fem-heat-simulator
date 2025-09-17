@@ -4,9 +4,9 @@
 
 #include "mex.hpp"
 #include "mexAdapter.hpp"
-#include<string>
-#include<memory>
-#include<iostream>
+#include <string>
+#include <memory>
+#include <iostream>
 #include "FEM_Simulator.h"
 
  //using namespace matlab::mex;
@@ -15,17 +15,19 @@
 class MexFunction : public matlab::mex::Function {
 private:
     /*Inputs required : T0, FluenceRate, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
-   OPTIONAL       : (useAllCPUs), (silentMode), (layers), (Nn1d), (alpha)*/
+   OPTIONAL       : (layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d), (createAllMatrices), */
     enum VarPlacement {
         TEMPERATURE, FLUENCE_RATE, TISSUE_SIZE, SIM_DURATION, DELTAT, TISSUE_PROP, BC,
-        FLUX, AMB_TEMP, SENSOR_LOC, USE_ALL_CPUS, SILENT_MODE, LAYERS, NN1D, ALPHA, CREATE_MAT
+        FLUX, AMB_TEMP, SENSOR_LOC, LAYERS, USE_ALL_CPUS, USE_GPU, ALPHA, SILENT_MODE, NN1D, CREATE_MAT, 
     };
 
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
-    FEM_Simulator* simulator;
+    FEM_Simulator simulator;
     std::ostringstream stream;
+    /* Default Parameters that are stored as class variables for repeat calls */
     bool silentMode = true;
     bool useAllCPUs = true;
+    bool useGPU = true;
     bool createAllMatrices = true;
     float layerHeight = 1;
     int elemsInLayer = 1;
@@ -36,9 +38,17 @@ public:
     MexFunction()
     {
         matlabPtr = getEngine();
-        simulator = new FEM_Simulator();
+#ifdef USE_CUDA
+        AMGX_initialize();
+#endif
     }
 
+    ~MexFunction()
+    {
+#ifdef USE_CUDA
+    AMGX_finalize();
+#endif
+    }
     /* Helper function to convert a matlab array to a std vector*/
     std::vector<std::vector<std::vector<float>>> convertMatlabArrayTo3DVector(const matlab::data::Array& matlabArray) {
         std::vector<std::vector<std::vector<float>>> result;
@@ -192,33 +202,38 @@ public:
             if (!this->createAllMatrices) {
                 this->createAllMatrices = checkForMatrixReset(Nn1d, T0, FluenceRate, tissueSize, layerHeight, elemsInLayer, boundaryType);
             }
+            
+            this->simulator.useGPU &= this->useGPU;
+            stream << "MEX: Set Use GPU to " << this->simulator.useGPU << std::endl;
+            displayOnMATLAB(stream);
+
             // Set the type of basis functions we are using by setting nodes per dimension of an 
-            this->simulator->Nn1d = Nn1d;
-            this->simulator->setTemp(T0);
+            this->simulator.Nn1d = Nn1d;
+            this->simulator.setTemp(T0);
             // Set the FluenceRate
-            this->simulator->setFluenceRate(FluenceRate);
-            this->simulator->setTissueSize(tissueSize);
+            this->simulator.setFluenceRate(FluenceRate);
+            this->simulator.setTissueSize(tissueSize);
             // set the layer info
-            this->simulator->setLayer(layerHeight, elemsInLayer);
+            this->simulator.setLayer(layerHeight, elemsInLayer);
             // set the time step
-            this->simulator->setDeltaT(deltaT);
+            this->simulator.setDeltaT(deltaT);
             // set the tissue properties
-            this->simulator->setMUA(MUA);
-            this->simulator->setTC(TC);
-            this->simulator->setVHC(VHC);
-            this->simulator->setHTC(HTC);
+            this->simulator.setMUA(MUA);
+            this->simulator.setTC(TC);
+            this->simulator.setVHC(VHC);
+            this->simulator.setHTC(HTC);
             // set boundary conditions
-            this->simulator->setBoundaryConditions(boundaryType);
+            this->simulator.setBoundaryConditions(boundaryType);
             // set heatFlux
-            this->simulator->setFlux(heatFlux);
+            this->simulator.setFlux(heatFlux);
 
             //print statements 
-            /*stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator->deltaT << std::endl;
+            /*stream << "Final Time: " << simDuration << "\nTime step: " << this->simulator.deltaT << std::endl;
             displayOnMATLAB(stream);
-            stream << "TC: " << this->simulator->TC << ", MUA: " << this->simulator->MUA << ", VHC: " << this->simulator->VHC << ", HTC: " << this->simulator->HTC << std::endl;
+            stream << "TC: " << this->simulator.TC << ", MUA: " << this->simulator.MUA << ", VHC: " << this->simulator.VHC << ", HTC: " << this->simulator.HTC << std::endl;
             displayOnMATLAB(stream);*/
 
-            this->simulator->setAmbientTemp(ambientTemp);
+            this->simulator.setAmbientTemp(ambientTemp);
         }
         catch (const std::exception& e) {
             stream << "MEX: Error in Setup: " << std::endl;
@@ -234,7 +249,7 @@ public:
             sensorTemps.push_back({ sensorTempsInput[s][0],sensorTempsInput[s][1] ,sensorTempsInput[s][2] });
         }
         try {
-            this->simulator->setSensorLocations(sensorTemps);
+            this->simulator.setSensorLocations(sensorTemps);
         }
         catch (const std::exception& e){
             stream << "MEX: Error setting sensor locations " << std::endl;
@@ -259,12 +274,11 @@ public:
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
-
         // Create global K M and F 
         if (this->createAllMatrices) { // only need to create the KMF matrices the first time
             this->createAllMatrices = false;
             try {
-                this->simulator->initializeModel();
+                this->simulator.initializeModel();
                 /*stream << "Global matrices created" << std::endl;
                 displayOnMATLAB(stream);*/
             }
@@ -283,7 +297,7 @@ public:
 
         // Perform time stepping
         try { //
-            this->simulator->multiStep(simDuration);
+            this->simulator.multiStep(simDuration);
             /*stream << "Time Stepping Complete" << std::endl;
             displayOnMATLAB(stream);*/
         }
@@ -299,15 +313,15 @@ public:
         displayOnMATLAB(stream);
 
         // Have to convert the std::vector to a matlab array for output
-        //display3DVector(this->simulator->Temp, "Final Temp: ");
-        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator->getTemp();
+        //display3DVector(this->simulator.Temp, "Final Temp: ");
+        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.getTemp();
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
         matlab::data::ArrayFactory factory;
-        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator->sensorTemps.size(), this->simulator->sensorTemps[0].size()});
-        for (size_t i = 0; i < this->simulator->sensorTemps.size(); ++i) {
-            for (size_t j = 0; j < this->simulator->sensorTemps[i].size(); ++j) {
-                sensorTempsOutput[i][j] = this->simulator->sensorTemps[i][j];
+        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator.sensorTemps.size(), this->simulator.sensorTemps[0].size()});
+        for (size_t i = 0; i < this->simulator.sensorTemps.size(); ++i) {
+            for (size_t j = 0; j < this->simulator.sensorTemps[i].size(); ++j) {
+                sensorTempsOutput[i][j] = this->simulator.sensorTemps[i][j];
             }
         }
         outputs[1] = sensorTempsOutput;
@@ -324,7 +338,8 @@ public:
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 10) {
             displayError("At least 10 inputs required: T0, NFR, tissueSize, simDuration,"
-                "deltaT tissueProperties, BC, Flux, ambientTemp, sensorLocations, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
+                "deltaT tissueProperties, BC, Flux, ambientTemp, sensorLocations, "
+                "(layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d), (createAllMatrices)");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -367,13 +382,6 @@ public:
         if ((inputs[VarPlacement::SENSOR_LOC].getDimensions()[1] != 3)) {
             displayError("Sensor Locations must be n x 3");
         }
-        if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
-            useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
-        }
-        if (inputs.size() > VarPlacement::SILENT_MODE) {
-            this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
-            this->simulator->silentMode = this->silentMode;
-        }
         if (inputs.size() > VarPlacement::LAYERS) {
             layerHeight = inputs[VarPlacement::LAYERS][0];
             elemsInLayer = int(inputs[VarPlacement::LAYERS][1]);
@@ -382,11 +390,22 @@ public:
             elemsInLayer = inputs[VarPlacement::TEMPERATURE].getDimensions()[2];
             layerHeight = inputs[VarPlacement::TISSUE_SIZE][2];
         }
-        if (inputs.size() > VarPlacement::NN1D) {
-            Nn1d = inputs[VarPlacement::NN1D][0];
+        if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
+            useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
+        }
+        if (inputs.size() > VarPlacement::USE_GPU) {
+            // Control GPU usage
+            this->useGPU = inputs[VarPlacement::USE_GPU][0];
         }
         if (inputs.size() > VarPlacement::ALPHA) {
-            this->simulator->alpha = inputs[VarPlacement::ALPHA][0];
+            this->simulator.alpha = inputs[VarPlacement::ALPHA][0];
+        }
+        if (inputs.size() > VarPlacement::SILENT_MODE) {
+            this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
+            this->simulator.silentMode = this->silentMode;
+        }
+        if (inputs.size() > VarPlacement::NN1D) {
+            Nn1d = inputs[VarPlacement::NN1D][0];
         }
         if (inputs.size() > VarPlacement::CREATE_MAT) {
             // this parameter is primarily here for debugging and timing tests. Not really practical for someone
@@ -401,29 +420,34 @@ public:
         this->createAllMatrices = false;
 
         // if the number of nodes in 1 dimension for an element changes, we need to reconstruct the matrices
-        if (this->simulator->Nn1d != Nn1d) {
+        if (this->simulator.Nn1d != Nn1d) {
             this->createAllMatrices = true;
         }
         // if the size of our temperature vector changes, we need to reconstruct the matrices
-        if (T0.size() != this->simulator->nodesPerAxis[0]) this->createAllMatrices = true; 
-        if (T0[0].size() != this->simulator->nodesPerAxis[1]) this->createAllMatrices = true;
-        if (T0[0][0].size() != this->simulator->nodesPerAxis[2]) this->createAllMatrices = true;
+        if (T0.size() != this->simulator.nodesPerAxis[0]) this->createAllMatrices = true; 
+        if (T0[0].size() != this->simulator.nodesPerAxis[1]) this->createAllMatrices = true;
+        if (T0[0][0].size() != this->simulator.nodesPerAxis[2]) this->createAllMatrices = true;
 
         // if our tissue size has changed we need to reconstruct all matrices because our jacobian has changed
-        if (tissueSize[0] != this->simulator->tissueSize[0]) this->createAllMatrices = true;
-        if (tissueSize[1] != this->simulator->tissueSize[1]) this->createAllMatrices = true;
-        if (tissueSize[2] != this->simulator->tissueSize[2]) this->createAllMatrices = true;
+        if (tissueSize[0] != this->simulator.tissueSize[0]) this->createAllMatrices = true;
+        if (tissueSize[1] != this->simulator.tissueSize[1]) this->createAllMatrices = true;
+        if (tissueSize[2] != this->simulator.tissueSize[2]) this->createAllMatrices = true;
 
         //if layer height or layer size changed then again we have a jacobian change
-        if (abs(layerHeight - this->simulator->layerHeight) > 0.0001) this->createAllMatrices = true;
+        if (abs(layerHeight - this->simulator.layerHeight) > 0.0001) this->createAllMatrices = true;
         if (elemsInLayer != elemsInLayer) this->createAllMatrices = true;
 
         // check if any boundaries have changed
         for (int b = 0; b < 6; b++) {
-            if (boundaryType[b] != this->simulator->boundaryType[b]) {
+            if (boundaryType[b] != this->simulator.boundaryType[b]) {
                 this->createAllMatrices = true;
                 break;
             }
+        }
+        
+        if (this->simulator.useGPU != this->useGPU){
+            // if the user changes whether or not to use the GPU we need recreate matrices to be safe
+            this->createAllMatrices = true;
         }
 
         if (this->createAllMatrices) {

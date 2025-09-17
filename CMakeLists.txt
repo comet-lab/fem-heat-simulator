@@ -5,34 +5,11 @@ project(HeatSimulation VERSION 4.0 LANGUAGES CXX CUDA)
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_FEM_MEX      "Build MATLAB MEX wrapper (Release)" OFF)
-option(USE_CUDA "Enable GPU solver using AmgX (requires CUDA)" ON)
-
-
-include(GNUInstallDirs)                 # Gives ${CMAKE_INSTALL_*} variables
-set(CMAKE_CXX_STANDARD 17)              # CMAKE_CXX_STANDARD is 17 because we need to use GCC 9.4 and CUDA 12.8
-# set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# ──────────────────────────────────────────────────────────────
-# Dependencies that come from the system or FetchContent
-# ──────────────────────────────────────────────────────────────
-find_package(Eigen3 3.4 CONFIG REQUIRED)
-find_package(OpenMP       REQUIRED)
-
-# Helper to add OpenMP to any target with one line
-function(enable_openmp tgt)
-    target_link_libraries(${tgt} PUBLIC OpenMP::OpenMP_CXX)
-endfunction()
-
-cmake_minimum_required(VERSION 3.29)
-project(HeatSimulation VERSION 3.2 LANGUAGES CXX CUDA)
-
-# ──────────────────────────────────────────────────────────────
-# Options & global settings
-# ──────────────────────────────────────────────────────────────
-option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" OFF)
+option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" ON)
 option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" ON)
+set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files are")
+
+message(STATUS "AMGX_ROOT: ${AMGX_ROOT}")
 
 include(GNUInstallDirs)
 set(CMAKE_CXX_STANDARD 17)
@@ -55,17 +32,13 @@ if(USE_CUDA)
     find_package(CUDAToolkit)
     if(CUDAToolkit_FOUND)
         message(STATUS "CUDA found, enabling GPU and AmgX support")
-        add_definitions(-DUSE_CUDA)
-
-        # AmgX paths
-        set(AMGX_ROOT "/usr/local/amgx")  # adjust if needed
 
         find_path(AMGX_INCLUDE_DIR
             NAMES amgx_c.h
             PATHS ${AMGX_ROOT}/include
         )
         find_library(AMGX_LIBRARY
-            NAMES amgx amgxsh
+            NAMES amgxsh amgx  # on my install, libamgxsh.so is dynamic and libamgx.a is static
             PATHS ${AMGX_ROOT}/lib
         )
     else()
@@ -73,7 +46,7 @@ if(USE_CUDA)
         message(STATUS "CUDA not found, disabling GPU support")
     endif()
 else()
-    message(STATUS "-DUSE_CUDA=OFF -- CUDA won't be compiled")
+    message(STATUS "USE_CUDA=OFF -- CUDA won't be compiled")
 endif()
 
 # ──────────────────────────────────────────────────────────────
@@ -118,7 +91,11 @@ target_include_directories(HeatSimulation
 
 # Compile definitions
 if(USE_CUDA)
-    target_compile_definitions(HeatSimulation PUBLIC USE_CUDA)
+    # set the #define USE_CUDA macro
+    target_compile_definitions(HeatSimulation PUBLIC 
+        USE_CUDA 
+        EIGEN_NO_CUDA # disable eigen __host__ __device__ keywords which produce warnings
+        AMGX_CONFIG_DIR="${CMAKE_SOURCE_DIR}") # so that we can find the amgx_config.txt file
 endif()
 
 # Libraries
@@ -202,6 +179,7 @@ endif()
 # MATLAB MEX (only built in Release *and* if MATLAB is found)
 # ──────────────────────────────────────────────────────────────
 if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Building MATLAB Executables (MEX)")
     find_package(Matlab REQUIRED)
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
@@ -238,6 +216,9 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
         elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE /openmp)
         endif()
+    else()
+        set(BUILD_FEM_MEX OFF)
+        message(STATUS "MATLAB not found - not building MATLAB Executable (MEX)")
     endif()
 endif()
 

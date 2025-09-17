@@ -5,11 +5,39 @@
 // =====================
 GPUSolver::GPUSolver() {
     CHECK_CUSPARSE(cusparseCreate(&this->handle));
-    this->amgxSolver = new AmgXSolver("../amgx_config.txt");
+    this->amgxSolver = new AmgXSolver();
 }
 
 GPUSolver::~GPUSolver() {
-    CHECK_CUSPARSE(cusparseDestroy(handle));
+    // Free device memory
+    cudaFree(globF_d);
+    cudaFree(vVec_d);
+
+    // Free CSR/Vec descriptors
+    freeCSR(Kint_d);
+    freeCSR(Kconv_d);
+    freeCSR(M_d);
+    freeCSR(FirrMat_d);
+
+    freeDeviceVec(FluenceRate_d);
+    freeDeviceVec(Fq_d);
+    freeDeviceVec(Fconv_d);
+    freeDeviceVec(Fk_d);
+    freeDeviceVec(FirrElem_d);
+    freeDeviceVec(dVec_d);
+
+    // Free global matrices
+    freeCSR(globK_d);
+    freeCSR(globM_d);
+
+    // Destroy cuSPARSE handle
+    if (handle) {
+        CHECK_CUSPARSE(cusparseDestroy(handle));    
+    }
+
+    // Free AMGXSolver if allocated
+    delete amgxSolver;
+    
 }
 
 // =====================
@@ -36,7 +64,6 @@ void GPUSolver::applyParameters(
     }
 
 void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR){
-    int threads = 256;
 
     // These variables get set in here so we want to make sure they are free
     freeCSR(this->globK_d);

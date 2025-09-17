@@ -2,17 +2,9 @@
 #include "AmgXSolver.hpp"
 #include <iostream>
 
-AmgXSolver::AmgXSolver(const std::string& configFile) {
-    static bool amgx_initialized = false;
-    if (!amgx_initialized) {
-        AMGX_initialize();
-        // AMGX_initializePlugins(); // optional, if you need plugins
-        amgx_initialized = true;
-        // std::cout << "Initialized AMGX" << std::endl;
-    }
-    //  else {
-    //     std::cout << "Did not initialize AMGX" << std::endl;
-    // }
+AmgXSolver::AmgXSolver() {
+
+    std::string configFile = std::string(AMGX_CONFIG_DIR) + "/amgx_config.txt";
     AMGX_config_create_from_file(&cfg, configFile.c_str());
     AMGX_resources_create_simple(&rsrc, cfg);
     AMGX_solver_create(&solver, rsrc, AMGX_mode_dFFI, cfg);
@@ -23,13 +15,12 @@ AmgXSolver::AmgXSolver(const std::string& configFile) {
 }
 
 AmgXSolver::~AmgXSolver() {
-    if (solver) AMGX_solver_destroy(solver);
-    if (Amat) AMGX_matrix_destroy(Amat);
-    if (Ax)   AMGX_vector_destroy(Ax);
-    if (Ab)   AMGX_vector_destroy(Ab);
-    if (rsrc) AMGX_resources_destroy(rsrc);
-    if (cfg)  AMGX_config_destroy(cfg);
-    // AMGX_finalize();
+    AMGX_vector_destroy(Ax);
+    AMGX_vector_destroy(Ab);
+    AMGX_matrix_destroy(Amat);
+    AMGX_solver_destroy(solver);
+    AMGX_resources_destroy(rsrc);
+    AMGX_config_destroy(cfg);
 }
 
 void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {

@@ -47,6 +47,7 @@ public:
 	FEM_Simulator();
 	FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d=2);
 	FEM_Simulator(const FEM_Simulator& inputSim);
+	~FEM_Simulator();
 	void multiStep(float duration); // simulates multiple steps of time integration
 	void singleStep();
 	void singleStepCPU(); // simulates a single step of time integration

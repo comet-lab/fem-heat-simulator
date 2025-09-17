@@ -16,6 +16,7 @@ TC = 0.0062; % thermal conductivity [W/K cm]
 VHC = 4.3; % volumetric heat capacity [J/K cm^3]
 HTC = 0.05; % heat transfer coefficient [W/K cm^2]
 useAllCPUs = true; % multithreading enabled
+useGPU = false; % enable gpu use
 silentMode = false; % print statements off
 Nn1d = 2; % nodes per axis in a single element
 layerInfo = [0.05,30]; % layer height, layer elements
@@ -42,8 +43,8 @@ if ~silentMode
     fprintf("\n");
 end
 [Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
-    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,useAllCPUs,...
-    silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+    useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
 toc
 
 %% Plot Sensor Temps over time

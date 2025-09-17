@@ -1,8 +1,8 @@
 #include "mex.hpp"
 #include "mexAdapter.hpp"
-#include<string>
-#include<memory>
-#include<iostream>
+#include <string>
+#include <memory>
+#include <iostream>
 #include "FEM_Simulator.h"
 
  //using namespace matlab::mex;
@@ -12,16 +12,17 @@ class MexFunction : public matlab::mex::Function {
 private:
 
     /*Inputs required : T0, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, 
-       OPTIONAL       : (useAllCPUs), (silentMode), (layers), (Nn1d), (alpha)*/
-    enum VarPlacement {TEMPERATURE, TISSUE_SIZE, TISSUE_PROP, BC, FLUX, AMB_TEMP, SENSOR_LOC, BEAM_WAIST, TIME, LASER_POSE, LASER_POWER,
-                        USE_ALL_CPUS, SILENT_MODE, LAYERS, NN1D, ALPHA};
+       OPTIONAL       : (layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d) */
+    enum VarPlacement {TEMPERATURE, TISSUE_SIZE, TISSUE_PROP, BC, FLUX, AMB_TEMP, SENSOR_LOC, 
+                        BEAM_WAIST, TIME, LASER_POSE, LASER_POWER,
+                        LAYERS, USE_ALL_CPUS, USE_GPU, ALPHA, SILENT_MODE, NN1D};
 
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
-    FEM_Simulator* simulator;
+    FEM_Simulator simulator;
     std::ostringstream stream;
     bool silentMode = false;
     bool useAllCPUs = true;
-    bool createAllMatrices = true;
+    bool useGPU = true;
     float layerHeight = 1;
     int elemsInLayer = 1;
     int Nn1d = 2;
@@ -31,7 +32,16 @@ public:
     MexFunction()
     {
         matlabPtr = getEngine();
-        simulator = new FEM_Simulator();
+#ifdef USE_CUDA
+        AMGX_initialize();
+#endif
+    }
+
+    ~MexFunction()
+    {
+#ifdef USE_CUDA
+    AMGX_finalize();
+#endif
     }
 
     /* Helper function to convert a matlab array to a std vector*/
@@ -232,22 +242,22 @@ public:
 
             /* SET ALL PARAMETERS NECESSARY BEFORE CONSTRUCTING ELEMENTS*/
             // Set the type of basis functions we are using by setting nodes per dimension of an 
-            this->simulator->Nn1d = Nn1d;
-            this->simulator->setTemp(T0);
-            this->simulator->setTissueSize(tissueSize);
+            this->simulator.Nn1d = Nn1d;
+            this->simulator.setTemp(T0);
+            this->simulator.setTissueSize(tissueSize);
             // set the layer info
-            this->simulator->setLayer(layerHeight, elemsInLayer);
+            this->simulator.setLayer(layerHeight, elemsInLayer);
             // set the tissue properties
-            this->simulator->setMUA(MUA);
-            this->simulator->setTC(TC);
-            this->simulator->setVHC(VHC);
-            this->simulator->setHTC(HTC);
+            this->simulator.setMUA(MUA);
+            this->simulator.setTC(TC);
+            this->simulator.setVHC(VHC);
+            this->simulator.setHTC(HTC);
             // set boundary conditions
-            this->simulator->setBoundaryConditions(boundaryType);
+            this->simulator.setBoundaryConditions(boundaryType);
             // set heatFlux
-            this->simulator->setFlux(heatFlux);
+            this->simulator.setFlux(heatFlux);
             // set ambient temperature
-            this->simulator->setAmbientTemp(ambientTemp);
+            this->simulator.setAmbientTemp(ambientTemp);
         }
         catch (const std::exception& e) {
             stream << "MEX: Error in Setup: " << std::endl;
@@ -263,7 +273,7 @@ public:
             sensorTemps.push_back({ sensorTempsInput[s][0],sensorTempsInput[s][1] ,sensorTempsInput[s][2] });
         }
         try {
-            this->simulator->setSensorLocations(sensorTemps);
+            this->simulator.setSensorLocations(sensorTemps);
         }
         catch (const std::exception& e) {
             stream << "MEX: Error setting sensor locations " << std::endl;
@@ -289,12 +299,14 @@ public:
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
 
-
+        this->simulator.useGPU &= this->useGPU;
+        stream << "MEX: Set Use GPU to " << this->simulator.useGPU << std::endl;
+        displayOnMATLAB(stream);
         /* Initialize the model for time = 0 or the first index and build the matrices*/
         try {
-            this->simulator->deltaT = timeVec[1] - timeVec[0]; // set deltaT
-            this->simulator->setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
-            this->simulator->initializeModel(); // initialize model
+            this->simulator.deltaT = timeVec[1] - timeVec[0]; // set deltaT
+            this->simulator.setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
+            this->simulator.initializeModel(); // initialize model
             /*stream << "Global matrices created" << std::endl;
             displayOnMATLAB(stream);*/
         }
@@ -311,18 +323,18 @@ public:
 
         /* Now perform time stepping with singele steps */
         int numSteps = timeVec.size() - 1; // if time is of size 2, then we only have 1 step.
-        this->simulator->initializeSensorTemps(numSteps);
-        this->simulator->updateTemperatureSensors(0);
+        this->simulator.initializeSensorTemps(numSteps);
+        this->simulator.updateTemperatureSensors(0);
         for (int t = 1; t <= numSteps; t++) {
             // we are simulating going from step t-1 to t. In the first case this is going from t[0] to t[1]. 
             try {
-                this->simulator->deltaT = timeVec[t] - timeVec[t - 1]; // set deltaT
+                this->simulator.deltaT = timeVec[t] - timeVec[t - 1]; // set deltaT
                 // fluence rate is set based on parameters at time = t. This is because for single step
                 // the explicit portion was actually calculated during the previous call, or during initializeModel()
                 // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
-                this->simulator->setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
-                this->simulator->singleStepCPU();
-                this->simulator->updateTemperatureSensors(t);
+                this->simulator.setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
+                this->simulator.singleStep();
+                this->simulator.updateTemperatureSensors(t);
             }
             catch (const std::exception& e) {
                 stream << "MEX: Error in performTimeStepping() " << std::endl;
@@ -339,15 +351,15 @@ public:
         displayOnMATLAB(stream);
 
         // Have to convert the std::vector to a matlab array for output
-        //display3DVector(this->simulator->Temp, "Final Temp: ");
-        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator->getTemp();
+        //display3DVector(this->simulator.Temp, "Final Temp: ");
+        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.getTemp();
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
         matlab::data::ArrayFactory factory;
-        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator->sensorTemps.size(), this->simulator->sensorTemps[0].size()});
-        for (size_t i = 0; i < this->simulator->sensorTemps.size(); ++i) {
-            for (size_t j = 0; j < this->simulator->sensorTemps[i].size(); ++j) {
-                sensorTempsOutput[i][j] = this->simulator->sensorTemps[i][j];
+        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator.sensorTemps.size(), this->simulator.sensorTemps[0].size()});
+        for (size_t i = 0; i < this->simulator.sensorTemps.size(); ++i) {
+            for (size_t j = 0; j < this->simulator.sensorTemps[i].size(); ++j) {
+                sensorTempsOutput[i][j] = this->simulator.sensorTemps[i][j];
             }
         }
         outputs[1] = sensorTempsOutput;
@@ -369,8 +381,9 @@ public:
     */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         if (inputs.size() < 11) {
-            displayError("At least 11 inputs required: T0, tissueSize,"
-                "tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, (useAllCPUs), (silentMode), (layers), (Nn1d), (createAllMatrices) ");
+            displayError("At least 11 inputs required: T0, tissueSize, tissueProperties, BC, "
+                "Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, "
+                "(layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d)");
         }
         if (outputs.size() > 2) {
             displayError("Too many outputs specified.");
@@ -421,26 +434,34 @@ public:
             (inputs[VarPlacement::TIME].getDimensions()[1] != inputs[VarPlacement::LASER_POSE].getDimensions()[1])) {
             displayError("Time vector, laserPower vector, and laserPose matrix should have the same number of columns");
         }
-        if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
-            useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
-        }
-        if (inputs.size() > VarPlacement::SILENT_MODE) {
-            this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
-            this->simulator->silentMode = this->silentMode;
-        }
+
         if (inputs.size() > VarPlacement::LAYERS) {
             layerHeight = inputs[VarPlacement::LAYERS][0];
             elemsInLayer = int(inputs[VarPlacement::LAYERS][1]);
-        }
-        else {
+        }else {
             elemsInLayer = inputs[VarPlacement::TEMPERATURE].getDimensions()[2];
             layerHeight = inputs[VarPlacement::TISSUE_SIZE][2];
         }
+
+        if (inputs.size() > VarPlacement::USE_ALL_CPUS) {
+            useAllCPUs = inputs[VarPlacement::USE_ALL_CPUS][0];
+        }
+
+        if (inputs.size() > VarPlacement::USE_GPU) {
+            this->useGPU = inputs[VarPlacement::USE_GPU][0];
+        }
+
+        if (inputs.size() > VarPlacement::ALPHA) {
+            this->simulator.alpha = inputs[VarPlacement::ALPHA][0];
+        }
+
+        if (inputs.size() > VarPlacement::SILENT_MODE) {
+            this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
+            this->simulator.silentMode = this->silentMode;
+        }
+
         if (inputs.size() > VarPlacement::NN1D) {
             Nn1d = inputs[VarPlacement::NN1D][0];
-        }
-        if (inputs.size() > VarPlacement::ALPHA) {
-            this->simulator->alpha = inputs[VarPlacement::ALPHA][0];
         }
     }
 };

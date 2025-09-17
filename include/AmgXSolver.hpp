@@ -6,7 +6,7 @@
 
 class AmgXSolver {
 public:
-    AmgXSolver(const std::string& configFile);
+    AmgXSolver();
     ~AmgXSolver();
 
     void uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A);
@@ -24,14 +24,3 @@ private:
     AMGX_vector_handle Ax, Ab;
     int rows, cols, nnz;
 };
-
-// #define CHECK_AMGX(call)                                           \
-//     do {                                                           \
-//         AMGX_RC error = call;                                   \
-//         if (error != AMGX_RC_SUCCESS) {                                    \
-//             const char* err_str = AMGX_get_error_string(error);    \
-//             fprintf(stderr, "AMGX error %d: %s\n", error, err_str); \
-//             fprintf(stderr, "In file %s at line %d\n", __FILE__, __LINE__); \
-//             exit(EXIT_FAILURE);                                     \
-//         }                                                          \
-//     } while (0)

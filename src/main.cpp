@@ -6,6 +6,12 @@
 
 int main()
 {
+#ifdef USE_CUDA
+    AMGX_initialize();
+#endif
+    
+
+{
     std::cout << "Starting Program" << std::endl;
     int nodesPerAxis[3] = { 101,101,100 };
 
@@ -26,6 +32,7 @@ int main()
     float tissueSize[3] = { 2.0f,2.0f,1.0f };
 
     FEM_Simulator simulator(Temp, tissueSize, 0.0062, 4.3, 200, 0.05, Nn1d);
+
     simulator.alpha = 0.5f;
     simulator.setLayer(0.05f, 30);
     std::cout << "Number of nodes: " << simulator.nodesPerAxis[0] * simulator.nodesPerAxis[1] * simulator.nodesPerAxis[2] << std::endl;
@@ -76,6 +83,7 @@ int main()
         simulator.parameterUpdate = true;
         simulator.singleStep();
     }
+    simulator.multiStep(1.0);
     
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
@@ -103,7 +111,9 @@ int main()
         std::cout << "Back Face Temp: " << simulator.Temp((nodesPerAxis[1]-1) / 2 * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
         std::cout << "Left Face Temp: " <<  simulator.Temp((nodesPerAxis[0]-1) / 2 + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
     }
-
+}
     // std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
-    
+#ifdef USE_CUDA
+    AMGX_finalize();
+#endif
 }
