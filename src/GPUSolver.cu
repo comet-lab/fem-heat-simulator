@@ -517,6 +517,69 @@ void GPUSolver::multiplySparseVector(const DeviceCSR& A, DeviceVec& x, float* y)
     cusparseDestroyDnVec(vecY);
 }
 
+bool GPUSolver::solveSparseLinearSystem(float alpha, float deltaT)
+{
+
+    int nRows = this->globK_d.rows;
+
+    if (alpha < 1) {
+        // performs the the addition for d = d + (1-alpha)*deltaT*v
+        this->addVectors(this->dVec_d.data,this->vVec_d,this->dVec_d.data,nRows,(1-alpha)*deltaT);
+	}
+
+    // -- Step 2: Perform Implicit Step
+    DeviceCSR A;
+    this->addSparse(this->globM_d, 1, this->globK_d, alpha*deltaT, A);
+
+    // -- Step 2a: Calculate vVec using Ax = b --> (M + alpha*dt*K)v = (F - K*d);
+    float* b_d; // temporary variable to store (F - K*d);
+    this->calculateRHS(b_d, nRows);
+
+    float* x_d; // where we will store our temporary solution to v
+    cudaMalloc(&x_d, sizeof(float) * nRows);
+
+    cusolverSpHandle_t handle;
+    cusolverSpCreate(&handle);
+    int singularity;
+    // Solve Ax = b (use LU for float)
+    cusparseMatDescr_t descrA;
+    cusparseCreateMatDescr(&descrA);
+    cusparseSetMatType(descrA, CUSPARSE_MATRIX_TYPE_GENERAL);
+    cusparseSetMatIndexBase(descrA, CUSPARSE_INDEX_BASE_ZERO);
+    cusolverSpScsrlsvqr(handle, nRows,
+                        A.nnz,
+                        descrA, // default descr
+                        A.data_d,
+                        A.rowPtr_d,
+                        A.colIdx_d,
+                        b_d,
+                        1e-6f, // tolerance
+                        0,     // reorder: 0 = no reordering
+                        x_d,
+                        &singularity);
+    
+    if (singularity >= 0) {
+        std::cerr << "Matrix is singular at row " << singularity << std::endl;
+    return false;
+    }
+
+    // -- Step 2b: Add implicit step to dVec --> dVec = dVec + alpha*dt*vVec
+    this->addVectors(this->dVec_d.data, x_d ,this->dVec_d.data,nRows,(alpha)*deltaT);
+
+    // -- Step 3: update our value for vVec
+    CHECK_CUDA(cudaMemcpy(this->vVec_d, x_d, nRows*sizeof(float), cudaMemcpyDeviceToDevice));
+
+    // -- Cleanup
+    CHECK_CUDA( cudaFree(b_d) ) // free memory of RHS which was temporary
+    b_d = nullptr;
+    CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
+    x_d = nullptr;
+    freeCSR(A);
+    
+    return true;
+}
+
+
 // =====================
 // Kernels and helpers
 // =====================

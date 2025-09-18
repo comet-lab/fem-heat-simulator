@@ -78,12 +78,14 @@ public:
 
     // Sparse-dense multiplication (csr*vec)
     void multiplySparseVector(const DeviceCSR& A, DeviceVec& vec, float* out);
+    bool solveSparseLinearSystem(float alpha, float deltaT);
 
     // Kernels
     void scaleCSR(DeviceCSR& dA, float alpha);
     void addVectors(float* v1, float* v2, float* out, int n, float vScale);
     void scaleVector(float *data, float alpha, int n);
     void printVector(float *data, int n);
+    
 
     //-----------------------------------------------------------------------------------------------
     // Variable Declarations 

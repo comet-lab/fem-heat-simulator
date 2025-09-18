@@ -12,7 +12,6 @@ AmgXSolver::AmgXSolver() {
     AMGX_matrix_create(&Amat, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ax, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ab, rsrc, AMGX_mode_dFFI);
-    std::cout << "AMGX Resources " << rsrc << std::endl;
 }
 
 AmgXSolver::~AmgXSolver() {
