@@ -299,7 +299,7 @@ public:
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
 
-        this->simulator.useGPU &= this->useGPU;
+        this->simulator.useGPU = this->simulator.gpuAvailable() && this->useGPU;
         stream << "MEX: Set Use GPU to " << this->simulator.useGPU << std::endl;
         displayOnMATLAB(stream);
         /* Initialize the model for time = 0 or the first index and build the matrices*/
