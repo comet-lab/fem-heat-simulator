@@ -90,7 +90,7 @@ fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
 % faster than anything calling MEX multiple times. 
 
 caseNum = 4;
-time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+time = 0:deltaT:deltaT*numTimeSteps; % this will be numTimeSteps + 1 long
 laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
 laserPower = ones(1,length(time));
 tic
@@ -109,7 +109,7 @@ fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
 
 caseNum = 5;
 createMatrices = true;
-time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+time = 0:deltaT:deltaT*numTimeSteps; % this will be numTimeSteps + 1 long
 laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
 laserPower = ones(1,length(time));
 TPrediction = T0;
@@ -122,6 +122,7 @@ tic
 CaseSensorTemps(caseNum,:,:) = sensorTemps;
 durationVec(caseNum,end) = toc;
 fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
 
 %% Plot Sensor Temps to confirm the different methods produce the same result
 

@@ -32,16 +32,10 @@ public:
     MexFunction()
     {
         matlabPtr = getEngine();
-#ifdef USE_CUDA
-        AMGX_initialize();
-#endif
     }
 
     ~MexFunction()
     {
-#ifdef USE_CUDA
-    AMGX_finalize();
-#endif
     }
 
     /* Helper function to convert a matlab array to a std vector*/
