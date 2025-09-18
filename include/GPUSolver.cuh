@@ -106,7 +106,7 @@ public:
     DeviceVec dVec_d;
     float* vVec_d = nullptr;
 
-    AmgXSolver* amgxSolver = nullptr;
+    AmgXSolver& amgxSolver;
 
 };
 

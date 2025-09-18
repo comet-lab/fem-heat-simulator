@@ -3,7 +3,7 @@
 #include <iostream>
 
 AmgXSolver::AmgXSolver() {
-
+    AMGX_initialize();
     std::string configFile = std::string(AMGX_CONFIG_DIR) + "/amgx_config.txt";
     AMGX_config_create_from_file(&cfg, configFile.c_str());
     AMGX_resources_create_simple(&rsrc, cfg);
@@ -28,6 +28,7 @@ AmgXSolver::~AmgXSolver() {
     // std::cout << "Destroyed rsrc" << std::endl;
     AMGX_config_destroy(cfg);
     // std::cout << "AMGX Vars Freed" << std::endl;
+    AMGX_finalize();
 }
 
 void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {

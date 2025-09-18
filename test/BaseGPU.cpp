@@ -24,7 +24,7 @@ protected:
         femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
 
         femSim->buildMatrices();
-        
+        // such a hack because I don't want to instantiate two gpu objects since technically 2 shouldn't exist. 
         gpu = new GPUSolver();
 
         gpu->uploadAllMatrices(femSim->Kint, femSim->Kconv, femSim->M, femSim->FirrMat,
@@ -36,6 +36,7 @@ protected:
         // std::cout << "Entered Tear Down" << std::endl;
         delete gpu;
         gpu = nullptr;
+        // femSim->gpuHandle = nullptr; // such a hack because I don't want to instantiate two gpu objects
         // std::cout << "Cleared gpu" << std::endl;       
         delete femSim;
         femSim = nullptr;
@@ -43,11 +44,11 @@ protected:
     }
 
     static void SetUpTestSuite() {
-        AMGX_initialize();
+        
         // AMGX_initialize_plugins();
     }
 
     static void TearDownTestSuite() {
-        AMGX_finalize();
+        // AMGX_finalize();
     }
 };

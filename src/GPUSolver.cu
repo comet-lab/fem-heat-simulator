@@ -3,9 +3,10 @@
 // =====================
 // Constructor / Destructor
 // =====================
-GPUSolver::GPUSolver() {
+GPUSolver::GPUSolver() 
+: amgxSolver(AmgXSolver::getInstance())
+{
     CHECK_CUSPARSE(cusparseCreate(&this->handle));
-    this->amgxSolver = new AmgXSolver();
 }
 
 GPUSolver::~GPUSolver() {
@@ -36,10 +37,6 @@ GPUSolver::~GPUSolver() {
     if (handle) {
         CHECK_CUSPARSE(cusparseDestroy(handle));    
     }
-    // Free AMGXSolver if allocated
-    delete amgxSolver;
-    amgxSolver = nullptr;
-    // std::cout << "GPU Variables Freed" << std::endl;
 }
 
 // =====================
@@ -146,7 +143,7 @@ void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec
     float* x_d; // where we will store our temporary solution to v
     cudaMalloc(&x_d, sizeof(float) * this->globM_d.cols);
 
-    this->amgxSolver->solve(b_d,x_d);
+    this->amgxSolver.solve(b_d,x_d);
 
     // -- Step 4: Assign attribute to solution and return to eigen
     // std::cout << "InitializeDV Step 4" << std::endl;
@@ -178,10 +175,10 @@ void GPUSolver::setup(float alpha, float deltaT){
     // Perform the addition of A = (M + alpha*deltaT*F)
     this->addSparse(this->globM_d, 1, this->globK_d, alpha*deltaT, A);
     // Upload A to the amgxSolver
-    this->amgxSolver->uploadMatrix(A.rows, A.cols, A.nnz,
+    this->amgxSolver.uploadMatrix(A.rows, A.cols, A.nnz,
         A.data_d, A.rowPtr_d, A.colIdx_d);
     // call setup
-    this->amgxSolver->setup();
+    this->amgxSolver.setup();
 
     // clean up A since its been uploaded into AMGX
     this->freeCSR(A);
@@ -223,7 +220,7 @@ void GPUSolver::singleStep(float alpha, float deltaT){
     float* x_d; // where we will store our temporary solution to v
     cudaMalloc(&x_d, sizeof(float) * nRows);
 
-    this->amgxSolver->solve(b_d,x_d); // solve for v
+    this->amgxSolver.solve(b_d,x_d); // solve for v
 
     // -- Step 2b: Add implicit step to dVec --> dVec = dVec + alpha*dt*vVec
     this->addVectors(this->dVec_d.data, x_d ,this->dVec_d.data,nRows,(alpha)*deltaT);
