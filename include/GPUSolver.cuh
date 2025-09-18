@@ -19,19 +19,8 @@ struct DeviceCSR {
 
 struct DeviceVec {
         float *data = nullptr;
-        cusparseDnVecDescr_t vecHandle;
+        cusparseDnVecDescr_t vecHandle = nullptr;
     };    
-
-struct GPUParameters {
-    DeviceCSR Kint_d, Kconv_d, M_d, FirrMat_d;
-    float* FluenceRate_d = nullptr;
-    float* Fq_d = nullptr;
-    float* Fconv_d = nullptr;
-    float* Fk_d = nullptr;
-    float* FirrElem_d = nullptr;
-    
-};
-
 
 class GPUSolver {
 
@@ -113,7 +102,7 @@ public:
 
     // State and State Velocity Vectors
     DeviceVec dVec_d;
-    float* vVec_d;
+    float* vVec_d = nullptr;
 
     AmgXSolver* amgxSolver = nullptr;
 

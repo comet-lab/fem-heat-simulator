@@ -126,7 +126,7 @@ public:
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
 	bool useGPU = false;
 #ifdef USE_CUDA
-	GPUSolver* gpuHandle;
+	GPUSolver* gpuHandle = nullptr;
 #endif
 
 	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.

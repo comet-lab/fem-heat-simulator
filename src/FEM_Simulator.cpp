@@ -83,6 +83,9 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
 	this->silentMode = inputSim.silentMode;
+	#ifdef USE_CUDA
+	this->gpuHandle = nullptr;
+	#endif
 
 	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
 	/* Try-Catch block won't actually catch a faulty matrix multiplication in Eigen*/
@@ -98,8 +101,11 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 }
 
 FEM_Simulator::~FEM_Simulator(){
+	// std::cout << "FEM_Simulator Destructor" << std::endl;
 #ifdef USE_CUDA
-    delete gpuHandle;  // safe even if nullptr
+	delete this->gpuHandle;  // safe even if nullptr
+	this->gpuHandle = nullptr;
+	// std::cout << "GPU Handle Freed" << std::endl;
 #endif
 }
 
@@ -1526,10 +1532,10 @@ bool FEM_Simulator::gpuAvailable() {
 
 
 	if (this->useGPU) {
-		// if (!this->silentMode)
-		// 	std::cout << "GPU detected: using AmgX solver\n";
-		gpuHandle = new GPUSolver();
-		useGPU = true;
+		delete this->gpuHandle; // make sure gpuHandle is nullptr before instantiating new one
+		this->gpuHandle = nullptr; 
+		this->gpuHandle = new GPUSolver();
+		this->useGPU = true;
 	}
 	else
 #endif 

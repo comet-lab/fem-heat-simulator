@@ -6,6 +6,15 @@
 #include <string>
 #include "TestHelpers.hpp"
 
+
+
+/*
+These test cases overall aren't great because BaseGPU creates an instance of FEM_Simulator to actually test 
+the GPUSolver functionality. This is because FEM_Simulator already creates Symmetric Positive (Semi) Definite 
+matrices to be used in the solver. (Solver assumes things are SPD) On the flipside though it feels we aren't testing 
+the GPUSolver directly. 
+*/
+
 TEST_F(BaseGPU, Test_UploadVector)
 {
     Eigen::VectorXf inputVec(10);
@@ -146,9 +155,9 @@ TEST_F(BaseGPU, Test_ScaleVector)
 
 TEST_F(BaseGPU, Test_addVector1)
 {
-    float* outputVec_d;
-    float* vec1_d;
-    float* vec2_d;
+    float* outputVec_d = nullptr;
+    float* vec1_d = nullptr;
+    float* vec2_d = nullptr;
     int nRows = 100;
 
     Eigen::VectorXf outputVec(nRows), truthVec(nRows), vec1(nRows), vec2(nRows);
@@ -170,13 +179,20 @@ TEST_F(BaseGPU, Test_addVector1)
         ASSERT_FLOAT_EQ(truthVec(i),outputVec(i));
     }
 
+    cudaFree(outputVec_d);
+    outputVec_d = nullptr;
+    cudaFree(vec1_d);
+    vec1_d = nullptr;
+    cudaFree(vec2_d);
+    vec2_d = nullptr;
+
 }
 
 TEST_F(BaseGPU, Test_addVector2)
 {
-    float* outputVec_d;
-    float* vec1_d;
-    float* vec2_d;
+    float* outputVec_d = nullptr;
+    float* vec1_d = nullptr;
+    float* vec2_d = nullptr;
     int nRows = 100;
 
     Eigen::VectorXf outputVec(nRows), truthVec(nRows), vec1(nRows), vec2(nRows);
@@ -198,6 +214,13 @@ TEST_F(BaseGPU, Test_addVector2)
     for (int i = 0; i < nRows; i++){
         ASSERT_FLOAT_EQ(truthVec(i),outputVec(i));
     }
+
+    cudaFree(outputVec_d);
+    outputVec_d = nullptr;
+    cudaFree(vec1_d);
+    vec1_d = nullptr;
+    cudaFree(vec2_d);
+    vec2_d = nullptr;
 }
 
 TEST_F(BaseGPU, Test_AddSparse1)
@@ -254,7 +277,7 @@ TEST_F(BaseGPU, Test_AddSparse2)
 
 TEST_F(BaseGPU, Test_multiplySparseVector)
 {
-    float* outputVec_d;
+    float* outputVec_d = nullptr;
     int nRows = femSim->Kconv.rows();
     cudaMalloc(&outputVec_d,nRows*sizeof(float));
     gpu->multiplySparseVector(gpu->FirrMat_d, gpu->FluenceRate_d, outputVec_d);
@@ -268,6 +291,8 @@ TEST_F(BaseGPU, Test_multiplySparseVector)
         ASSERT_NEAR(truthVec(i),outputVec(i), epsilon); 
     }
 
+    cudaFree(outputVec_d);
+    outputVec_d = nullptr;
 }
 
 TEST_F(BaseGPU, Test_applyParameters)
@@ -321,7 +346,7 @@ TEST_F(BaseGPU, Test_calculateRHS)
     femSim->initializeTimeIntegrationCPU(); // performs applyParametersCPU() internally
     // Calculate RHS using stored matrices
     Eigen::VectorXf bTrue = (femSim->globF - femSim->globK*femSim->dVec);
-    Eigen::VectorXf bPartial = femSim->globK*femSim->dVec;
+    // Eigen::VectorXf bPartial = femSim->globK*femSim->dVec;
 
     // -- Run on GPU 
     Eigen::VectorXf outputB_d(nRows);
@@ -347,25 +372,15 @@ TEST_F(BaseGPU, Test_calculateRHS)
 
     // Calculate
     std::cout << "Calculating RHS" << std::endl;
-    float* RHS_d;
-    float* outTemp; 
-    CHECK_CUDA( cudaMalloc(&RHS_d, sizeof(float)*nRows) ) // allocate memory for RHS
-    CHECK_CUDA( cudaMalloc(&outTemp, sizeof(float)*nRows) ) // allocate memory for RHS
-    // Perform b_d = K*d
-    gpu->multiplySparseVector(gpu->globK_d, gpu->dVec_d, RHS_d); 
-    Eigen::VectorXf bPartialOutput(nRows);
-
-    gpu->downloadVector(bPartialOutput,RHS_d);
-    compareTwoVectors(bPartial,bPartialOutput);
-
-    // Perform b_d = F - K*d
-    gpu->addVectors(gpu->globF_d, RHS_d, RHS_d, nRows, -1); // scale is negative one to subtract v2 from v1
+    
+    float* RHS_d = nullptr;
+    gpu->calculateRHS(RHS_d, nRows);
     gpu->downloadVector(outputB_d, RHS_d); 
     std::cout << "Comparing Vectors" << std::endl;
     compareTwoVectors(bTrue, outputB_d);
 
     cudaFree(RHS_d);
-    cudaFree(outTemp);
+    RHS_d = nullptr;
 }
 
 TEST_F(BaseGPU, Test_initializeDV)
@@ -379,19 +394,21 @@ TEST_F(BaseGPU, Test_initializeDV)
 
     // Perform Ground truth
     femSim->initializeTimeIntegrationCPU();
-    
+    Eigen::VectorXf trueD = femSim->dVec;
+    Eigen::VectorXf trueV = femSim->vVec;
     // Apply GPU 
-    Eigen::VectorXf outputD_d(nRows), outputV_d(nRows);
+    Eigen::VectorXf outputD(nRows), outputV(nRows);
     gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
-    gpu->initializeDV(femSim->dVec, outputV_d); // automatically assigns v to input
+
+    gpu->initializeDV(trueD, outputV); // automatically assigns v to input
     
     std::cout<< "Downloading d" <<std::endl;
-    gpu->downloadVector(outputD_d, gpu->dVec_d.data);
-    // gpu->downloadVector(outputV_d, gpu->vVec_d);
+    gpu->downloadVector(outputD, gpu->dVec_d.data);
+    // gpu->downloadVector(outputV, gpu->vVec_d);
     std::cout<< "Comparing d" <<std::endl;
-    compareTwoVectors(femSim->dVec, outputD_d);
+    compareTwoVectors(trueD, outputD);
     std::cout<< "Comparing v" <<std::endl;
     // v is found using two different iterative solvers, so I am allowing a good amount of wiggle
-    compareTwoVectors(femSim->vVec, outputV_d, 0.01); 
+    compareTwoVectors(trueV, outputV, 0.01); 
 }
 

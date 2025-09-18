@@ -12,15 +12,23 @@ AmgXSolver::AmgXSolver() {
     AMGX_matrix_create(&Amat, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ax, rsrc, AMGX_mode_dFFI);
     AMGX_vector_create(&Ab, rsrc, AMGX_mode_dFFI);
+    std::cout << "AMGX Resources " << rsrc << std::endl;
 }
 
 AmgXSolver::~AmgXSolver() {
+    // std::cout << "AMGX Solver Destructor" << std::endl;
     AMGX_vector_destroy(Ax);
+    // std::cout << "Destroyed Ax" << std::endl;
     AMGX_vector_destroy(Ab);
+    // std::cout << "Destroyed Ab" << std::endl;
     AMGX_matrix_destroy(Amat);
+    // std::cout << "Destroyed Amat" << std::endl;
     AMGX_solver_destroy(solver);
+    // std::cout << "Destroyed solver" << std::endl;
     AMGX_resources_destroy(rsrc);
+    // std::cout << "Destroyed rsrc" << std::endl;
     AMGX_config_destroy(cfg);
+    // std::cout << "AMGX Vars Freed" << std::endl;
 }
 
 void AmgXSolver::uploadMatrix(const Eigen::SparseMatrix<float, Eigen::RowMajor>& A) {

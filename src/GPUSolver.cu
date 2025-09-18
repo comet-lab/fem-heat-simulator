@@ -9,35 +9,37 @@ GPUSolver::GPUSolver() {
 }
 
 GPUSolver::~GPUSolver() {
+    // std::cout << "GPU Solver Destructor" << std::endl;
     // Free device memory
-    cudaFree(globF_d);
-    cudaFree(vVec_d);
+    CHECK_CUDA( cudaFree(globF_d) );
+    globF_d = nullptr;
+    CHECK_CUDA( cudaFree(vVec_d) );
+    vVec_d = nullptr;
 
     // Free CSR/Vec descriptors
     freeCSR(Kint_d);
     freeCSR(Kconv_d);
     freeCSR(M_d);
     freeCSR(FirrMat_d);
+    // Free global matrices
+    freeCSR(globK_d);
+    freeCSR(globM_d);
 
     freeDeviceVec(FluenceRate_d);
     freeDeviceVec(Fq_d);
     freeDeviceVec(Fconv_d);
     freeDeviceVec(Fk_d);
     freeDeviceVec(FirrElem_d);
-    freeDeviceVec(dVec_d);
-
-    // Free global matrices
-    freeCSR(globK_d);
-    freeCSR(globM_d);
+    freeDeviceVec(dVec_d);  
 
     // Destroy cuSPARSE handle
     if (handle) {
         CHECK_CUSPARSE(cusparseDestroy(handle));    
     }
-
     // Free AMGXSolver if allocated
     delete amgxSolver;
-    
+    amgxSolver = nullptr;
+    // std::cout << "GPU Variables Freed" << std::endl;
 }
 
 // =====================
@@ -116,7 +118,8 @@ void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool 
 
     // ---------------- Step 5: Free temporary GPU vectors ----------------
     // std::cout << "Apply Parameters Step 5" << std::endl;
-    if (!elemNFR) CHECK_CUDA(cudaFree(Firr_d));
+    CHECK_CUDA(cudaFree(Firr_d));
+    Firr_d = nullptr;
 }
 
 void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
@@ -155,7 +158,9 @@ void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec
 
     // -- Cleanup
     CHECK_CUDA( cudaFree(b_d) ) // free memory of RHS which was temporary
+    b_d = nullptr;
     CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
+    x_d = nullptr;
 }
 
 void GPUSolver::setup(float alpha, float deltaT){
@@ -228,7 +233,9 @@ void GPUSolver::singleStep(float alpha, float deltaT){
 
     // -- Cleanup
     CHECK_CUDA( cudaFree(b_d) ) // free memory of RHS which was temporary
+    b_d = nullptr;
     CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
+    x_d = nullptr;
 }
 
 void GPUSolver::calculateRHS(float* &b_d, int nRows){
@@ -318,7 +325,7 @@ void GPUSolver::uploadVector(const Eigen::VectorXf& v, DeviceVec& dV) {
 
 void GPUSolver::uploadVector(const float* data, int n, DeviceVec& dV){
     
-    CHECK_CUDA( cudaFree(dV.data) ) // freeing pointer just in case there is data. 
+    freeDeviceVec(dV);
     //Allocate memory
     CHECK_CUDA(cudaMalloc((void**)&dV.data, n*sizeof(float)));
     //Copy Memory

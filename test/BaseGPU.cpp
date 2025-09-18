@@ -3,11 +3,12 @@
 
 class BaseGPU : public testing::Test {
 protected:
-    GPUSolver *gpu;
-    FEM_Simulator* femSim;      
-    void SetUp() override {
+    GPUSolver *gpu = nullptr;
+    FEM_Simulator* femSim = nullptr;     
 
-        // Example FEM_Simulator initialization
+    void SetUp() override {
+        
+        //Example FEM_Simulator initialization
         int nodesPerAxis[3] = { 20, 20, 20 };
         std::vector<std::vector<std::vector<float>>> Temp(
             nodesPerAxis[0], std::vector<std::vector<float>>(
@@ -23,7 +24,7 @@ protected:
         femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
 
         femSim->buildMatrices();
-
+        
         gpu = new GPUSolver();
 
         gpu->uploadAllMatrices(femSim->Kint, femSim->Kconv, femSim->M, femSim->FirrMat,
@@ -32,8 +33,13 @@ protected:
 
 
     void TearDown() override {
-        // delete gpu;
-        // delete femSim; // deletes FEM_Simulator automatically
+        // std::cout << "Entered Tear Down" << std::endl;
+        delete gpu;
+        gpu = nullptr;
+        // std::cout << "Cleared gpu" << std::endl;       
+        delete femSim;
+        femSim = nullptr;
+        // std::cout << "Cleared femSim" << std::endl; 
     }
 
     static void SetUpTestSuite() {
@@ -42,7 +48,6 @@ protected:
     }
 
     static void TearDownTestSuite() {
-        // AMGX_finalize_plugins();
         AMGX_finalize();
     }
 };
