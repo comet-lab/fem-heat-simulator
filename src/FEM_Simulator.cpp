@@ -586,13 +586,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx) {
 			// convert subscript to index
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 			// add temperature contribution of node
-			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * this->dVec(this->nodeMap[globalNode]);
-			}
-			else { // dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);
-			}
-			
+			tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);			
 		}
 		this->sensorTemps[s][timeIdx] = tempValue;
 	}
@@ -1523,27 +1517,22 @@ std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::st
 }
 
 bool FEM_Simulator::gpuAvailable() {
-	bool useGPU = false;
 
 #ifdef USE_CUDA
 	int deviceCount = 0;
 	cudaError_t err = cudaGetDeviceCount(&deviceCount);
 	this->useGPU = (err == cudaSuccess && deviceCount > 0);
 
-
-	if (this->useGPU) {
-		delete this->gpuHandle; // make sure gpuHandle is nullptr before instantiating new one
-		this->gpuHandle = nullptr; 
+	if (this->useGPU && !this->gpuHandle) { // only create a new handle if we don't have one already
 		this->gpuHandle = new GPUSolver();
-		this->useGPU = true;
 	}
-	else
+	// else
 #endif 
-	{
-		std::cout << "No GPU: using Eigen solver\n";
-	}
+	// {
+	// 	std::cout << "No GPU: using Eigen solver\n";
+	// }
 
-	return useGPU;
+	return this->useGPU;
 }
 
 #ifdef USE_CUDA
@@ -1584,6 +1573,10 @@ void FEM_Simulator::setupGPU()
 
 void FEM_Simulator::singleStepGPU()
 {
+	// upload the current dVec value in case the temperature across the mesh was overriden by the user
+	// in between singleStep calls
+	this->dVec = this->Temp(this->validNodes);
+	gpuHandle->uploadVector(this->dVec,gpuHandle->dVec_d);
 	// auto start = std::chrono::steady_clock::now();
 	if (this->fluenceUpdate || this->parameterUpdate){
 		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU

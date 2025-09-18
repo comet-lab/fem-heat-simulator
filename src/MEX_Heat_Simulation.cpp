@@ -14,7 +14,7 @@
 
 class MexFunction : public matlab::mex::Function {
 private:
-    /*Inputs required : T0, FluenceRate, tissueSize, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
+    /*Inputs required : T0, FluenceRate, tissueSize, tfinal, deltat, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
    OPTIONAL       : (layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d), (createAllMatrices), */
     enum VarPlacement {
         TEMPERATURE, FLUENCE_RATE, TISSUE_SIZE, SIM_DURATION, DELTAT, TISSUE_PROP, BC,
@@ -38,16 +38,11 @@ public:
     MexFunction()
     {
         matlabPtr = getEngine();
-#ifdef USE_CUDA
-        AMGX_initialize();
-#endif
     }
 
     ~MexFunction()
     {
-#ifdef USE_CUDA
-    AMGX_finalize();
-#endif
+        return;
     }
     /* Helper function to convert a matlab array to a std vector*/
     std::vector<std::vector<std::vector<float>>> convertMatlabArrayTo3DVector(const matlab::data::Array& matlabArray) {
@@ -203,7 +198,7 @@ public:
                 this->createAllMatrices = checkForMatrixReset(Nn1d, T0, FluenceRate, tissueSize, layerHeight, elemsInLayer, boundaryType);
             }
             
-            this->simulator.useGPU &= this->useGPU;
+            this->simulator.useGPU = this->simulator.gpuAvailable() && this->useGPU;
             stream << "MEX: Set Use GPU to " << this->simulator.useGPU << std::endl;
             displayOnMATLAB(stream);
 
@@ -446,6 +441,7 @@ public:
         }
         
         if (this->simulator.useGPU != this->useGPU){
+            std::cout << "MEX: GPU usage requires matrix rebuild" << std::endl;
             // if the user changes whether or not to use the GPU we need recreate matrices to be safe
             this->createAllMatrices = true;
         }
