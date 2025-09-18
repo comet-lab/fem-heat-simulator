@@ -1213,7 +1213,7 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 	// Uploading fluence rate to GPU if enabled
 #ifdef USE_CUDA
 	if (this->useGPU){
-		this->gpuHandle->uploadVector(this->FluenceRate, this->gpuHandle->FluenceRate_d);
+		this->gpuHandle->uploadFluenceRate(this->FluenceRate);
 	}
 #endif
 }
@@ -1576,7 +1576,7 @@ void FEM_Simulator::singleStepGPU()
 	// upload the current dVec value in case the temperature across the mesh was overriden by the user
 	// in between singleStep calls
 	this->dVec = this->Temp(this->validNodes);
-	gpuHandle->uploadVector(this->dVec,gpuHandle->dVec_d);
+	gpuHandle->uploaddVec_d(this->dVec);
 	// auto start = std::chrono::steady_clock::now();
 	if (this->fluenceUpdate || this->parameterUpdate){
 		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
@@ -1591,7 +1591,7 @@ void FEM_Simulator::singleStepGPU()
 	// If a user wants to switch between GPU and CPU they'll have to call initializeModel() again. 
 	gpuHandle->singleStep(this->alpha, this->deltaT);
 	// After Single Step we get the dVector to the system and assign it to T
-	gpuHandle->downloadVector(this->dVec,gpuHandle->dVec_d.data);
+	gpuHandle->downloaddVec_d(this->dVec);
     this->Temp(this->validNodes) = this->dVec;
 	// printDuration("Single Step on GPU: ", start);
 }

@@ -46,7 +46,7 @@ public:
     void initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
     void setup(float alpha, float deltaT);
     void singleStep(float alpha, float deltaT);
-
+    
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);
 
@@ -61,6 +61,7 @@ public:
         const Eigen::VectorXf& Fk,
         const Eigen::VectorXf& FirrElem
     ); 
+    
     // Clear Structs 
     void freeCSR(DeviceCSR& dA);
     void freeDeviceVec(DeviceVec &vec);
@@ -69,8 +70,12 @@ public:
     void uploadSparseMatrix(int numRows, int numCols, int nnz, const int* csrOffsets, const int* columns, const float* values, DeviceCSR& dA);
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
     void uploadVector(const float* data, int n, DeviceVec& dV);
-    
+    void uploaddVec_d(Eigen::VectorXf& dVec);
+    void uploadFluenceRate(Eigen::VectorXf& FluenceRate);
+
     void downloadVector(Eigen::VectorXf& v,const float* dv);
+    void downloaddVec_d(Eigen::VectorXf& dVec);
+    void downloadvVec_d(Eigen::VectorXf& vVec);
     void downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source);
 
      // Sparse-sparse addition
@@ -89,7 +94,6 @@ public:
 
     //-----------------------------------------------------------------------------------------------
     // Variable Declarations 
-
     // Store GPU handles
     cusparseHandle_t handle;
     // Stored Sparse Matrices

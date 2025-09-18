@@ -6,9 +6,9 @@
 
 int main()
 {
-#ifdef USE_CUDA
-    AMGX_initialize();
-#endif
+// #ifdef USE_CUDA
+//     AMGX_initialize();
+// #endif
     
 
 {
@@ -113,7 +113,7 @@ int main()
     }
 }
     // std::cout << "Sensor Temp: " << simulator.sensorTemps[0][static_cast<int>(totalTime/simulator.deltaT)] << std::endl;
-#ifdef USE_CUDA
-    AMGX_finalize();
-#endif
+// #ifdef USE_CUDA
+//     AMGX_finalize();
+// #endif
 }

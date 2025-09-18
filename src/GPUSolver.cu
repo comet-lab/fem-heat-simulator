@@ -333,9 +333,29 @@ void GPUSolver::uploadVector(const float* data, int n, DeviceVec& dV){
     // this->printVector(dV.data, n);
 }
 
+void GPUSolver::uploaddVec_d(Eigen::VectorXf &dVec)
+{
+    this->uploadVector(dVec,this->dVec_d);
+}
+
+void GPUSolver::uploadFluenceRate(Eigen::VectorXf &FluenceRate)
+{
+    this->uploadVector(FluenceRate, this->FluenceRate_d);
+}
+
 void GPUSolver::downloadVector(Eigen::VectorXf &v,const float *dv)
 {
     CHECK_CUDA(cudaMemcpy(v.data(),dv,v.size() * sizeof(float),cudaMemcpyDeviceToHost) )
+}
+
+void GPUSolver::downloaddVec_d(Eigen::VectorXf &dVec)
+{
+    this->downloadVector(dVec, this->dVec_d.data);
+}
+
+void GPUSolver::downloadvVec_d(Eigen::VectorXf &vVec)
+{
+    this->downloadVector(vVec, this->vVec_d);
 }
 
 void GPUSolver::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)
