@@ -7,12 +7,19 @@ three boundary conditions: a heat sink, a flux boundary, or a convection boundar
 For modeling details, see the reference below [1]. 
 
 The main FEM modeling is performed in C++ using the Eigen Library. The file 'main.cpp' provides an example of 
-how to initialize and run an FEM_Simulation object, which is defined in 'FEM_Simulation.h'. 
-Additionally, the simulation can be called and run from MATLAB using the MEX file executable that gets generated 
+how to initialize and run an FEM_Simulation object, which is defined in 'FEM_Simulation.h'. If you would like to run the
+simulations on a GPU, use the GPUTimeIntegration class. Additionally, the simulation can be called and run 
+from MATLAB using the MEX file executable that gets generated 
 
 ## Dependencies
 
-The Eigen3 library must be installed.
+Eigen3 Version 3.4 must be installed.
+
+### For GPU Acceleration
+
+CudaToolkit Version 12.8 must be installed 
+
+AMGX must be installed. 
 
 ## Building the project
 
@@ -23,12 +30,17 @@ To build the project run the following commands:
 ``cmake -DCMAKE_BUILD_TYPE=Release ..``\
 ``cmake --build .``
 
-This will create three executables and a library that can be included in other projects. 
+This copmile a library that can be included in other projects. Additionally, it will compile a file called main.exe which serves as a test script. 
 
-- main.exe: This code simply demonstrates the execution of the simulator and serves as an example
-- FEM_Unit_Tests.exe: runs unit tests for FEM_Simulator methods. 
-- MEX_Heat_Simulation.mex*64: A mex file callable from matlab to run the simulator. 
+### cmake arguments
 
+- ``CMAKE_BUILD_TYPE``: can be ``Release`` (which is necessary to build MEX files) or ``Debug``. 
+- ``BUILD_TESTING``: can be ``ON`` (Default) or ``OFF``. Determines if test executables are created (FEM_Unit_Tests.exe and GPUSolver_Unit_Tests.exe)
+- ``BUILD_FEM_MEX``: can be ``ON`` (Default) or ``OFF``. Determines if the MEX files (MEX_Heat_Simulation.mex*64 and MEX_Heat_Simulation_MultiStep.mex*64) are compiled
+- ``USE_CUDA``: can be ``ON`` or ``OFF`` (Default). Determines whether to compile the code necessary for GPU acceleration. 
+- ``AMGX_ROOT``: The root location of the AMGX library files. Default is /usr/local/amgx. Necessary if ``USE_CUDA`` is ``ON``.
+
+### Library Install
 The library name is HeatSimulation. If you would like to install the library so it can be found using
 ``find-package(HeatSimulation)`` then run the following command:
 
@@ -82,7 +94,7 @@ stability when using Forward Euler. If your time step is too large the system ma
 Additionally print statements can be controlled with the, ``silentMode`` attribute. If you would like to enable multi-threading,
 simply call ``Eigen::SetNbThreads()`` before running the simulator. 
 
-## Running the Simulator
+### Running the Simulator on CPU
 After all appropriate conditions have been set for the object, we can initialize and run the model. 
 To initialize the model, call the function ``FEM_Simulator::initializeModel()``. This will perform the spatial discretization and get the system ready
 to perform the time integration. Then call either ``FEM_Simulator::singleStep()`` or ``FEM_Simulator::multiStep()`` to simulate the time stepping. 
@@ -90,23 +102,25 @@ If there are no changes to the tissue geometry, number of nodes, or boundary con
 between subsequent calls to ``FEM_Simulator::singleStep()`` or ``FEM_Simulator::multiStep()``. However, if one of those items changes, 
 ``FEM_Simulator::initializeModel()`` will need to be rerun.
 
+### Using GPU Acceleration
+After initializing the ``FEM_Simulator`` object, call ``FEM_Simulator::buildMatrices()`` to initialize the component matrices necessary to perform the time integration. Then , create an instance of ``GPUTimeIntegrator`` and call ``GPUTimeIntegrator::setModel(FEM_Simulation*)``. This will upload the necessary matrices on the GPU. From here simply call ``GPUTimeIntegrator::initializeWithModel()`` to initialize the ``d`` and ``v`` vectors for time stepping. To perform a step then call ``GPUTimeIntegrator::singleStepWithUpdate()``. Note that ``initializeWithModel()`` only needs to be called if the time step ``deltaT`` or ``alpha`` change. Similarly, if there are any changes to the tissue geometry, number ofnodes, or boundary conditions, the matrices need to be rebuilt and ``setModel`` needs to be called again. 
 
 ## MEX Usage
 The mex file can be called in MATALB as long as it is on the MATLAB Path. 
 Example usage can be found in the folder MexTesting/MexFileTest.m. The mex file controls parellelization by
 setting the useAllCPUs variable. 
 
-``[TPredLayer,sensorTempsLayer] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,
-            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,
-            silentMode,layerInfo,Nn1d,createMatrices);``
+``[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',deltaT,...
+        deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+        useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);``
 
 Alternatively, you can use the multi-step mex file which takes in a time series of inputs. This allows you to reduce the number
 of mex calls if you are simlating a multi-step process with changing inputs. 
 
 ``[TpredMulti,sensorTempsMulti] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
     tissueProperties,BC,flux,ambientTemp,sensorPositions,w0,time,...
-    laserPose,laserPower,useAllCPUs,...
-    silentMode,layerInfo,Nn1d,alpha);``
+    laserPose,laserPower,layerInfo,useAllCPUs,useGPU,alpha,...
+    silentMode,Nn1d);``
 
 
 # References
