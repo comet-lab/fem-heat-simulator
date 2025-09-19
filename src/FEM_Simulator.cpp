@@ -354,13 +354,6 @@ void FEM_Simulator::buildMatrices()
 	this->M.makeCompressed();
 	this->FirrMat.makeCompressed();
 
-#ifdef USE_CUDA
-	/* After building the matrices, if we are using a GPU we need to upload them.*/
-	if (this->useGPU){
-		this->gpuHandle->uploadAllMatrices(this->Kint,this->Kconv,this->M,this->FirrMat,
-			this->FluenceRate,this->Fq,this->Fconv,this->Fk,this->FirrElem);
-	}
-#endif
 
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::steady_clock::now();

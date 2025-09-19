@@ -27,6 +27,7 @@ class GPUTimeIntegrator {
 
 public:
     GPUTimeIntegrator();
+    GPUTimeIntegrator(float alpha, float deltaT);
     ~GPUTimeIntegrator();
 
     void applyParameters(
@@ -46,7 +47,7 @@ public:
     void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
     void initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
     void setup(float alpha, float deltaT);
-    void singleStep(float alpha, float deltaT);
+    void singleStep();
     
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);
@@ -54,7 +55,8 @@ public:
     void setModel(FEM_Simulator* model);
     void updateModel();
     void releaseModel();
-    
+    void getMatricesFromModel();
+
     void uploadAllMatrices(
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
@@ -69,8 +71,10 @@ public:
     
     // Clear Structs 
     void freeCSR(DeviceCSR& dA);
+    void freeModelMatrices();
     void freeDeviceVec(DeviceVec &vec);
 
+    // Commands to upload vectors/matrices to gpu
     void uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMajor>& inMat, DeviceCSR& outMat);
     void uploadSparseMatrix(int numRows, int numCols, int nnz, const int* csrOffsets, const int* columns, const float* values, DeviceCSR& dA);
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
@@ -78,6 +82,7 @@ public:
     void uploaddVec_d(Eigen::VectorXf& dVec);
     void uploadFluenceRate(Eigen::VectorXf& FluenceRate);
 
+    // commands to download vectors/matrices from gpu
     void downloadVector(Eigen::VectorXf& v,const float* dv);
     void downloaddVec_d(Eigen::VectorXf& dVec);
     void downloadvVec_d(Eigen::VectorXf& vVec);
@@ -88,7 +93,11 @@ public:
 
     // Sparse-dense multiplication (csr*vec)
     void multiplySparseVector(const DeviceCSR& A, DeviceVec& vec, float* out);
-    bool solveSparseLinearSystem(float alpha, float deltaT);
+    bool solveSparseLinearSystem();
+
+    // Setters
+    void setAlpha(float alpha);
+    void setDeltaT(float deltaT);
 
     // Kernels
     void scaleCSR(DeviceCSR& dA, float alpha);
@@ -102,6 +111,11 @@ public:
 
     // Store the model
     FEM_Simulator* femModel_ = nullptr;
+
+    //Time stepping variables
+    float alpha_ = 1; 
+    float deltaT_ = 0.05;
+
     // Store GPU handles
     cusparseHandle_t handle_;
     // Stored Sparse Matrices
