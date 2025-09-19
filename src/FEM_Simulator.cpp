@@ -1524,7 +1524,7 @@ bool FEM_Simulator::gpuAvailable() {
 	this->useGPU = (err == cudaSuccess && deviceCount > 0);
 
 	if (this->useGPU && !this->gpuHandle) { // only create a new handle if we don't have one already
-		this->gpuHandle = new GPUSolver();
+		this->gpuHandle = new GPUTimeIntegrator();
 	}
 	// else
 #endif 

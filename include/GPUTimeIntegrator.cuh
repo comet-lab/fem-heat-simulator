@@ -22,11 +22,11 @@ struct DeviceVec {
         cusparseDnVecDescr_t vecHandle = nullptr;
     };    
 
-class GPUSolver {
+class GPUTimeIntegrator {
 
 public:
-    GPUSolver();
-    ~GPUSolver();
+    GPUTimeIntegrator();
+    ~GPUTimeIntegrator();
 
     void applyParameters(
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,

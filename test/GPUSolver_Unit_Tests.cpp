@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-// #include "GPUSolver.cuh"
+// #include "GPUTimeIntegrator.cuh"
 #include "FEM_Simulator.h"
 #include "BaseGPU.cpp"
 #include <iostream>
@@ -10,9 +10,9 @@
 
 /*
 These test cases overall aren't great because BaseGPU creates an instance of FEM_Simulator to actually test 
-the GPUSolver functionality. This is because FEM_Simulator already creates Symmetric Positive (Semi) Definite 
+the GPUTimeIntegrator functionality. This is because FEM_Simulator already creates Symmetric Positive (Semi) Definite 
 matrices to be used in the solver. (Solver assumes things are SPD) On the flipside though it feels we aren't testing 
-the GPUSolver directly. 
+the GPUTimeIntegrator directly. 
 */
 
 TEST_F(BaseGPU, Test_UploadVector)

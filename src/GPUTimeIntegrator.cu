@@ -1,15 +1,15 @@
-#include "GPUSolver.cuh"
+#include "GPUTimeIntegrator.cuh"
 
 // =====================
 // Constructor / Destructor
 // =====================
-GPUSolver::GPUSolver() 
+GPUTimeIntegrator::GPUTimeIntegrator() 
 : amgxSolver(AmgXSolver::getInstance())
 {
     CHECK_CUSPARSE(cusparseCreate(&this->handle));
 }
 
-GPUSolver::~GPUSolver() {
+GPUTimeIntegrator::~GPUTimeIntegrator() {
     // std::cout << "GPU Solver Destructor" << std::endl;
     // Free device memory
     CHECK_CUDA( cudaFree(globF_d) );
@@ -42,7 +42,7 @@ GPUSolver::~GPUSolver() {
 // =====================
 // Apply Parameters
 // =====================
-void GPUSolver::applyParameters(
+void GPUTimeIntegrator::applyParameters(
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
@@ -62,7 +62,7 @@ void GPUSolver::applyParameters(
     this->applyParameters(TC, HTC, VHC, MUA, elemNFR);
     }
 
-void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR){
+void GPUTimeIntegrator::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR){
 
     // These variables get set in here so we want to make sure they are free
     freeCSR(this->globK_d);
@@ -119,7 +119,7 @@ void GPUSolver::applyParameters(float TC, float HTC, float VHC, float MUA, bool 
     Firr_d = nullptr;
 }
 
-void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
+void GPUTimeIntegrator::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
     /*
     This function will initialize the d and v vectors used for Euler integration. The d vector is
     simply passed in, and the v vector is assigned through the equation M*v = (F - K*d).
@@ -160,7 +160,7 @@ void GPUSolver::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec
     x_d = nullptr;
 }
 
-void GPUSolver::setup(float alpha, float deltaT){
+void GPUTimeIntegrator::setup(float alpha, float deltaT){
     /*
     This function initializes the A matrix in AMGX in order to solve the sparse linear system
                 Ax = b
@@ -184,7 +184,7 @@ void GPUSolver::setup(float alpha, float deltaT){
     this->freeCSR(A);
 }
 
-void GPUSolver::singleStep(float alpha, float deltaT){
+void GPUTimeIntegrator::singleStep(float alpha, float deltaT){
     /* This function performs a single step of Euler Integration. For each step, we perform 
     an Explicit Step and Implicit Step
     --- Explicit Step:
@@ -197,7 +197,7 @@ void GPUSolver::singleStep(float alpha, float deltaT){
         Then we simply update d with d = d + alpha*dt*v
     */
 
-    // --- Function Assumes GPUSolver::setup() has already been called ----
+    // --- Function Assumes GPUTimeIntegrator::setup() has already been called ----
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	int nRows = this->globK_d.rows;
     // -- Step 1: Perform Explicit Step
@@ -235,7 +235,7 @@ void GPUSolver::singleStep(float alpha, float deltaT){
     x_d = nullptr;
 }
 
-void GPUSolver::calculateRHS(float* &b_d, int nRows){
+void GPUTimeIntegrator::calculateRHS(float* &b_d, int nRows){
     CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ) // allocate memory for RHS
     // Perform b_d = K*d
     this->multiplySparseVector(this->globK_d, this->dVec_d, b_d); 
@@ -246,7 +246,7 @@ void GPUSolver::calculateRHS(float* &b_d, int nRows){
 // =====================
 // Upload utilities
 // =====================
-void GPUSolver::uploadAllMatrices(
+void GPUTimeIntegrator::uploadAllMatrices(
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
     const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
@@ -270,7 +270,7 @@ void GPUSolver::uploadAllMatrices(
     uploadVector(FirrElem, this->FirrElem_d);
 }
 
-void GPUSolver::uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMajor>& A, DeviceCSR& dA){
+void GPUTimeIntegrator::uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMajor>& A, DeviceCSR& dA){
     // Just in case it wasn't passed in compressed.
     // A.makeCompressed(); we are passing in const so we assume it is already compressed
     //Parameter setting
@@ -281,7 +281,7 @@ void GPUSolver::uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMaj
     this->uploadSparseMatrix(numRows,numCols,nnz,A.outerIndexPtr(),A.innerIndexPtr(),A.valuePtr(),dA);
 }
 
-void GPUSolver::uploadSparseMatrix(int numRows, int numCols, int nnz, const int* rowPtr, const int* columnIdx, const float* values, DeviceCSR& dA){
+void GPUTimeIntegrator::uploadSparseMatrix(int numRows, int numCols, int nnz, const int* rowPtr, const int* columnIdx, const float* values, DeviceCSR& dA){
     // Just in case it wasn't passed in compressed.
     //uploads a sparse matrix with individual components instead of Eigen matrix
     freeCSR(dA);
@@ -316,11 +316,11 @@ void GPUSolver::uploadSparseMatrix(int numRows, int numCols, int nnz, const int*
 
 }
 
-void GPUSolver::uploadVector(const Eigen::VectorXf& v, DeviceVec& dV) {
+void GPUTimeIntegrator::uploadVector(const Eigen::VectorXf& v, DeviceVec& dV) {
     this->uploadVector(v.data(),v.size(),dV);
 }
 
-void GPUSolver::uploadVector(const float* data, int n, DeviceVec& dV){
+void GPUTimeIntegrator::uploadVector(const float* data, int n, DeviceVec& dV){
     
     freeDeviceVec(dV);
     //Allocate memory
@@ -333,32 +333,32 @@ void GPUSolver::uploadVector(const float* data, int n, DeviceVec& dV){
     // this->printVector(dV.data, n);
 }
 
-void GPUSolver::uploaddVec_d(Eigen::VectorXf &dVec)
+void GPUTimeIntegrator::uploaddVec_d(Eigen::VectorXf &dVec)
 {
     this->uploadVector(dVec,this->dVec_d);
 }
 
-void GPUSolver::uploadFluenceRate(Eigen::VectorXf &FluenceRate)
+void GPUTimeIntegrator::uploadFluenceRate(Eigen::VectorXf &FluenceRate)
 {
     this->uploadVector(FluenceRate, this->FluenceRate_d);
 }
 
-void GPUSolver::downloadVector(Eigen::VectorXf &v,const float *dv)
+void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
 {
     CHECK_CUDA(cudaMemcpy(v.data(),dv,v.size() * sizeof(float),cudaMemcpyDeviceToHost) )
 }
 
-void GPUSolver::downloaddVec_d(Eigen::VectorXf &dVec)
+void GPUTimeIntegrator::downloaddVec_d(Eigen::VectorXf &dVec)
 {
     this->downloadVector(dVec, this->dVec_d.data);
 }
 
-void GPUSolver::downloadvVec_d(Eigen::VectorXf &vVec)
+void GPUTimeIntegrator::downloadvVec_d(Eigen::VectorXf &vVec)
 {
     this->downloadVector(vVec, this->vVec_d);
 }
 
-void GPUSolver::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)
+void GPUTimeIntegrator::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)
 {
     // -- Make sure receiving matrix has an appropriate amount of space
     outMat.resize(source.rows, source.cols);
@@ -380,7 +380,7 @@ void GPUSolver::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>&
 }
 
 
-void GPUSolver::freeCSR(DeviceCSR& dA) {
+void GPUTimeIntegrator::freeCSR(DeviceCSR& dA) {
     if (dA.rowPtr_d) {
         CHECK_CUDA(cudaFree(dA.rowPtr_d));
         dA.rowPtr_d = nullptr;
@@ -402,7 +402,7 @@ void GPUSolver::freeCSR(DeviceCSR& dA) {
     dA.nnz  = 0;
 }
 
-void GPUSolver::freeDeviceVec(DeviceVec& vec) {
+void GPUTimeIntegrator::freeDeviceVec(DeviceVec& vec) {
     if (vec.data){
         CHECK_CUDA(cudaFree(vec.data) )
         vec.data = nullptr;
@@ -413,7 +413,7 @@ void GPUSolver::freeDeviceVec(DeviceVec& vec) {
     }
 }
 
-void GPUSolver::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, float beta, DeviceCSR& C) {
+void GPUTimeIntegrator::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, float beta, DeviceCSR& C) {
      // Matrix A and B should already be uploaded into the system. C is where we will store the solution
     // need to upload the location of our solution which should be initially empty
     
@@ -499,7 +499,7 @@ void GPUSolver::addSparse(const DeviceCSR& A, float alpha, const DeviceCSR& B, f
     cusparseDestroyMatDescr(descrC);
 }
 
-void GPUSolver::multiplySparseVector(const DeviceCSR& A, DeviceVec& x, float* y) {
+void GPUTimeIntegrator::multiplySparseVector(const DeviceCSR& A, DeviceVec& x, float* y) {
     float alpha = 1.0f;
     float beta  = 0.0f;
 
@@ -534,7 +534,7 @@ void GPUSolver::multiplySparseVector(const DeviceCSR& A, DeviceVec& x, float* y)
     cusparseDestroyDnVec(vecY);
 }
 
-bool GPUSolver::solveSparseLinearSystem(float alpha, float deltaT)
+bool GPUTimeIntegrator::solveSparseLinearSystem(float alpha, float deltaT)
 {
 
     int nRows = this->globK_d.rows;
@@ -605,7 +605,7 @@ __global__ void scaleCSRValues(float* data, float alpha, int nnz) {
     if (i < nnz) data[i] *= alpha;
 }
 
-void GPUSolver::scaleCSR(DeviceCSR& dA, float alpha) {
+void GPUTimeIntegrator::scaleCSR(DeviceCSR& dA, float alpha) {
     if (dA.nnz == 0) return;  // nothing to scale
 
     int threads = 256;
@@ -619,7 +619,7 @@ __global__ void addVectorsKernel(const float* v1, const float* v2, float* out, i
     if (i < n) out[i] = v1[i] + vScale*v2[i];
 }
 
-void GPUSolver::addVectors(float* v1, float* v2, float* out, int n, float vScale) {
+void GPUTimeIntegrator::addVectors(float* v1, float* v2, float* out, int n, float vScale) {
     int threads = 256;
     int blocks = (n + threads -1)/threads;
     addVectorsKernel<<<blocks, threads>>>(v1, v2, out, n, vScale);
@@ -631,7 +631,7 @@ __global__ void scaleVectorValues(float* data, float alpha, int n) {
     if (i < n) data[i] *= alpha;
 }
 
-void GPUSolver::scaleVector(float* data, float alpha, int n) {
+void GPUTimeIntegrator::scaleVector(float* data, float alpha, int n) {
     int threads = 256;
     int blocks = (n + threads -1)/threads;
     scaleVectorValues<<<blocks, threads>>>(data, alpha, n);
@@ -645,7 +645,7 @@ __global__ void printKernel(float *d_data, int N) {
     }
 }
 
-void GPUSolver::printVector(float* data, int n) {
+void GPUTimeIntegrator::printVector(float* data, int n) {
     int threads = 256;
     int blocks = (n + threads -1)/threads;
     printKernel<<<blocks, threads>>>(data, n);

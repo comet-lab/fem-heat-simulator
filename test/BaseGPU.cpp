@@ -3,7 +3,7 @@
 
 class BaseGPU : public testing::Test {
 protected:
-    GPUSolver *gpu = nullptr;
+    GPUTimeIntegrator *gpu = nullptr;
     FEM_Simulator* femSim = nullptr;     
 
     void SetUp() override {
@@ -25,7 +25,7 @@ protected:
 
         femSim->buildMatrices();
         // such a hack because I don't want to instantiate two gpu objects since technically 2 shouldn't exist. 
-        gpu = new GPUSolver();
+        gpu = new GPUTimeIntegrator();
 
         gpu->uploadAllMatrices(femSim->Kint, femSim->Kconv, femSim->M, femSim->FirrMat,
             femSim->FluenceRate, femSim->Fq, femSim->Fconv, femSim->Fk, femSim->FirrElem);
