@@ -31,7 +31,7 @@ private:
     int elemsInLayer = 1;
     int Nn1d = 2;
     std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
-#ifdef
+#ifdef USE_CUDA
     GPUTimeIntegrator gpuHandle;
 #endif
 
@@ -278,11 +278,7 @@ public:
             displayError(e.what());
             return;
         }
-
-        stopTime = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-        stream << "MEX: Set all simulation parameters:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
-        displayOnMATLAB(stream);
+        printDuration("MEX: Set all simulation parameters -- ");
 
         // Set parallelization
         Eigen::setNbThreads(1);
@@ -303,7 +299,11 @@ public:
             this->simulator.setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
 #ifdef USE_CUDA
             if (useGPU)
+            {
+                stream << "MEX: GPU enabled " <<std::endl;
+                displayOnMATLAB(stream);
                 initializeGPU();
+            }
             else
 #endif
             {
@@ -332,9 +332,9 @@ public:
                 // the explicit portion was actually calculated during the previous call, or during initializeModel()
                 // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
                 this->simulator.setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
-#ifdef USE_GPU
-                if (useGPU)
-                    gpuHandle.singleStepWithUpdate();
+#ifdef USE_CUDA
+                if (this->useGPU)
+                    this->gpuHandle.singleStepWithUpdate();
                 else
 #endif
                 {
@@ -352,10 +352,7 @@ public:
             stream << "Step " << t << " of " << numSteps << std::endl;
             displayOnMATLAB(stream);
         }
-        stopTime = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-        stream << "MEX: Time Stepping Complete:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
-        displayOnMATLAB(stream);
+        printDuration("MEX: Time Stepping Complete -- ");
 
         // Have to convert the std::vector to a matlab array for output
         //display3DVector(this->simulator.Temp, "Final Temp: ");
@@ -370,11 +367,8 @@ public:
             }
         }
         outputs[1] = sensorTempsOutput;
-
-        stopTime = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-        stream << "MEX: End of MEX Function:  " << duration.count() / 1000000.0 << std::endl;
-        displayOnMATLAB(stream);
+        
+        printDuration("MEX: End of MEX function -- ");
     }
 
     /** @brief This function makes sure that user has provided the proper inputs
@@ -476,7 +470,7 @@ public:
         timeRef = std::chrono::steady_clock::now();
     }
 
-    void FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {
+    void printDuration(const std::string& message) {
         auto stopTime = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - timeRef);
         stream << message << duration.count() / 1000000.0 << " s" << std::endl;	

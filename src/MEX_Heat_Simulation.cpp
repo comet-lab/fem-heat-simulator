@@ -37,7 +37,7 @@ private:
     int elemsInLayer = 1;
     int Nn1d = 2;
     std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
-#ifdef
+#ifdef USE_CUDA
     GPUTimeIntegrator gpuHandle;
 #endif
         
@@ -265,7 +265,11 @@ public:
             try {
 #ifdef USE_CUDA
                 if (this->useGPU)
+                {
+                    stream << "MEX: GPU enabled " <<std::endl;
+                    displayOnMATLAB(stream);
                     initializeGPU();
+                }
                 else
 #endif  
                 {
@@ -383,7 +387,7 @@ public:
         if (inputs.size() > VarPlacement::USE_GPU) {
             // Control GPU usage
             bool tempGPU = inputs[VarPlacement::USE_GPU][0];
-            if (this->useGPU != tempGPU);
+            if (this->useGPU != tempGPU)
                 this->createAllMatrices = true; // if we switch GPU usage createMatrices has to be true
             this->useGPU = tempGPU;
         }
@@ -447,7 +451,7 @@ public:
         timeRef = std::chrono::steady_clock::now();
     }
 
-    void FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {
+    void printDuration(const std::string& message) {
         auto stopTime = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - timeRef);
         stream << message << duration.count() / 1000000.0 << " s" << std::endl;	
@@ -460,7 +464,6 @@ public:
         gpuHandle.setAlpha(simulator.alpha);
         gpuHandle.setDeltaT(simulator.deltaT);
         gpuHandle.setModel(&simulator);
-        std::cout << "Model Assigned" << std::endl;
         gpuHandle.initializeWithModel();
     }
 

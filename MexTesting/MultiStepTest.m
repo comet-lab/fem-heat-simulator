@@ -17,8 +17,8 @@ TC = 0.0062; % thermal conductivity [W/K cm]
 VHC = 4.3; % volumetric heat capacity [J/K cm^3]
 HTC = 0.05; % heat transfer coefficient [W/K cm^2]
 useAllCPUs = true; % multithreading enabled
-useGPU = false;
-silentMode = true; % print statements off
+useGPU = true;
+silentMode = false; % print statements off
 Nn1d = 2; % nodes per axis in a single element
 layerInfo = [0.05,30]; % layer height, layer elements
 sensorPositions = [0,0,0; 0,0,0.05; -1,0,0; -1/2,0,0];
@@ -52,7 +52,9 @@ end
 fprintf("Running with multistep call: %0.2f sec\n",toc);
 
 %% Running Single Step but calling multiple times to change fluence rate.
-
+clear MEX_Heat_Simulation_MultiStep
+pause(5);
+silentMode = true;
 Tpred = T0;
 sensorTemps = zeros(size(sensorTempsMulti));
 sensorTemps(:,1) = sensorTempsMulti(:,1);
@@ -67,7 +69,7 @@ for i = 2:length(time)
         % the results won't actually match because creating the matrices
         % resets the explicit step in the crank-nicolson
     end
-    [Tpred,sensOutput] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+    [Tpred,sensOutput] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',deltaT,...
         deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
         useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
     
