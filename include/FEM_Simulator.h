@@ -124,10 +124,6 @@ public:
 	by how they are created (e.g. conduction, laser, etc). These are saved as class attributes because
 	the current build assumes them to be relatively constant throughout the mesh so its easier to save once*/
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver;
-	bool useGPU = false;
-#ifdef USE_CUDA
-	GPUTimeIntegrator* gpuHandle = nullptr;
-#endif
 
 	Eigen::SparseMatrix<float> LHS; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Kint; // Conductivity matrix for non-dirichlet nodes

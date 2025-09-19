@@ -5,6 +5,7 @@
 #include <Eigen/Sparse>
 #include <iostream>
 #include "AmgXSolver.hpp"
+#include "FEM_Simulator.h"
 
 
 struct DeviceCSR {
@@ -50,6 +51,10 @@ public:
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);
 
+    void setModel(FEM_Simulator* model);
+    void updateModel();
+    void releaseModel();
+    
     void uploadAllMatrices(
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
@@ -94,23 +99,26 @@ public:
 
     //-----------------------------------------------------------------------------------------------
     // Variable Declarations 
+
+    // Store the model
+    FEM_Simulator* femModel_ = nullptr;
     // Store GPU handles
-    cusparseHandle_t handle;
+    cusparseHandle_t handle_;
     // Stored Sparse Matrices
-    DeviceCSR Kint_d, Kconv_d, M_d, FirrMat_d;
+    DeviceCSR Kint_d_, Kconv_d_, M_d_, FirrMat_d_;
     // Store Dense Vectors
-    DeviceVec FluenceRate_d, Fq_d, Fconv_d, Fk_d, FirrElem_d;  
+    DeviceVec FluenceRate_d_, Fq_d_, Fconv_d_, Fk_d_, FirrElem_d_;  
     
     //---GPU resident Global terms --
-    DeviceCSR globK_d;
-    DeviceCSR globM_d;
-    float* globF_d = nullptr;
+    DeviceCSR globK_d_;
+    DeviceCSR globM_d_;
+    float* globF_d_ = nullptr;
 
     // State and State Velocity Vectors
-    DeviceVec dVec_d;
-    float* vVec_d = nullptr;
+    DeviceVec dVec_d_;
+    float* vVec_d_ = nullptr;
 
-    AmgXSolver& amgxSolver;
+    AmgXSolver& amgxSolver_;
 
 };
 

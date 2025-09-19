@@ -20,11 +20,11 @@ TEST_F(BaseGPU, Test_UploadVector)
     Eigen::VectorXf inputVec(10);
     inputVec << 0,1,2,3,4,5,6,7,8,9;
     std::cout << "Trying to uplaod vector " << std::endl;
-    gpu->uploadVector(inputVec,gpu->dVec_d);
+    gpu->uploadVector(inputVec,gpu->dVec_d_);
 
     std::cout << "Trying to download vector " << std::endl;
     Eigen::VectorXf returnVec(10);
-    gpu->downloadVector(returnVec,gpu->dVec_d.data);
+    gpu->downloadVector(returnVec,gpu->dVec_d_.data);
 
     std::cout << "Testing Equivalence " << std::endl;
     for (int i = 0; i < 10; i++){
@@ -54,9 +54,9 @@ TEST_F(BaseGPU, Test_UploadMatrix)
     inputMat.makeCompressed();
 
     // std::cout << "Uploading Sparse Matrix" << std::endl;
-    gpu->uploadSparseMatrix(inputMat,gpu->Kint_d);
+    gpu->uploadSparseMatrix(inputMat,gpu->Kint_d_);
     // std::cout << "Downloading Sparse Matrix" << std::endl;
-    gpu->downloadSparseMatrix(outputMat,gpu->Kint_d);
+    gpu->downloadSparseMatrix(outputMat,gpu->Kint_d_);
     // std::cout << "Checking Result" << std::endl;
     for (int k=0; k<inputMat.outerSize(); ++k){
         Eigen::SparseMatrix<float, Eigen::RowMajor>::InnerIterator itA(inputMat, k);
@@ -82,55 +82,55 @@ TEST_F(BaseGPU, Test_UploadAll)
     // Checking Kint
     std::cout << "Checking Kint" << std::endl;
     Eigen::SparseMatrix<float, Eigen::RowMajor> KintOutput; 
-    gpu->downloadSparseMatrix(KintOutput,gpu->Kint_d);
+    gpu->downloadSparseMatrix(KintOutput,gpu->Kint_d_);
     compareTwoMats(femSim->Kint,KintOutput);
 
     // Checking Kconv
     std::cout << "Checking Kconv" << std::endl;
     Eigen::SparseMatrix<float, Eigen::RowMajor> KconvOutput; 
-    gpu->downloadSparseMatrix(KconvOutput,gpu->Kconv_d);
+    gpu->downloadSparseMatrix(KconvOutput,gpu->Kconv_d_);
     compareTwoMats(femSim->Kconv,KconvOutput);
 
     // Checking M
     std::cout << "Checking M" << std::endl;
     Eigen::SparseMatrix<float, Eigen::RowMajor> MOutput; 
-    gpu->downloadSparseMatrix(MOutput,gpu->M_d);
+    gpu->downloadSparseMatrix(MOutput,gpu->M_d_);
     compareTwoMats(femSim->M,MOutput);
 
     // Checking FirrMat
     std::cout << "Checking FirrMat" << std::endl;
     Eigen::SparseMatrix<float, Eigen::RowMajor> FirrMatOutput; 
-    gpu->downloadSparseMatrix(FirrMatOutput,gpu->FirrMat_d);
+    gpu->downloadSparseMatrix(FirrMatOutput,gpu->FirrMat_d_);
     compareTwoMats(femSim->FirrMat,FirrMatOutput);
 
     // Checking FluenceRate
     std::cout << "Checking FluenceRate" << std::endl;
     Eigen::VectorXf FluenceRateOutput(femSim->FirrMat.cols()); 
-    gpu->downloadVector(FluenceRateOutput,gpu->FluenceRate_d.data);
+    gpu->downloadVector(FluenceRateOutput,gpu->FluenceRate_d_.data);
     compareTwoVectors(femSim->FluenceRate,FluenceRateOutput);
 
     // Checking Fq
     std::cout << "Checking Fq" << std::endl;
     Eigen::VectorXf FqOutput(nRows); 
-    gpu->downloadVector(FqOutput,gpu->Fq_d.data);
+    gpu->downloadVector(FqOutput,gpu->Fq_d_.data);
     compareTwoVectors(femSim->Fq,FqOutput);
 
     // Checking Fconv
     std::cout << "Checking Fconv" << std::endl;
     Eigen::VectorXf FconvOutput(nRows); 
-    gpu->downloadVector(FconvOutput,gpu->Fconv_d.data);
+    gpu->downloadVector(FconvOutput,gpu->Fconv_d_.data);
     compareTwoVectors(femSim->Fconv,FconvOutput);
 
     // Checking Fk
     std::cout << "Checking Fk" << std::endl;
     Eigen::VectorXf FkOutput(nRows); 
-    gpu->downloadVector(FkOutput,gpu->Fk_d.data);
+    gpu->downloadVector(FkOutput,gpu->Fk_d_.data);
     compareTwoVectors(femSim->Fk,FkOutput);
 
     // Checking FirrElem
     std::cout << "Checking FirrElem" << std::endl;
     Eigen::VectorXf FelemOutput(nRows); 
-    gpu->downloadVector(FelemOutput,gpu->FirrElem_d.data);
+    gpu->downloadVector(FelemOutput,gpu->FirrElem_d_.data);
     compareTwoVectors(femSim->FirrElem,FelemOutput);
 }
 
@@ -140,12 +140,12 @@ TEST_F(BaseGPU, Test_ScaleVector)
     float alpha = 2;
     Eigen::VectorXf inputVec(10);
     inputVec << 0,1,2,3,4,5,6,7,8,9;
-    gpu->uploadVector(inputVec,gpu->Fq_d);
+    gpu->uploadVector(inputVec,gpu->Fq_d_);
 
-    gpu->scaleVector(gpu->Fq_d.data, alpha, 10);
+    gpu->scaleVector(gpu->Fq_d_.data, alpha, 10);
 
     Eigen::VectorXf returnVec(10);
-    gpu->downloadVector(returnVec,gpu->Fq_d.data);
+    gpu->downloadVector(returnVec,gpu->Fq_d_.data);
 
     for (int j = 0; j < 10; j++){
         ASSERT_FLOAT_EQ(inputVec(j)*alpha,returnVec(j));
@@ -227,7 +227,7 @@ TEST_F(BaseGPU, Test_AddSparse1)
 {
     float TC = 2;
     float HTC = 3;
-    gpu->addSparse(gpu->Kint_d, TC, gpu->Kconv_d, HTC, gpu->globK_d);
+    gpu->addSparse(gpu->Kint_d_, TC, gpu->Kconv_d_, HTC, gpu->globK_d_);
     Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC + femSim->Kconv*HTC;
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputMat = truthMat;
 
@@ -242,7 +242,7 @@ TEST_F(BaseGPU, Test_AddSparse1)
         }
 
     outputMat.makeCompressed();
-    gpu->downloadSparseMatrix(outputMat, gpu->globK_d);
+    gpu->downloadSparseMatrix(outputMat, gpu->globK_d_);
 
     compareTwoMats(truthMat,outputMat);
 
@@ -252,7 +252,7 @@ TEST_F(BaseGPU, Test_AddSparse2)
 {
     float TC = 0;
     float HTC = -1;
-    gpu->addSparse(gpu->Kint_d, TC, gpu->Kconv_d, HTC, gpu->globK_d);
+    gpu->addSparse(gpu->Kint_d_, TC, gpu->Kconv_d_, HTC, gpu->globK_d_);
     Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC + femSim->Kconv*HTC;
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputMat = truthMat; // copy for size
 
@@ -269,7 +269,7 @@ TEST_F(BaseGPU, Test_AddSparse2)
 
 
     outputMat.makeCompressed();
-    gpu->downloadSparseMatrix(outputMat, gpu->globK_d);
+    gpu->downloadSparseMatrix(outputMat, gpu->globK_d_);
 
     compareTwoMats(truthMat,outputMat);
 
@@ -280,7 +280,7 @@ TEST_F(BaseGPU, Test_multiplySparseVector)
     float* outputVec_d = nullptr;
     int nRows = femSim->Kconv.rows();
     cudaMalloc(&outputVec_d,nRows*sizeof(float));
-    gpu->multiplySparseVector(gpu->FirrMat_d, gpu->FluenceRate_d, outputVec_d);
+    gpu->multiplySparseVector(gpu->FirrMat_d_, gpu->FluenceRate_d_, outputVec_d);
     Eigen::VectorXf truthVec = femSim->FirrMat*femSim->FluenceRate;
     Eigen::VectorXf outputVec(nRows);
 
@@ -313,9 +313,9 @@ TEST_F(BaseGPU, Test_applyParameters)
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputM, outputK;
     Eigen::VectorXf outputF(nRows);
     // std::cout << "Downloading Vars" << std::endl;
-    gpu->downloadVector(outputF, gpu->globF_d);
-    gpu->downloadSparseMatrix(outputM, gpu->globM_d);
-    gpu->downloadSparseMatrix(outputK, gpu->globK_d);
+    gpu->downloadVector(outputF, gpu->globF_d_);
+    gpu->downloadSparseMatrix(outputM, gpu->globM_d_);
+    gpu->downloadSparseMatrix(outputK, gpu->globK_d_);
 
 
     // CHECK GLOB K
@@ -354,8 +354,8 @@ TEST_F(BaseGPU, Test_calculateRHS)
     gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputK;
     Eigen::VectorXf outputF(nRows);
-    gpu->downloadVector(outputF, gpu->globF_d);
-    gpu->downloadSparseMatrix(outputK, gpu->globK_d);
+    gpu->downloadVector(outputF, gpu->globF_d_);
+    gpu->downloadSparseMatrix(outputK, gpu->globK_d_);
     // CHECK GLOB K
     std::cout << "Checking K...." << std::endl;
     compareTwoMats(femSim->globK,outputK);
@@ -365,9 +365,9 @@ TEST_F(BaseGPU, Test_calculateRHS)
 
     std::cout << "Uploading dVec to gpu->..." << std::endl;
     // Make sure dVec has been uploaded
-    gpu->uploadVector(femSim->dVec,gpu->dVec_d); // make sure 
+    gpu->uploadVector(femSim->dVec,gpu->dVec_d_); // make sure 
     Eigen::VectorXf dVecCopy(nRows);
-    gpu->downloadVector(dVecCopy,gpu->dVec_d.data);
+    gpu->downloadVector(dVecCopy,gpu->dVec_d_.data);
     compareTwoVectors(femSim->dVec,dVecCopy);
 
     // Calculate
@@ -403,8 +403,8 @@ TEST_F(BaseGPU, Test_initializeDV)
     gpu->initializeDV(trueD, outputV); // automatically assigns v to input
     
     std::cout<< "Downloading d" <<std::endl;
-    gpu->downloadVector(outputD, gpu->dVec_d.data);
-    // gpu->downloadVector(outputV, gpu->vVec_d);
+    gpu->downloadVector(outputD, gpu->dVec_d_.data);
+    // gpu->downloadVector(outputV, gpu->vVec_d_);
     std::cout<< "Comparing d" <<std::endl;
     compareTwoVectors(trueD, outputD);
     std::cout<< "Comparing v" <<std::endl;
