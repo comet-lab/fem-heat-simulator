@@ -1,3 +1,4 @@
+#pragma once
 #include <cuda_runtime.h>
 #include <cusparse.h>
 #include <cusolverSp.h>
@@ -44,12 +45,13 @@ public:
         bool elemNFR
     ); 
 
+    void applyParameters();
     void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
     void initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
     void initializeWithModel();
-    void setup();
+    void setup(float alpha);
     void singleStep();
-    void singleStepWithUpdate()
+    void singleStepWithUpdate();
     
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);

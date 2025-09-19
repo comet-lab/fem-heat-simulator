@@ -49,62 +49,72 @@ void GPUTimeIntegrator::applyParameters(
     applyParameters(TC, HTC, VHC, MUA, elemNFR);
     }
 
-void GPUTimeIntegrator::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR){
-
-    // These variables get set in here so we want to make sure they are free
-    freeCSR(globK_d_);
-    freeCSR(globM_d_);
-    if (globF_d_) {
-        CHECK_CUDA(cudaFree(globF_d_));
-        globF_d_ = nullptr;  // <--- IMPORTANT
+    void GPUTimeIntegrator::applyParameters()
+    {
+        applyParameters(femModel_->TC, femModel_->HTC, femModel_->VHC, femModel_->MUA, femModel_->elemNFR);
     }
 
-    // ---------------- Step 1: Compute globK ----------------
-    // This will perform Kint*TC + Kconv*HTC = globK
-    // std::cout << "Apply Parameters Step 1" << std::endl;
-    addSparse(Kint_d_, TC, Kconv_d_, HTC, globK_d_); 
-    // addSparse naturally will define globK_d_ properly as a DeviceCSR
+    void GPUTimeIntegrator::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR)
+    {
 
-    // ---------------- Step 2: Set globM ----------------
-    // this will perform M*VHC + M*0 = globM
-    // std::cout << "Apply Parameters Step 2" << std::endl;
-    addSparse(M_d_, VHC, M_d_, 0, globM_d_); ; // Already scaled
-    // addSparse naturally will define globM_d properly as a DeviceCSR
+        // These variables get set in here so we want to make sure they are free
+        freeCSR(globK_d_);
+        freeCSR(globM_d_);
+        if (globF_d_)
+        {
+            CHECK_CUDA(cudaFree(globF_d_));
+            globF_d_ = nullptr; // <--- IMPORTANT
+        }
 
-    // ---------------- Step 3: Compute Firr ----------------
-    // std::cout << "Apply Parameters Step 3" << std::endl;
-    float* Firr_d = nullptr;
-    if (elemNFR) {
-        Firr_d = FirrElem_d_.data;
-    } else {
-        CHECK_CUDA(cudaMalloc((void**)&Firr_d, FirrMat_d_.rows * sizeof(float)));
-        multiplySparseVector(FirrMat_d_, FluenceRate_d_, Firr_d);
+        // ---------------- Step 1: Compute globK ----------------
+        // This will perform Kint*TC + Kconv*HTC = globK
+        // std::cout << "Apply Parameters Step 1" << std::endl;
+        addSparse(Kint_d_, TC, Kconv_d_, HTC, globK_d_);
+        // addSparse naturally will define globK_d_ properly as a DeviceCSR
+
+        // ---------------- Step 2: Set globM ----------------
+        // this will perform M*VHC + M*0 = globM
+        // std::cout << "Apply Parameters Step 2" << std::endl;
+        addSparse(M_d_, VHC, M_d_, 0, globM_d_); // Already scaled
+        // addSparse naturally will define globM_d properly as a DeviceCSR
+
+        // ---------------- Step 3: Compute Firr ----------------
+        // std::cout << "Apply Parameters Step 3" << std::endl;
+        float *Firr_d = nullptr;
+        if (elemNFR)
+        {
+            Firr_d = FirrElem_d_.data;
+        }
+        else
+        {
+            CHECK_CUDA(cudaMalloc((void **)&Firr_d, FirrMat_d_.rows * sizeof(float)));
+            multiplySparseVector(FirrMat_d_, FluenceRate_d_, Firr_d);
+        }
+
+        // ---------------- Step 4: Compute globF ----------------
+        // std::cout << "Apply Parameters Step 4" << std::endl;
+        // Firr = Firr*MUA;
+        scaleVector(Firr_d, MUA, FirrMat_d_.rows);
+
+        if (!globF_d_)
+            CHECK_CUDA(cudaMalloc((void **)&globF_d_, FirrMat_d_.rows * sizeof(float)));
+
+        // globF = Firr*MUA
+        CHECK_CUDA(cudaMemcpy(globF_d_, Firr_d, FirrMat_d_.rows * sizeof(float),
+                              cudaMemcpyDeviceToDevice));
+
+        // globF = Firr*MUA + Fconv*HTC
+        addVectors(globF_d_, Fconv_d_.data, globF_d_, FirrMat_d_.rows, HTC);
+        // globF = Firr*MUA + Fconv*HTC + F_q
+        addVectors(globF_d_, Fq_d_.data, globF_d_, FirrMat_d_.rows, 1);
+        // globF = Firr*MUA + Fconv*HTC + F_q + Fk*TC
+        addVectors(globF_d_, Fk_d_.data, globF_d_, FirrMat_d_.rows, TC);
+
+        // ---------------- Step 5: Free temporary GPU vectors ----------------
+        // std::cout << "Apply Parameters Step 5" << std::endl;
+        CHECK_CUDA(cudaFree(Firr_d));
+        Firr_d = nullptr;
     }
-
-    // ---------------- Step 4: Compute globF ----------------
-    // std::cout << "Apply Parameters Step 4" << std::endl;
-    // Firr = Firr*MUA;
-    scaleVector(Firr_d, MUA, FirrMat_d_.rows);
-
-    if (!globF_d_)
-        CHECK_CUDA(cudaMalloc((void**)&globF_d_, FirrMat_d_.rows * sizeof(float)));
-
-    // globF = Firr*MUA
-    CHECK_CUDA(cudaMemcpy(globF_d_, Firr_d, FirrMat_d_.rows * sizeof(float),
-                          cudaMemcpyDeviceToDevice));
-
-    // globF = Firr*MUA + Fconv*HTC
-    addVectors(globF_d_, Fconv_d_.data, globF_d_, FirrMat_d_.rows, HTC);
-    // globF = Firr*MUA + Fconv*HTC + F_q
-    addVectors(globF_d_, Fq_d_.data, globF_d_, FirrMat_d_.rows, 1);
-    // globF = Firr*MUA + Fconv*HTC + F_q + Fk*TC
-    addVectors(globF_d_, Fk_d_.data, globF_d_, FirrMat_d_.rows, TC);
-
-    // ---------------- Step 5: Free temporary GPU vectors ----------------
-    // std::cout << "Apply Parameters Step 5" << std::endl;
-    CHECK_CUDA(cudaFree(Firr_d));
-    Firr_d = nullptr;
-}
 
 void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
     /*
@@ -116,17 +126,17 @@ void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf
     uploadVector(dVec,dVec_d_);
     // -- Step1: Construct Right Hand Side of Ax = b
     // In this case b = (F - K*d);
-    // std::cout << "InitializeDV Step 1" << std::endl;
+    // std::cout << "Initialize Step 1" << std::endl;
     float* b_d;
     calculateRHS(b_d, nRows);
 
     // -- Step 2: construct Left Hand Side of Ax = b
     // In this case it is just A = M so we run setup with alpha = 0 and dt = 0;
-    // std::cout << "InitializeDV Step 2" << std::endl;
-    setup(0,0); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
+    // std::cout << "Initialize Step 2" << std::endl;
+    setup(0); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
 
     // -- Step 3: Solve using AMGX so we can have a linear solver
-    // std::cout << "InitializeDV Step 3" << std::endl;
+    // std::cout << "Initialize Step 3" << std::endl;
     float* x_d; // where we will store our temporary solution to v
     cudaMalloc(&x_d, sizeof(float) * globM_d_.cols);
 
@@ -134,16 +144,16 @@ void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf
 
     // -- Step 4: Assign attribute to solution and return to eigen
     // std::cout << "InitializeDV Step 4" << std::endl;
-    CHECK_CUDA( cudaMemcpy(vVec.data(), x_d, nRows*sizeof(float),cudaMemcpyDeviceToHost) )
+    CHECK_CUDA( cudaMemcpy(vVec.data(), x_d, nRows*sizeof(float),cudaMemcpyDeviceToHost) );
     // We aren't using upload vector here because upload vector assumes host-to-device copy
     // we don't want to free this data after either because it is a class attribute
     CHECK_CUDA(cudaMalloc((void**)&(vVec_d_), nRows*sizeof(float)));
     CHECK_CUDA(cudaMemcpy(vVec_d_, x_d, nRows*sizeof(float), cudaMemcpyDeviceToDevice));
 
     // -- Cleanup
-    CHECK_CUDA( cudaFree(b_d) ) // free memory of RHS which was temporary
+    CHECK_CUDA( cudaFree(b_d) ); // free memory of RHS which was temporary
     b_d = nullptr;
-    CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
+    CHECK_CUDA( cudaFree(x_d) ); // free memory of our solution since its been copied
     x_d = nullptr;
 }
 
@@ -156,15 +166,15 @@ void GPUTimeIntegrator::initializeWithModel()
 	femModel_->vVec = Eigen::VectorXf::Zero(nNodes - femModel_->dirichletNodes.size());
 
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
-	femModel_->dVec = this->Temp(validNodes);
-    gpuHandle->initializeDV(femModel_->dVec,femModel_->vVec);
+	femModel_->dVec = femModel_->Temp(femModel_->validNodes);
+    initialize(femModel_->dVec,femModel_->vVec);
 
-    setupGPU();
+    setup(alpha_);
 	femModel_->fluenceUpdate = false;
 	femModel_->parameterUpdate = false;
 }
 
-void GPUTimeIntegrator::setup(){
+void GPUTimeIntegrator::setup(float alpha){
     /*
     This function initializes the A matrix in AMGX in order to solve the sparse linear system
                 Ax = b
@@ -177,7 +187,7 @@ void GPUTimeIntegrator::setup(){
     // -- Step 1: Construct A for Ax = b
     DeviceCSR A;
     // Perform the addition of A = (M + alpha*deltaT*F)
-    addSparse(globM_d_, 1, globK_d_, alpha_*deltaT_, A);
+    addSparse(globM_d_, 1, globK_d_, alpha*deltaT_, A);
     // Upload A to the amgxSolver_
     amgxSolver_.uploadMatrix(A.rows, A.cols, A.nnz,
         A.data_d, A.rowPtr_d, A.colIdx_d);
@@ -215,7 +225,7 @@ void GPUTimeIntegrator::singleStep(){
 
     // -- Step 2a: Calculate vVec using Ax = b --> (M + alpha*dt*K)v = (F - K*d);
     float* b_d; // temporary variable to store (F - K*d);
-    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ) // allocate memory for RHS
+    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ); // allocate memory for RHS
     // Multiplication of K*d --> b_d
     multiplySparseVector(globK_d_, dVec_d_, b_d); 
     // Subtraction of (F - b_d) --> b_d
@@ -233,9 +243,9 @@ void GPUTimeIntegrator::singleStep(){
     CHECK_CUDA(cudaMemcpy(vVec_d_, x_d, nRows*sizeof(float), cudaMemcpyDeviceToDevice));
 
     // -- Cleanup
-    CHECK_CUDA( cudaFree(b_d) ) // free memory of RHS which was temporary
+    CHECK_CUDA( cudaFree(b_d) ); // free memory of RHS which was temporary
     b_d = nullptr;
-    CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
+    CHECK_CUDA( cudaFree(x_d) ); // free memory of our solution since its been copied
     x_d = nullptr;
 }
 
@@ -243,27 +253,29 @@ void GPUTimeIntegrator::singleStepWithUpdate()
 {
 	// upload the current dVec value in case the temperature across the mesh was overriden by the user
 	// in between singleStep calls
-	femModel_->dVec = femModel_->Temp(this->validNodes);
+	femModel_->dVec = femModel_->Temp(femModel_->validNodes);
 	uploaddVec_d();
 	// auto start = std::chrono::steady_clock::now();
 	if (femModel_->fluenceUpdate || femModel_->parameterUpdate){
+        // std::cout << "GPUTimeIntegrator: update before singleStep" << std::endl;
 		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
-	    applyParameters();
+        if (femModel_->fluenceUpdate)
+	        uploadFluenceRate();
+        applyParameters();
 		femModel_->fluenceUpdate = false;
 		if (femModel_->parameterUpdate)
-			setup(); // reset AMGX left hand side (M + alpha*dt*K)
+			setup(alpha_); // reset AMGX left hand side (M + alpha*dt*K)
 		femModel_->parameterUpdate = false;
 	}
 
 	singleStep();
 	// After Single Step we get the dVector to the system and assign it to T
-	gpuHandle->downloaddVec_d();
-    femModel_->Temp(femModel_->validNodes) = femModel_->dVec;
+	updateModel();
 	// printDuration("Single Step on GPU: ", start);
 }
 
 void GPUTimeIntegrator::calculateRHS(float* &b_d, int nRows){
-    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ) // allocate memory for RHS
+    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ); // allocate memory for RHS
     // Perform b_d = K*d
     multiplySparseVector(globK_d_, dVec_d_, b_d); 
     // Perform b_d = F - K*d
@@ -377,7 +389,7 @@ void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
 
 void GPUTimeIntegrator::downloaddVec_d()
 {
-    downloadVector(femModel->dVec, dVec_d_.data);
+    downloadVector(femModel_->dVec, dVec_d_.data);
 }
 
 void GPUTimeIntegrator::downloadvVec_d()
@@ -586,12 +598,12 @@ void GPUTimeIntegrator::multiplySparseVector(const DeviceCSR& A, DeviceVec& x, f
     cusparseDestroyDnVec(vecY);
 }
 
-void setAlpha(float alpha)
+void GPUTimeIntegrator::setAlpha(float alpha)
 {
     alpha_ = alpha;
 }
 
-void setDeltaT(float deltaT)
+void GPUTimeIntegrator::setDeltaT(float deltaT)
 {
     deltaT_ = deltaT;
 }
@@ -720,11 +732,13 @@ void GPUTimeIntegrator::setModel(FEM_Simulator *model)
         freeModelMatrices();
     }
     femModel_ = model;
+    getMatricesFromModel(); 
+    applyParameters();
 }
 
 void GPUTimeIntegrator::updateModel()
 {
-    downloaddVec_d(femModel_->dVec);
+    downloaddVec_d();
     femModel_->Temp(femModel_->validNodes) = femModel_->dVec;
 }
 
