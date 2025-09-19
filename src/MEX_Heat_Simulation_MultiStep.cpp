@@ -5,6 +5,10 @@
 #include <iostream>
 #include "FEM_Simulator.h"
 
+#ifdef USE_CUDA
+#include "GPUTimeIntegrator.cuh"
+#endif
+
  //using namespace matlab::mex;
  //using namespace matlab::data;
 
@@ -26,6 +30,10 @@ private:
     float layerHeight = 1;
     int elemsInLayer = 1;
     int Nn1d = 2;
+    std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
+#ifdef
+    GPUTimeIntegrator gpuHandle;
+#endif
 
 public:
     /* Constructor for the class. */
@@ -178,9 +186,7 @@ public:
     * @param inputs - list of inputs matlab provideds
     */
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        auto startTime = std::chrono::high_resolution_clock::now();
-        auto stopTime = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
+        resetTimer();
         checkArguments(outputs, inputs);
         stream.str("");
         stream << "MEX: Start of MEX function" << std::endl;
@@ -193,10 +199,7 @@ public:
 
             // Have to convert T0 and FluenceRate to std::vector<<<float>>>
             std::vector<std::vector<std::vector<float>>> T0 = convertMatlabArrayTo3DVector(inputs[VarPlacement::TEMPERATURE]);
-            stopTime = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-            stream << "MEX: Converted MATLAB Matrices:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
-            displayOnMATLAB(stream);
+            printDuration("MEX: Converted MATLAB Matrices -- ");
 
             // Get tissue size
             float tissueSize[3];
@@ -293,14 +296,19 @@ public:
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(stream);
 
-        this->simulator.useGPU = this->simulator.gpuAvailable() && this->useGPU;
-        stream << "MEX: Set Use GPU to " << this->simulator.useGPU << std::endl;
-        displayOnMATLAB(stream);
+
         /* Initialize the model for time = 0 or the first index and build the matrices*/
         try {
             this->simulator.deltaT = timeVec[1] - timeVec[0]; // set deltaT
             this->simulator.setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
-            this->simulator.initializeModel(); // initialize model
+#ifdef USE_CUDA
+            if (useGPU)
+                initializeGPU();
+            else
+#endif
+            {
+                this->simulator.initializeModel(); // initialize model
+            }
             /*stream << "Global matrices created" << std::endl;
             displayOnMATLAB(stream);*/
         }
@@ -310,10 +318,7 @@ public:
             displayError(e.what());
             return;
         }
-        stopTime = std::chrono::high_resolution_clock::now();
-        duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
-        stream << "MEX: Matrices Built:  " << duration.count() / 1000000.0 << " seconds" << std::endl;
-        displayOnMATLAB(stream);
+        printDuration("MEX: Matrices Built -- ");
 
         /* Now perform time stepping with singele steps */
         int numSteps = timeVec.size() - 1; // if time is of size 2, then we only have 1 step.
@@ -327,7 +332,15 @@ public:
                 // the explicit portion was actually calculated during the previous call, or during initializeModel()
                 // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
                 this->simulator.setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
-                this->simulator.singleStep();
+#ifdef USE_GPU
+                if (useGPU)
+                    gpuHandle.singleStepWithUpdate();
+                else
+#endif
+                {
+                    this->simulator.singleStep();
+                }                
+                
                 this->simulator.updateTemperatureSensors(t);
             }
             catch (const std::exception& e) {
@@ -458,4 +471,26 @@ public:
             Nn1d = inputs[VarPlacement::NN1D][0];
         }
     }
+
+    void resetTimer(){
+        timeRef = std::chrono::steady_clock::now();
+    }
+
+    void FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {
+        auto stopTime = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - timeRef);
+        stream << message << duration.count() / 1000000.0 << " s" << std::endl;	
+        displayOnMATLAB(stream);
+    }
+
+#ifdef USE_CUDA
+    void initializeGPU(){
+        simulator.buildMatrices();
+        gpuHandle.setAlpha(simulator.alpha);
+        gpuHandle.setDeltaT(simulator.deltaT);
+        gpuHandle.setModel(&simulator);
+        std::cout << "Model Assigned" << std::endl;
+        gpuHandle.initializeWithModel();
+    }
+#endif 
 };
