@@ -75,7 +75,7 @@ if(USE_CUDA)
 endif()
 
 # Create the library with CUDA support
-add_library(HeatSimulation STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
+add_library(HeatSimulation SHARED ${HEATSIM_SRC} ${HEATSIM_HEADERS})
 add_library(HeatSimulation::HeatSimulation ALIAS HeatSimulation)
 set_target_properties(HeatSimulation PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
