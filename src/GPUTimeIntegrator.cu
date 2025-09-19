@@ -106,7 +106,7 @@ void GPUTimeIntegrator::applyParameters(float TC, float HTC, float VHC, float MU
     Firr_d = nullptr;
 }
 
-void GPUTimeIntegrator::initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
+void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
     /*
     This function will initialize the d and v vectors used for Euler integration. The d vector is
     simply passed in, and the v vector is assigned through the equation M*v = (F - K*d).
@@ -145,6 +145,23 @@ void GPUTimeIntegrator::initializeDV(const Eigen::VectorXf & dVec, Eigen::Vector
     b_d = nullptr;
     CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
     x_d = nullptr;
+}
+
+void GPUTimeIntegrator::initializeWithModel()
+{
+    int nNodes = femModel_->nodesPerAxis[0] * femModel_->nodesPerAxis[1] * femModel_->nodesPerAxis[2];
+	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
+	// Initialize d, v, and dTilde vectors
+	femModel_->dVec.resize(nNodes - femModel_->dirichletNodes.size());
+	femModel_->vVec = Eigen::VectorXf::Zero(nNodes - femModel_->dirichletNodes.size());
+
+	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
+	femModel_->dVec = this->Temp(validNodes);
+    gpuHandle->initializeDV(femModel_->dVec,femModel_->vVec);
+
+    setupGPU();
+	femModel_->fluenceUpdate = false;
+	femModel_->parameterUpdate = false;
 }
 
 void GPUTimeIntegrator::setup(){
@@ -220,6 +237,29 @@ void GPUTimeIntegrator::singleStep(){
     b_d = nullptr;
     CHECK_CUDA( cudaFree(x_d) ) // free memory of our solution since its been copied
     x_d = nullptr;
+}
+
+void GPUTimeIntegrator::singleStepWithUpdate()
+{
+	// upload the current dVec value in case the temperature across the mesh was overriden by the user
+	// in between singleStep calls
+	femModel_->dVec = femModel_->Temp(this->validNodes);
+	uploaddVec_d();
+	// auto start = std::chrono::steady_clock::now();
+	if (femModel_->fluenceUpdate || femModel_->parameterUpdate){
+		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
+	    applyParameters();
+		femModel_->fluenceUpdate = false;
+		if (femModel_->parameterUpdate)
+			setup(); // reset AMGX left hand side (M + alpha*dt*K)
+		femModel_->parameterUpdate = false;
+	}
+
+	singleStep();
+	// After Single Step we get the dVector to the system and assign it to T
+	gpuHandle->downloaddVec_d();
+    femModel_->Temp(femModel_->validNodes) = femModel_->dVec;
+	// printDuration("Single Step on GPU: ", start);
 }
 
 void GPUTimeIntegrator::calculateRHS(float* &b_d, int nRows){
@@ -320,14 +360,14 @@ void GPUTimeIntegrator::uploadVector(const float* data, int n, DeviceVec& dV){
     // printVector(dV.data, n);
 }
 
-void GPUTimeIntegrator::uploaddVec_d(Eigen::VectorXf &dVec)
+void GPUTimeIntegrator::uploaddVec_d()
 {
-    uploadVector(dVec,dVec_d_);
+    uploadVector(femModel_->dVec,dVec_d_);
 }
 
-void GPUTimeIntegrator::uploadFluenceRate(Eigen::VectorXf &FluenceRate)
+void GPUTimeIntegrator::uploadFluenceRate()
 {
-    uploadVector(FluenceRate, FluenceRate_d_);
+    uploadVector(femModel_->FluenceRate, FluenceRate_d_);
 }
 
 void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
@@ -335,14 +375,14 @@ void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
     CHECK_CUDA(cudaMemcpy(v.data(),dv,v.size() * sizeof(float),cudaMemcpyDeviceToHost) )
 }
 
-void GPUTimeIntegrator::downloaddVec_d(Eigen::VectorXf &dVec)
+void GPUTimeIntegrator::downloaddVec_d()
 {
-    downloadVector(dVec, dVec_d_.data);
+    downloadVector(femModel->dVec, dVec_d_.data);
 }
 
-void GPUTimeIntegrator::downloadvVec_d(Eigen::VectorXf &vVec)
+void GPUTimeIntegrator::downloadvVec_d()
 {
-    downloadVector(vVec, vVec_d_);
+    downloadVector(femModel_->vVec, vVec_d_);
 }
 
 void GPUTimeIntegrator::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)

@@ -4,7 +4,6 @@
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
 
 FEM_Simulator::FEM_Simulator() {
-	this->useGPU = gpuAvailable();
 }
 
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
@@ -17,8 +16,6 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setVHC(VHC);
 	this->setMUA(MUA);
 	this->setHTC(HTC);
-
-	this->useGPU = gpuAvailable();
 }
 
 FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
@@ -83,9 +80,6 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	// A value of -1 at index i, indicates that global node i is a dirichlet node.
 	this->nodeMap = inputSim.nodeMap;
 	this->silentMode = inputSim.silentMode;
-	#ifdef USE_CUDA
-	this->gpuHandle = nullptr;
-	#endif
 
 	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
 	/* Try-Catch block won't actually catch a faulty matrix multiplication in Eigen*/
@@ -102,11 +96,6 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 
 FEM_Simulator::~FEM_Simulator(){
 	// std::cout << "FEM_Simulator Destructor" << std::endl;
-#ifdef USE_CUDA
-	delete this->gpuHandle;  // safe even if nullptr
-	this->gpuHandle = nullptr;
-	// std::cout << "GPU Handle Freed" << std::endl;
-#endif
 }
 
 void FEM_Simulator::multiStep(float duration) {
@@ -134,14 +123,7 @@ void FEM_Simulator::singleStep() {
 	/* 
 	Performs either the GPU single step or the CPU single step
 	*/
-#ifdef USE_CUDA
-	if (this->useGPU){
-		this->singleStepGPU();
-	} else
-#endif
-	{
-		this->singleStepCPU();
-	}
+	this->singleStepCPU();
 }
 
 void FEM_Simulator::singleStepCPU() {
@@ -530,15 +512,8 @@ void FEM_Simulator::initializeModel()
 	this->buildMatrices();
 	this->fluenceUpdate = false;
 
-#ifdef USE_CUDA
-	if (this->useGPU){
-		this->applyParametersGPU();
-		this->initializeDVGPU();
-	} else
-#endif
-	{
-		this->initializeTimeIntegrationCPU();
-	}
+	this->initializeTimeIntegrationCPU();
+	
 	// We are now ready to call single step
 }
 
@@ -1202,13 +1177,6 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
 	}
 	// -- setting flag that fluence has been updated
 	this->fluenceUpdate = true;
-
-	// Uploading fluence rate to GPU if enabled
-#ifdef USE_CUDA
-	if (this->useGPU){
-		this->gpuHandle->uploadFluenceRate(this->FluenceRate);
-	}
-#endif
 }
 
 void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> inputFluence)
@@ -1508,84 +1476,3 @@ std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::st
 	}
 	return startTime;
 }
-
-bool FEM_Simulator::gpuAvailable() {
-
-#ifdef USE_CUDA
-	int deviceCount = 0;
-	cudaError_t err = cudaGetDeviceCount(&deviceCount);
-	this->useGPU = (err == cudaSuccess && deviceCount > 0);
-
-	if (this->useGPU && !this->gpuHandle) { // only create a new handle if we don't have one already
-		this->gpuHandle = new GPUTimeIntegrator();
-	}
-	// else
-#endif 
-	// {
-	// 	std::cout << "No GPU: using Eigen solver\n";
-	// }
-
-	return this->useGPU;
-}
-
-#ifdef USE_CUDA
-void FEM_Simulator::applyParametersGPU() {
-	auto start = std::chrono::steady_clock::now();
-	// GPU apply parameters 
-	gpuHandle->applyParameters(this->TC,this->HTC,this->VHC,this->MUA,elemNFR);
-	start = printDuration("Parameter application: ", start);
-	// Once applied parameters is called on the GPU, as far as its concerned, the fluence has been updated
-}
-
-
-void FEM_Simulator::initializeDVGPU() {
-	auto start = std::chrono::steady_clock::now();
-	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
-	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
-	// Initialize d, v, and dTilde vectors
-	this->dVec.resize(nNodes - dirichletNodes.size());
-	this->vVec = Eigen::VectorXf::Zero(nNodes - dirichletNodes.size());
-
-	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
-	this->dVec = this->Temp(validNodes);
-
-    gpuHandle->initializeDV(this->dVec,this->vVec);
-	printDuration("Initalized D and V Vectors GPU: ", start);
-	// run final call to setupGPU() so that the GPU is ready to just perform repeated forward steps. 
-	this->setupGPU();
-	this->fluenceUpdate = false;
-	this->parameterUpdate = false;
-}
-
-void FEM_Simulator::setupGPU()
-{
-	auto start = std::chrono::steady_clock::now();
-	gpuHandle->setup(this->alpha, this->deltaT);
-	printDuration("Setup on GPU: ", start);
-}
-
-void FEM_Simulator::singleStepGPU()
-{
-	// upload the current dVec value in case the temperature across the mesh was overriden by the user
-	// in between singleStep calls
-	this->dVec = this->Temp(this->validNodes);
-	gpuHandle->uploaddVec_d(this->dVec);
-	// auto start = std::chrono::steady_clock::now();
-	if (this->fluenceUpdate || this->parameterUpdate){
-		// if our parameters or fluenceRate have changed we need to applyParameters to the GPU
-		this->applyParametersGPU();
-		this->fluenceUpdate = false;
-		if (this->parameterUpdate)
-			this->setupGPU();
-		this->parameterUpdate = false;
-	}
-
-	// we don't need to reupload dVec because gpuHandle has its own copy of it that it updates. 
-	// If a user wants to switch between GPU and CPU they'll have to call initializeModel() again. 
-	gpuHandle->singleStep(this->alpha, this->deltaT);
-	// After Single Step we get the dVector to the system and assign it to T
-	gpuHandle->downloaddVec_d(this->dVec);
-    this->Temp(this->validNodes) = this->dVec;
-	// printDuration("Single Step on GPU: ", start);
-}
-#endif

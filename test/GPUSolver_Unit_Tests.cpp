@@ -400,7 +400,7 @@ TEST_F(BaseGPU, Test_initializeDV)
     Eigen::VectorXf outputD(nRows), outputV(nRows);
     gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
 
-    gpu->initializeDV(trueD, outputV); // automatically assigns v to input
+    gpu->initialize(trueD, outputV); // automatically assigns v to input
     
     std::cout<< "Downloading d" <<std::endl;
     gpu->downloadVector(outputD, gpu->dVec_d_.data);

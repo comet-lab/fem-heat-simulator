@@ -9,12 +9,6 @@
 #include <chrono>
 #include <stdexcept>
 
-#ifdef USE_CUDA
-
-#include "GPUTimeIntegrator.cuh"
-
-#endif
-
 class FEM_Simulator
 {
 public:
@@ -189,14 +183,6 @@ public:
 	// -- Miscenallenous helper Functions 
 	void ind2sub(int index, int size[3], int sub[3]); 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
-	bool gpuAvailable();
-
-#ifdef USE_CUDA
-	void applyParametersGPU();
-	void initializeDVGPU();
-	void setupGPU();
-	void singleStepGPU();
-#endif
 };
 
 

@@ -45,9 +45,11 @@ public:
     ); 
 
     void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
-    void initializeDV(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
-    void setup(float alpha, float deltaT);
+    void initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
+    void initializeWithModel();
+    void setup();
     void singleStep();
+    void singleStepWithUpdate()
     
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);
@@ -79,13 +81,13 @@ public:
     void uploadSparseMatrix(int numRows, int numCols, int nnz, const int* csrOffsets, const int* columns, const float* values, DeviceCSR& dA);
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
     void uploadVector(const float* data, int n, DeviceVec& dV);
-    void uploaddVec_d(Eigen::VectorXf& dVec);
-    void uploadFluenceRate(Eigen::VectorXf& FluenceRate);
+    void uploaddVec_d();
+    void uploadFluenceRate();
 
     // commands to download vectors/matrices from gpu
     void downloadVector(Eigen::VectorXf& v,const float* dv);
-    void downloaddVec_d(Eigen::VectorXf& dVec);
-    void downloadvVec_d(Eigen::VectorXf& vVec);
+    void downloaddVec_d();
+    void downloadvVec_d();
     void downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source);
 
      // Sparse-sparse addition
