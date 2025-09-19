@@ -76,8 +76,9 @@ TEST_F(BaseGPU, Test_UploadMatrix)
 TEST_F(BaseGPU, Test_UploadAll)
 {
     int nRows = femSim->Kconv.rows();
-    gpu->uploadAllMatrices(femSim->Kint,femSim->Kconv,femSim->M,femSim->FirrMat,
-		femSim->FluenceRate,femSim->Fq,femSim->Fconv,femSim->Fk,femSim->FirrElem);
+    // This line is called in BaseGPU.cpp when we call gpu->setMode();
+    // gpu->uploadAllMatrices(femSim->Kint,femSim->Kconv,femSim->M,femSim->FirrMat,
+	// 	femSim->FluenceRate,femSim->Fq,femSim->Fconv,femSim->Fk,femSim->FirrElem);
     
     // Checking Kint
     std::cout << "Checking Kint" << std::endl;

@@ -4,7 +4,7 @@ project(HeatSimulation VERSION 4.0 LANGUAGES CXX)
 # ──────────────────────────────────────────────────────────────
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
-option(BUILD_TESTING  "Build unit‑test runner"            OFF)
+option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" OFF)
 option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" ON)
 set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files are")

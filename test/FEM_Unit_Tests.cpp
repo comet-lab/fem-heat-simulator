@@ -746,7 +746,6 @@ TEST_F(BaseSim, testSetFluenceRate) {
 TEST(SecondaryTest, testPositionToElement2) {
 
 	// Multi Layer Test
-	AMGX_initialize();
 	int nodesPerAxis[3] = {21,21,20};
 	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
@@ -808,13 +807,11 @@ TEST(SecondaryTest, testPositionToElement2) {
 
 	delete femSimLin;
 	femSimLin = nullptr;
-	AMGX_finalize();	
 }
 
 TEST(SecondaryTest, testSetSensorTemps) {
 
 	// Multi Layer Test
-	AMGX_initialize();
 	int nodesPerAxis[3] = { 21,21,20 };
 	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
@@ -863,5 +860,4 @@ TEST(SecondaryTest, testSetSensorTemps) {
 
 	delete femSimLin;
 	femSimLin = nullptr;
-	AMGX_finalize();
 }

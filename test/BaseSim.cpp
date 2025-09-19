@@ -37,16 +37,10 @@ protected:
 
 
     static void SetUpTestSuite() {
-        #ifdef USE_CUDA
-        AMGX_initialize();
-        #endif
-        // AMGX_initialize_plugins();
+
     }
 
     static void TearDownTestSuite() {
-        // AMGX_finalize_plugins();
-        #ifdef USE_CUDA
-        AMGX_finalize();
-        #endif
+
     }
 };

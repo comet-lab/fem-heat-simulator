@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "FEM_Simulator.h"
+#include "GPUTimeIntegrator.cuh"
 
 class BaseGPU : public testing::Test {
 protected:
@@ -24,11 +24,10 @@ protected:
         femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
 
         femSim->buildMatrices();
-        // such a hack because I don't want to instantiate two gpu objects since technically 2 shouldn't exist. 
-        gpu = new GPUTimeIntegrator();
+        
+        gpu = new GPUTimeIntegrator(femSim->alpha, femSim->deltaT);
 
-        gpu->uploadAllMatrices(femSim->Kint, femSim->Kconv, femSim->M, femSim->FirrMat,
-            femSim->FluenceRate, femSim->Fq, femSim->Fconv, femSim->Fk, femSim->FirrElem);
+        gpu->setModel(femSim);
     }
 
 
@@ -36,7 +35,6 @@ protected:
         // std::cout << "Entered Tear Down" << std::endl;
         delete gpu;
         gpu = nullptr;
-        // femSim->gpuHandle = nullptr; // such a hack because I don't want to instantiate two gpu objects
         // std::cout << "Cleared gpu" << std::endl;       
         delete femSim;
         femSim = nullptr;
