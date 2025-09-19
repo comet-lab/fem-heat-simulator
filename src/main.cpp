@@ -3,7 +3,10 @@
 
 #include <iostream>
 #include "FEM_Simulator.h"
+
+#ifdef USE_CUDA
 #include "GPUTimeIntegrator.cuh"
+#endif
 
 int main()
 {
