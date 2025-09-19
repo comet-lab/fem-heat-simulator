@@ -14,6 +14,7 @@ TC = 0.0062; % thermal conductivity [W/K cm]
 VHC = 4.3; % volumetric heat capacity [J/K cm^3]
 HTC = 0.05; % heat transfer coefficient [W/K cm^2]
 useAllCPUs = true; % multithreading enabled
+useGPU = true;
 silentMode = false; % print statements off
 Nn1d = 2; % nodes per axis in a single element
 layerInfo = [0.05,30]; % layer height, layer elements
@@ -48,8 +49,8 @@ for dd = 1:length(deltaTOpts)
         end
         tic
         [Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+            deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
         durationCell{dd,aa} = toc;
 
         sensorTempsCell{dd,aa} = sensorTemps;
@@ -57,6 +58,7 @@ for dd = 1:length(deltaTOpts)
 end
 
 %% Plot Sensor Temps over time
+fprintf("\n\n")
 c = colororder;
 lineOpts = {'-', '--',':','-.'};
 figure(1);
@@ -78,7 +80,7 @@ for ss = 1:size(sensorPositions,1)
                 sprintf("\\alpha: %g, \\Deltat: %g",alpha,deltaT));
 
             if ss == 1
-                fprintf("Duration for alpha = %g and deltaT= %g: %d s\n",alpha,deltaT,durationCell{dd,aa});
+                fprintf("Duration for alpha = %g and deltaT= %g: %0.1f s\n",alpha,deltaT,durationCell{dd,aa});
             end
         end
     end

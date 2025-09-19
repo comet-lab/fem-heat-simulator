@@ -1,21 +1,20 @@
 clc; clear; close all;
-
-clear MEX_Heat_Simulation
 %% Initialization of parameters
-tissueSize = [5.0,5.0,1.0]; % [cm, cm, cm]
-nodesPerAxis = [81,81,50];
+tissueSize = [2.0,2.0,1.0]; % [cm, cm, cm]
+nodesPerAxis = [41,41,50];
 ambientTemp = 24; % ambient temp
 T0 = single(20*ones(nodesPerAxis)); % initial temp [deg C]
 deltaT = 0.05; % Time Step for integration % [s]
 alpha = 1/2; % implicit percentage of time integration (0 - forward, 1/2 - crank-nicolson, 1 - backward)
-tFinal = single(15.0); % final duration of simulation [s]
+tFinal = single(1.0); % final duration of simulation [s]
 w0 = 0.0168; % beam Waist [cm]
 focalPoint = 35; % distance from waist to target [cm]
 MUA = 200; % absorption coefficient [cm^-1]
 TC = 0.0062; % thermal conductivity [W/K cm]
 VHC = 4.3; % volumetric heat capacity [J/K cm^3]
 HTC = 0.05; % heat transfer coefficient [W/K cm^2]
-useAllCPUs = true; % multithreading enabled
+useAllCPUs = false; % multithreading enabled
+useGPU = true; % enable gpu use
 silentMode = false; % print statements off
 Nn1d = 2; % nodes per axis in a single element
 layerInfo = [0.05,30]; % layer height, layer elements
@@ -34,7 +33,7 @@ z = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(la
 fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
-createMatrices = true; % whether to always recreate all the matrices. 
+createMatrices = false; % whether to always recreate all the matrices. 
 %% Running MEX File
 
 tic
@@ -42,8 +41,8 @@ if ~silentMode
     fprintf("\n");
 end
 [Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
-    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,useAllCPUs,...
-    silentMode,layerInfo,Nn1d,alpha,createMatrices);
+    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+    useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
 toc
 
 %% Plot Sensor Temps over time
@@ -111,5 +110,3 @@ c.Label.String = 'Temperature (deg C)';
 axis equal
 view(0,90);
 colormap('hot')
-
-clear mex

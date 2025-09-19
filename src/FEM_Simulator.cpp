@@ -1,10 +1,10 @@
 #include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
 #include <iostream>
 
 const int FEM_Simulator::A[8][3] = {{-1, -1, -1},{1,-1,-1},{-1,1,-1},{1,1,-1}, {-1,-1,1},{1,-1,1},{-1,1,1}, { 1,1,1 } };
+
+FEM_Simulator::FEM_Simulator() {
+}
 
 FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, float tissueSize[3], float TC, float VHC, float MUA, float HTC, int Nn1d)
 {
@@ -16,7 +16,6 @@ FEM_Simulator::FEM_Simulator(std::vector<std::vector<std::vector<float>>> Temp, 
 	this->setVHC(VHC);
 	this->setMUA(MUA);
 	this->setHTC(HTC);
-	
 }
 
 FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
@@ -85,7 +84,7 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	//this->cgSolver = inputSim.cgSolver; this assignment doesn't work
 	/* Try-Catch block won't actually catch a faulty matrix multiplication in Eigen*/
 	//try {
-	//	this->initializeTimeIntegration(); // insteady try and initializeTimeIntegration();
+	//	this->initializeTimeIntegrationCPU(); // insteady try and initializeTimeIntegrationCPU();
 	//}
 	//catch (...) {
 	//	// This block catches any other type of exception not caught by previous handlers
@@ -95,11 +94,15 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
 	//}
 }
 
+FEM_Simulator::~FEM_Simulator(){
+	// std::cout << "FEM_Simulator Destructor" << std::endl;
+}
+
 void FEM_Simulator::multiStep(float duration) {
 	/* This function simulates multiple steps of the heat equation. A single step duration is given by deltaT. If the total
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
-	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
+	It repeatedly calls to singleStepCPU(). This function will also update the temperature sensors vector.  */ 
 	auto startTime = std::chrono::steady_clock::now();
 	int numSteps = round(duration / this->deltaT);
 	this->initializeSensorTemps(numSteps);
@@ -116,13 +119,17 @@ void FEM_Simulator::multiStep(float duration) {
 	startTime = this->printDuration("Time Stepping Completed in ", startTime);
 }
 
-
 void FEM_Simulator::singleStep() {
-	/* Simulates a single step of the heat equation. A single step is given by the duration deltaT. To run single step,
+	/* 
+	Performs either the GPU single step or the CPU single step
+	*/
+	this->singleStepCPU();
+}
+
+void FEM_Simulator::singleStepCPU() {
+	/* Simulates a single step of the heat equation using CPU. A single step is given by the duration deltaT. To run single step,
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. */
-
-	
 
 	if (this->fluenceUpdate || this->parameterUpdate) {
 		// only happens if fluenceUpdate is true
@@ -131,7 +138,7 @@ void FEM_Simulator::singleStep() {
 			createFirr();
 		}
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
-		this->applyParameters(); 
+		this->applyParametersCPU();
 		this->fluenceUpdate = false;
 
 		if (this->parameterUpdate) { // Happens only if parameters were updated
@@ -145,7 +152,6 @@ void FEM_Simulator::singleStep() {
 		}
 	}
 
-	
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	this->dVec = this->Temp(validNodes);
 
@@ -158,7 +164,7 @@ void FEM_Simulator::singleStep() {
 	Eigen::VectorXf RHS = this->globF - this->globK * this->dVec; // ... and dTilde would be used here
 	// Solve Ax = b using conjugate gradient
 	// Time derivative should not change too much between time steps so we can use previous v to initialize conjugate gradient. 
-	this->vVec = this->cgSolver.solveWithGuess(RHS,this->vVec);
+	this->vVec = this->cgSolver.solveWithGuess(RHS, this->vVec);
 	//this->vVec = this->cgSolver.solve(RHS);
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Issue With Solver" << std::endl;
@@ -220,7 +226,7 @@ void FEM_Simulator::buildMatrices()
 	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
 	this->Kconv = Eigen::SparseMatrix<float>(nNodes - this->dirichletNodes.size(), nNodes - this->dirichletNodes.size());
 	this->Kconv.reserve(Eigen::VectorXi::Constant(nNodes - this->dirichletNodes.size(), pow((this->Nn1d * 2 - 1), 3))); // at most 27 non-zero entries per column
-	
+
 	int Nne = pow(this->Nn1d, 3); // number of nodes in an element is equal to the number of nodes in a single dimension cubed
 	
 	/*std::vector<Eigen::Triplet<float>> Ktriplets;
@@ -330,6 +336,7 @@ void FEM_Simulator::buildMatrices()
 	this->M.makeCompressed();
 	this->FirrMat.makeCompressed();
 
+
 	if (!this->silentMode) {
 		auto stopTime = std::chrono::steady_clock::now();
 		auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - startTime);
@@ -418,15 +425,21 @@ void FEM_Simulator::createFirr()
 	}
 }
 
-void FEM_Simulator::applyParameters()
+void FEM_Simulator::applyParametersCPU()
 {
-	/* Here we assume constant tissue properties throughout the mesh. This allows us to
+	/* 
+	Applying MUA, TC, HTC, VHC, and the fluence rate to the matrices we built on the CPU.
+	Here we assume constant tissue properties throughout the mesh. This allows us to
 	multiply by tissue specific properties after the element construction, which means we can change
 	tissue properties without having to reconstruct the matrices
 	*/
+	// auto startTime = std::chrono::steady_clock::now();
+	
 	// Apply parameter specific multiplication for each global matrix.
 	this->globK = this->Kint * this->TC + this->Kconv * this->HTC;
 	this->globM = this->M * this->VHC; // M Doesn't have any additions so we just multiply it by the constant
+	this->globK.makeCompressed();
+	this->globM.makeCompressed();
 	Eigen::VectorXf Firr;
 	if (elemNFR) { // Using Element based NFR so we just use assignment
 		Firr = this->FirrElem;
@@ -435,12 +448,18 @@ void FEM_Simulator::applyParameters()
 		Firr = this->FirrMat * this->FluenceRate;
 	}
 	this->globF = this->MUA * Firr + this->Fconv * this->HTC + this->Fq + this->Fk * this->TC;
+	// startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
 }
 
-void FEM_Simulator::initializeTimeIntegration()
+void FEM_Simulator::initializeTimeIntegrationCPU()
 {
+	/* 
+	Creates the d and v vectors used for time integration. V vector is created by solving the 
+	linear system M*v = (F-K*d). Then the Eigen conjugate gradient solver is initialized with the 
+	left-hand-side of the system (M + alpha*dt*K)*v = (F - K*d). 
+	*/
 	auto startTime = std::chrono::steady_clock::now();
-	this->applyParameters();
+	this->applyParametersCPU();
 	this->parameterUpdate = false;
 
 	int nNodes = this->nodesPerAxis[0] * this->nodesPerAxis[1] * this->nodesPerAxis[2];
@@ -459,7 +478,7 @@ void FEM_Simulator::initializeTimeIntegration()
 		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 		initSolver.compute(this->globM);
 		Eigen::VectorXf RHSinit = (this->globF) - this->globK * this->dVec;
-		vVec = initSolver.solve(RHSinit);
+		this->vVec = initSolver.solve(RHSinit);
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
@@ -468,6 +487,8 @@ void FEM_Simulator::initializeTimeIntegration()
 	// Prepare solver for future iterations
 	this->LHS = this->globM + this->alpha * this->deltaT * this->globK;
 	this->LHS.makeCompressed();
+	startTime = this->printDuration("LHS created: ", startTime);
+	
 	// These two steps form the cgSolver.compute() function. By calling them separately, we 
 	// only ever need to call factorize when the tissue properties change.
 	this->cgSolver.analyzePattern(this->LHS);
@@ -475,7 +496,8 @@ void FEM_Simulator::initializeTimeIntegration()
 	if (this->cgSolver.info() != Eigen::Success) {
 		std::cout << "Decomposition Failed" << std::endl;
 	}
-	startTime = this->printDuration("Initial Matrix Factorization Completed in ", startTime);
+	startTime = this->printDuration("Initial Matrix Factorization Completed: ", startTime);
+	
 }
 
 void FEM_Simulator::initializeModel()
@@ -485,12 +507,13 @@ void FEM_Simulator::initializeModel()
 	conditions, changing the layers in the mesh, etc. This function also needs to be called if alpha or the time step 
 	changes. 
 	
-	This function does not need to be called if we are only changing the irradiance, or the value of tissue properties
-	like */
+	This function does not need to be called if we are only changing the fluenceRate, or the value of tissue properties
+	*/
 	this->buildMatrices();
 	this->fluenceUpdate = false;
 
-	this->initializeTimeIntegration();
+	this->initializeTimeIntegrationCPU();
+	
 	// We are now ready to call single step
 }
 
@@ -531,13 +554,7 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx) {
 			// convert subscript to index
 			int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
 			// add temperature contribution of node
-			if (this->nodeMap[globalNode] >= 0) {//non-dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * this->dVec(this->nodeMap[globalNode]);
-			}
-			else { // dirichlet node
-				tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);
-			}
-			
+			tempValue += this->calculateNA(xi, Ai) * this->Temp(globalNode);			
 		}
 		this->sensorTemps[s][timeIdx] = tempValue;
 	}
@@ -1143,46 +1160,48 @@ std::vector<std::vector<std::vector<float>>> FEM_Simulator::getTemp()
 	return TempOut;
 }
 
-void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> FluenceRate)
-{
-	this->FluenceRate = Eigen::VectorXf::Zero(FluenceRate.size() * FluenceRate[0].size() * FluenceRate[0][0].size());
-	// Convert nested vectors into a single column Eigen Vector. 
-	for (int i = 0; i < FluenceRate.size(); i++) // associated with x and is columns of matlab matrix
-	{
-		for (int j = 0; j < FluenceRate[0].size(); j++) // associated with y and is rows of matlab matrix
-		{
-			for (int k = 0; k < FluenceRate[0][0].size(); k++) // associated with z and is depth of matlab matrix
-			{
-				this->FluenceRate(i + j * FluenceRate.size() + k * FluenceRate.size() * FluenceRate[0].size()) = FluenceRate[i][j][k];
-			}
-		}
-	}
-
-	if ((FluenceRate.size() == this->elementsPerAxis[0]) && (FluenceRate[0].size() == this->elementsPerAxis[1]) && (FluenceRate[0][0].size() == this->elementsPerAxis[2])) {
-		this->elemNFR = true;
-	}
-	else if ((FluenceRate.size() == this->nodesPerAxis[0]) && (FluenceRate[0].size() == this->nodesPerAxis[1]) && (FluenceRate[0][0].size() == this->nodesPerAxis[2])) {
+void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
+{	/* 
+	Main function to set the fluence rate of the laser. All other setFluenceRate() functions will call this one in the end. 
+	*/
+	this->FluenceRate = FluenceRate;
+	
+	// -- Checking size of vector to make sure it is appropriate
+	if (this->FluenceRate.size() == (nodesPerAxis[0]*nodesPerAxis[1]*nodesPerAxis[2])){
 		this->elemNFR = false;
-	}
-	else {
+	} else if (this->FluenceRate.size() == (elementsPerAxis[0]*elementsPerAxis[1]*elementsPerAxis[2])){
+		this->elemNFR = true;
+	} else {
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
 	}
-
+	// -- setting flag that fluence has been updated
 	this->fluenceUpdate = true;
 }
 
-void FEM_Simulator::setFluenceRate(Eigen::VectorXf& FluenceRate)
+void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> inputFluence)
 {
-	this->FluenceRate = FluenceRate;
-	//TODO Check for element or nodal FluenceRate;
-	this->elemNFR = false;
-	this->fluenceUpdate = true;
+	int xNumNodes = inputFluence.size();
+	int yNumNodes = inputFluence[0].size();
+	int zNumNodes = inputFluence[0][0].size();
+	Eigen::VectorXf FR = Eigen::VectorXf::Zero(xNumNodes * yNumNodes * zNumNodes);
+	// Convert nested vectors into a single column Eigen Vector. 
+	for (int i = 0; i < xNumNodes; i++) // associated with x and is columns of matlab matrix
+	{
+		for (int j = 0; j < yNumNodes; j++) // associated with y and is rows of matlab matrix
+		{
+			for (int k = 0; k < zNumNodes; k++) // associated with z and is depth of matlab matrix
+			{
+				FR(i + j * xNumNodes + k * xNumNodes * yNumNodes) = inputFluence[i][j][k];
+			}
+		}
+	}
+	this->setFluenceRate(FR);
 }
 
 void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float beamWaist)
 {
-	this->FluenceRate = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
+	Eigen::VectorXf FR = Eigen::VectorXf::Zero(this->nodesPerAxis[0]* this->nodesPerAxis[1]* this->nodesPerAxis[2]);
 	
 	// Precompute constants
 	const float pi = 3.14159265358979323846f;
@@ -1221,14 +1240,14 @@ void FEM_Simulator::setFluenceRate(float laserPose[6], float laserPower, float b
 				float irr = 2.0f * laserPower / (pi * width2) * std::exp(exponent);
 
 				int index = i + j * nx + k * nx * ny;
-				this->FluenceRate(index) = irr;
+				FR(index) = irr;
 
 				z += (k < this->elemsInLayer) ? zStep1 : zStep2;
 			}
 		}
 	}
 
-	this->fluenceUpdate = true;
+	this->setFluenceRate(FR);
 }
 
 void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float laserPower, float beamWaist)
@@ -1238,7 +1257,6 @@ void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float lase
 		laserPoseVec[i] = laserPose(i);
 	}
 	this->setFluenceRate(laserPoseVec, laserPower, beamWaist);
-	this->fluenceUpdate = true;
 }
 
 void FEM_Simulator::setDeltaT(float deltaT)

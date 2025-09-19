@@ -647,11 +647,19 @@ TEST_F(BaseSim, CompareLinearAndQuadratic1) {
 			}
 		}
 	}
+
 	float tissueSize[3] = { 1,1,1 };
 	float TC = 1.0f;
 	int BC[6] = { 0,0,2,2,2,2 };
-	FEM_Simulator* femSimLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
-	FEM_Simulator* femSimQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
+
+	// already defined in BaseSim so we need to clear and reinstatiate
+	delete femSimLin;
+	femSimLin = nullptr;
+	delete femSimQuad;
+	femSimQuad = nullptr;
+
+	femSimLin = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 2);
+	femSimQuad = new FEM_Simulator(Temp, tissueSize, TC, 1.0f, 1.0f, 1.0f, 3);
 
 	femSimLin->deltaT = 0.05f;
 	femSimLin->setBoundaryConditions(BC);
@@ -738,7 +746,6 @@ TEST_F(BaseSim, testSetFluenceRate) {
 TEST(SecondaryTest, testPositionToElement2) {
 
 	// Multi Layer Test
-
 	int nodesPerAxis[3] = {21,21,20};
 	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
@@ -798,12 +805,13 @@ TEST(SecondaryTest, testPositionToElement2) {
 		}
 	}
 
+	delete femSimLin;
+	femSimLin = nullptr;
 }
 
 TEST(SecondaryTest, testSetSensorTemps) {
 
 	// Multi Layer Test
-
 	int nodesPerAxis[3] = { 21,21,20 };
 	std::vector<std::vector<std::vector<float>>> Temp(nodesPerAxis[0], std::vector<std::vector<float>>(nodesPerAxis[1], std::vector<float>(nodesPerAxis[2])));
 	for (int i = 0; i < nodesPerAxis[0]; i++) {
@@ -850,4 +858,6 @@ TEST(SecondaryTest, testSetSensorTemps) {
 		ASSERT_FLOAT_EQ(expectedSensorTemp[i], femSimLin->sensorTemps[i][0]);
 	}
 
+	delete femSimLin;
+	femSimLin = nullptr;
 }

@@ -1,6 +1,7 @@
-clc; clear; close all;
+clc; clear; close all;  
 
 clear MEX_Heat_Simulation
+clear MEX_Heat_Simulation_MultiStep
 %% Initialization of parameters
 tissueSize = [2.0,2.0,1.0];
 nodesPerAxis = [41,41,50];
@@ -16,10 +17,11 @@ TC = 0.0062;
 VHC = 4.3;
 HTC = 0.05;
 useAllCPUs = false;
+useGPU = true;
 silentMode = true;
 Nn1d = 2;
 layerInfo = [0.05,30];
-sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
+sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1];
 
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
@@ -32,7 +34,7 @@ fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
 BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
-Flux = 0;
+flux = 0;
 
 %% Timing Tests
 nCases = 5;
@@ -48,8 +50,8 @@ TPrediction = T0;
 for i = 1:numTimeSteps
     tic
     [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+        deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+        useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
     CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
     durationVec(caseNum,i) = toc;
 end
@@ -62,8 +64,8 @@ TPrediction = T0;
 for i = 1:numTimeSteps
     tic
     [TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
-            silentMode,layerInfo,Nn1d,alpha,createMatrices);
+        deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+        useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
     createMatrices = false; % after first call it will always be false
     CaseSensorTemps(caseNum,:,i+1) = sensorTemps(:,end);
     durationVec(caseNum,i) = toc;
@@ -75,9 +77,9 @@ createMatrices = true;
 tFinal = numTimeSteps*deltaT;
 TPrediction = T0;
 tic
-[TPrediction,sensorTemps] = MEX_Heat_Simulation(TPrediction,fluenceRate,tissueSize',tFinal,...
-        deltaT,tissueProperties,BC,Flux,ambientTemp,sensorPositions,useAllCPUs,...
-        silentMode,layerInfo,Nn1d,alpha,createMatrices);
+[TPrediction,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+    deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
+    useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
 CaseSensorTemps(caseNum,:,:) = sensorTemps;
 durationVec(caseNum,end) = toc;
 fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
@@ -88,16 +90,14 @@ fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
 % faster than anything calling MEX multiple times. 
 
 caseNum = 4;
-createMatrices = true;
-time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+time = 0:deltaT:deltaT*numTimeSteps; % this will be numTimeSteps + 1 long
 laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
 laserPower = ones(1,length(time));
-TPrediction = T0;
 tic
 [~,sensorTemps] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
-    tissueProperties,BC,Flux,ambientTemp,sensorPositions,w0,time,...
-    laserPose,laserPower,useAllCPUs,...
-    silentMode,layerInfo,Nn1d,alpha);
+    tissueProperties,BC,flux,ambientTemp,sensorPositions,w0,time,...
+    laserPose,laserPower,layerInfo,useAllCPUs,useGPU,alpha,...
+    silentMode,Nn1d);
 CaseSensorTemps(caseNum,:,:) = sensorTemps;
 durationVec(caseNum,end) = toc;
 fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
@@ -109,19 +109,20 @@ fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
 
 caseNum = 5;
 createMatrices = true;
-time = 0:deltaT:deltaT*100; % this will be numTimeSteps + 1 long
+time = 0:deltaT:deltaT*numTimeSteps; % this will be numTimeSteps + 1 long
 laserPose = [0;0;-focalPoint;0;0;0].*ones(6,length(time));
 laserPower = ones(1,length(time));
 TPrediction = T0;
 alpha = 1;
 tic
 [~,sensorTemps] = MEX_Heat_Simulation_MultiStep(T0,tissueSize',...
-    tissueProperties,BC,Flux,ambientTemp,sensorPositions,w0,time,...
-    laserPose,laserPower,useAllCPUs,...
-    silentMode,layerInfo,Nn1d,alpha);
+    tissueProperties,BC,flux,ambientTemp,sensorPositions,w0,time,...
+    laserPose,laserPower,layerInfo,useAllCPUs,useGPU,alpha,...
+    silentMode,Nn1d);
 CaseSensorTemps(caseNum,:,:) = sensorTemps;
 durationVec(caseNum,end) = toc;
 fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(durationVec(caseNum,:)));
+
 
 %% Plot Sensor Temps to confirm the different methods produce the same result
 
