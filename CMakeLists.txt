@@ -8,8 +8,11 @@ option(BUILD_TESTING  "Build unit‑test runner"            ON)
 option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" ON)
 option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" OFF)
 set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files are")
+# Local install folder
+set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/HeatSimulationInstall" CACHE PATH "Local install prefix" FORCE)
 
 message(STATUS "AMGX_ROOT: ${AMGX_ROOT}")
+message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -87,7 +90,7 @@ target_compile_options(HeatSimulation PUBLIC -fPIC)
 target_include_directories(HeatSimulation
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<INSTALL_INTERFACE:include> # because of local install
         $<$<BOOL:${USE_CUDA}>:${AMGX_INCLUDE_DIR}>
 )
 
@@ -232,28 +235,38 @@ endif()
 # ──────────────────────────────────────────────────────────────
 # Install rules: library + headers (so other projects can `find_package`)
 # ──────────────────────────────────────────────────────────────
-install(TARGETS HeatSimulation
-        EXPORT HeatSimulationTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+
+# Install headers
+install(DIRECTORY include/ DESTINATION include)
+
+install(TARGETS HeatSimulation
+        EXPORT HeatSimulationTargets     # <-- this line creates the export set
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
+)
+
+# ────────────── Export targets for find_package ──────────────
+# This generates the Targets.cmake file
 install(EXPORT HeatSimulationTargets
         FILE HeatSimulationTargets.cmake
         NAMESPACE HeatSimulation::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HeatSimulation)
+        DESTINATION lib/cmake/HeatSimulation
+)
 
-# Generate and install the config file
+# Generate the config file
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeatSimulationConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/cmake/HeatSimulationConfig.cmake"
-    INSTALL_DESTINATION lib/cmake/HeatSimulation
+    INSTALL_DESTINATION "lib/cmake/HeatSimulation" # relative to install prefix
 )
 
+# Install the config file
 install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/cmake/HeatSimulationConfig.cmake"
-    DESTINATION lib/cmake/HeatSimulation
+    DESTINATION "lib/cmake/HeatSimulation"
 )
 
 
