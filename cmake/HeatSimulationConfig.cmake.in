@@ -1,0 +1,20 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Store whether CUDA support was enabled when HeatSimulation was built
+set(HEATSIMULATION_USE_CUDA @USE_CUDA@)
+
+if(HEATSIMULATION_USE_CUDA)
+  find_dependency(CUDAToolkit REQUIRED) 
+  # If HeatSimulation was compiled with AmgX support
+  # Downstream projects don’t need to call find_path/find_library
+  # because your exported target should already have AMGX linked in.
+  # Just note it here if needed.
+  set(HeatSimulation_AMGX_LIB_DIR "@AMGX_ROOT@/lib")
+  
+endif()
+
+
+
+include("${CMAKE_CURRENT_LIST_DIR}/HeatSimulationTargets.cmake")

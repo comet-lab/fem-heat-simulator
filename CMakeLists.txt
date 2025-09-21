@@ -12,6 +12,7 @@ set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files 
 message(STATUS "AMGX_ROOT: ${AMGX_ROOT}")
 
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 set(CMAKE_CXX_STANDARD 17)
 
 # ──────────────────────────────────────────────────────────────
@@ -92,7 +93,12 @@ target_include_directories(HeatSimulation
 
 # Compile definitions
 if(USE_CUDA)
-    # set the #define USE_CUDA macro
+    # #set paths so downstream users can find amgx
+    # set_target_properties(HeatSimulation PROPERTIES
+    #     INSTALL_RPATH "${AMGX_ROOT}/lib"
+    #     BUILD_RPATH   "${AMGX_ROOT}/lib"
+    # )
+    # set the #define USE_CUDA macro.
     target_compile_definitions(HeatSimulation PUBLIC 
         USE_CUDA 
         EIGEN_NO_CUDA # disable eigen __host__ __device__ keywords which produce warnings
@@ -237,3 +243,17 @@ install(EXPORT HeatSimulationTargets
         FILE HeatSimulationTargets.cmake
         NAMESPACE HeatSimulation::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/HeatSimulation)
+
+# Generate and install the config file
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeatSimulationConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/HeatSimulationConfig.cmake"
+    INSTALL_DESTINATION lib/cmake/HeatSimulation
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/HeatSimulationConfig.cmake"
+    DESTINATION lib/cmake/HeatSimulation
+)
+
+
