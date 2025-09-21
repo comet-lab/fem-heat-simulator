@@ -247,12 +247,12 @@ install(EXPORT HeatSimulationTargets
 # Generate and install the config file
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/HeatSimulationConfig.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/HeatSimulationConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/HeatSimulationConfig.cmake"
     INSTALL_DESTINATION lib/cmake/HeatSimulation
 )
 
 install(FILES
-    "${CMAKE_CURRENT_BINARY_DIR}/HeatSimulationConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake/HeatSimulationConfig.cmake"
     DESTINATION lib/cmake/HeatSimulation
 )
 
