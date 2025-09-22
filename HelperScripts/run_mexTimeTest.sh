@@ -13,9 +13,7 @@
 # ------------------------------
 # Paths to GCC 12 (Spack)
 # ------------------------------
-GCC12_PATH=/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63
-export LD_LIBRARY_PATH="$GCC12_PATH/lib64:$LD_LIBRARY_PATH"
-export PATH="$GCC12_PATH/bin:$PATH"
+GCC12_LIB=/cm/shared/spack/opt/spack/linux-ubuntu20.04-x86_64/gcc-9.4.0/gcc-12.1.0-i6yk33fh72z4rymfmydkenietcbpzz63/lib64/libstdc++.so.6
 
 # ------------------------------
 # Load modules
@@ -26,5 +24,6 @@ module load cuda/12.6.3
 # ------------------------------
 # Run MATLAB with LD_PRELOAD to force GCC 12 libstdc++
 # ------------------------------
-LD_PRELOAD=$GCC12_PATH/lib64/libstdc++.so.6 matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
  "addpath('/home/nepacheco/Repositories/fem-heat-simulator/'); run('MexTesting/MultiStepTest.m'); exit;"
+
