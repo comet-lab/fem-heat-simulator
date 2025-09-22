@@ -38,7 +38,7 @@ private:
     int Nn1d = 2;
     std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
 #ifdef USE_CUDA
-    GPUTimeIntegrator gpuHandle;
+    GPUTimeIntegrator* gpuHandle = nullptr;
 #endif
         
 
@@ -51,6 +51,8 @@ public:
 
     ~MexFunction()
     {
+        delete gpuHandle;
+        gpuHandle = nullptr;
         return;
     }
     /* Helper function to convert a matlab array to a std vector*/
@@ -254,6 +256,8 @@ public:
         stream << "MEX: OPEMMP Enabled" << std::endl;
         displayOnMATLAB(stream);
         if (useAllCPUs) { //useAllCPUs is true
+            stream << "MEX: Using all CPUs" << std::endl;
+            displayOnMATLAB(stream);
             Eigen::setNbThreads(omp_get_num_procs()/2);
         }
 #endif
@@ -273,6 +277,8 @@ public:
                 else
 #endif  
                 {
+                    stream << "MEX: GPU Disabled " << std::endl;
+                    displayOnMATLAB(stream);
                     this->simulator.initializeModel();    
                 }
                 /*stream << "Global matrices created" << std::endl;
@@ -291,10 +297,16 @@ public:
         try { //
 #ifdef USE_CUDA
             if (this->useGPU)
+            {
+                stream << "MEX: GPU time step " << std::endl;
+                displayOnMATLAB(stream);
                 multiStepGPU(simDuration);
+            }
             else
 #endif  
             {
+                stream << "MEX: CPU time step " << std::endl;
+                displayOnMATLAB(stream);
                 this->simulator.multiStep(simDuration);
             }
         }
@@ -460,11 +472,14 @@ public:
 
 #ifdef USE_CUDA
     void initializeGPU(){
+        if (!gpuHandle){
+            gpuHandle = new GPUTimeIntegrator();
+        }
         simulator.buildMatrices();
-        gpuHandle.setAlpha(simulator.alpha);
-        gpuHandle.setDeltaT(simulator.deltaT);
-        gpuHandle.setModel(&simulator);
-        gpuHandle.initializeWithModel();
+        gpuHandle->setAlpha(simulator.alpha);
+        gpuHandle->setDeltaT(simulator.deltaT);
+        gpuHandle->setModel(&simulator);
+        gpuHandle->initializeWithModel();
     }
 
     void multiStepGPU(float totalTime){
@@ -473,7 +488,7 @@ public:
         simulator.initializeSensorTemps(numSteps);
         simulator.updateTemperatureSensors(0);
         for (int i = 1; i <= numSteps; i++) {
-            gpuHandle.singleStepWithUpdate();
+            gpuHandle->singleStepWithUpdate();
             simulator.updateTemperatureSensors(i);
         }
     }

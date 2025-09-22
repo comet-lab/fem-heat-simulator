@@ -32,7 +32,7 @@ private:
     int Nn1d = 2;
     std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
 #ifdef USE_CUDA
-    GPUTimeIntegrator gpuHandle;
+    GPUTimeIntegrator* gpuHandle = nullptr;
 #endif
 
 public:
@@ -44,6 +44,8 @@ public:
 
     ~MexFunction()
     {
+        delete gpuHandle;
+        gpuHandle = nullptr;
     }
 
     /* Helper function to convert a matlab array to a std vector*/
@@ -334,7 +336,7 @@ public:
                 this->simulator.setFluenceRate(laserPose.col(t), laserPower[t], beamWaist);
 #ifdef USE_CUDA
                 if (this->useGPU)
-                    this->gpuHandle.singleStepWithUpdate();
+                    this->gpuHandle->singleStepWithUpdate();
                 else
 #endif
                 {
@@ -479,12 +481,15 @@ public:
 
 #ifdef USE_CUDA
     void initializeGPU(){
+        if (!gpuHandle){
+            gpuHandle = new GPUTimeIntegrator();
+        }
         simulator.buildMatrices();
-        gpuHandle.setAlpha(simulator.alpha);
-        gpuHandle.setDeltaT(simulator.deltaT);
-        gpuHandle.setModel(&simulator);
+        gpuHandle->setAlpha(simulator.alpha);
+        gpuHandle->setDeltaT(simulator.deltaT);
+        gpuHandle->setModel(&simulator);
         std::cout << "Model Assigned" << std::endl;
-        gpuHandle.initializeWithModel();
+        gpuHandle->initializeWithModel();
     }
 #endif 
 };
