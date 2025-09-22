@@ -11,6 +11,6 @@
 #SBATCH --gres=gpu:1
 
 export OMP_NUM_THREADS=10
-module load cuda/12.8.0
+module load cuda/12.6.3
 
 ./build/main
