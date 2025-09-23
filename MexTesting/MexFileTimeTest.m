@@ -3,11 +3,17 @@ clc; clear; close all;
 clear MEX_Heat_Simulation
 clear MEX_Heat_Simulation_MultiStep
 %% Initialization of parameters
-tissueSize = [2.0,2.0,1.0];
-nodesPerAxis = [41,41,50];
+useAllCPUs = false;
+useGPU = true;
+silentMode = true;
+
+numTimeSteps = 20;
+deltaT = 0.05;
+
+tissueSize = [5.0,5.0,1.0];
+nodesPerAxis = [101,101,100];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
-deltaT = 0.05;
 alpha = 1/2;
 tFinal = single(0.05);
 w0 = 0.0168;
@@ -16,9 +22,6 @@ MUA = 200;
 TC = 0.0062;
 VHC = 4.3;
 HTC = 0.05;
-useAllCPUs = false;
-useGPU = true;
-silentMode = true;
 Nn1d = 2;
 layerInfo = [0.05,30];
 sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1];
@@ -38,7 +41,7 @@ flux = 0;
 
 %% Timing Tests
 nCases = 5;
-numTimeSteps = 100;
+
 
 durationVec = zeros(nCases,numTimeSteps);
 CaseSensorTemps = ones(nCases,size(sensorPositions,1),numTimeSteps+1)*20;

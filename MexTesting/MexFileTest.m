@@ -1,25 +1,27 @@
-clc; clear; close all;
+clear; close all;
 %% Initialization of parameters
-tissueSize = [2.0,2.0,1.0]; % [cm, cm, cm]
-nodesPerAxis = [41,41,50];
-ambientTemp = 24; % ambient temp
-T0 = single(20*ones(nodesPerAxis)); % initial temp [deg C]
+useAllCPUs = true; % multithreading enabled
+useGPU = false; % enable gpu use
+silentMode = false; % print statements off
+
 deltaT = 0.05; % Time Step for integration % [s]
-alpha = 1/2; % implicit percentage of time integration (0 - forward, 1/2 - crank-nicolson, 1 - backward)
-tFinal = single(1.0); % final duration of simulation [s]
-w0 = 0.0168; % beam Waist [cm]
-focalPoint = 35; % distance from waist to target [cm]
+simDuration = single(1.0); % final duration of simulation [s]
+
+tissueSize = [5.0,5.0,1.0]; % [cm, cm, cm]
+nodesPerAxis = [101,101,100];
 MUA = 200; % absorption coefficient [cm^-1]
 TC = 0.0062; % thermal conductivity [W/K cm]
 VHC = 4.3; % volumetric heat capacity [J/K cm^3]
 HTC = 0.05; % heat transfer coefficient [W/K cm^2]
-useAllCPUs = false; % multithreading enabled
-useGPU = true; % enable gpu use
-silentMode = false; % print statements off
+ambientTemp = 24; % ambient temp
+T0 = single(20*ones(nodesPerAxis)); % initial temp [deg C]
+alpha = 0.5; % implicit percentage of time integration (0 - forward, 1/2 - crank-nicolson, 1 - backward)
+w0 = 0.0168; % beam Waist [cm]
+focalPoint = 35; % distance from waist to target [cm]
 Nn1d = 2; % nodes per axis in a single element
 layerInfo = [0.05,30]; % layer height, layer elements
 sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
-BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
+BC = int32([2,0,2,2,2,2]'); %0: HeatSink, 1: Flux, 2: Convection
 flux = 0;
 
 
@@ -33,24 +35,24 @@ z = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(la
 fluenceRate = single(I(X,Y,Z,MUA));
 tissueProperties = [MUA,TC,VHC,HTC]';
 
-createMatrices = false; % whether to always recreate all the matrices. 
+createMatrices = true; % whether to always recreate all the matrices. 
 %% Running MEX File
 
 tic
 if ~silentMode
     fprintf("\n");
 end
-[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
+[Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',simDuration,...
     deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
     useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
 toc
-
+clear mex
 %% Plot Sensor Temps over time
 figure(1);
 clf;
 hold on;
 for ss = 1:size(sensorPositions,1)
-    plot(0:deltaT:tFinal,sensorTemps(ss,:),'LineWidth',2,'DisplayName',...
+    plot(0:deltaT:simDuration,sensorTemps(ss,:),'LineWidth',2,'DisplayName',...
         sprintf("(%g,%g,%g)",sensorPositions(ss,:)));
 end
 hold off
