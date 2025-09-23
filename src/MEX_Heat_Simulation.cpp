@@ -51,8 +51,10 @@ public:
 
     ~MexFunction()
     {
+        #ifdef USE_CUDA
         delete gpuHandle;
         gpuHandle = nullptr;
+        #endif
         return;
     }
     /* Helper function to convert a matlab array to a std vector*/
