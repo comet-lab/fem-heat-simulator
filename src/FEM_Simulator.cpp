@@ -109,6 +109,7 @@ void FEM_Simulator::multiStep(float duration) {
 	this->updateTemperatureSensors(0);
 	if (!this->silentMode) {
 		std::cout << "Number of Steps: " << numSteps << std::endl;
+		std::cout << "MultiStep(): Number of threads " << Eigen::nbThreads() << std::endl;
 	}
 
 	for (int t = 1; t <= numSteps; t++) {
