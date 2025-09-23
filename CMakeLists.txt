@@ -78,67 +78,75 @@ if(USE_CUDA)
     )
 endif()
 
-# Create the library with CUDA support
-add_library(HeatSimulation SHARED ${HEATSIM_SRC} ${HEATSIM_HEADERS})
-add_library(HeatSimulation::HeatSimulation ALIAS HeatSimulation)
-set_target_properties(HeatSimulation PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
-# Enable PIC
-target_compile_options(HeatSimulation PUBLIC -fPIC)
+# ──────────────────────────────
+# STATIC LIBRARY
+# ──────────────────────────────
+add_library(HeatSimulationStatic STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
+add_library(HeatSimulation::Static ALIAS HeatSimulationStatic)
+set_target_properties(HeatSimulationStatic PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Include directories
-target_include_directories(HeatSimulation
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include> # because of local install
-        $<$<BOOL:${USE_CUDA}>:${AMGX_INCLUDE_DIR}>
+# ──────────────────────────────
+# SHARED LIBRARY
+# ──────────────────────────────
+add_library(HeatSimulationShared SHARED ${HEATSIM_SRC} ${HEATSIM_HEADERS})
+add_library(HeatSimulation::Shared ALIAS HeatSimulationShared)
+set_target_properties(HeatSimulationShared PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+# Common include dirs
+target_include_directories(HeatSimulationStatic PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    $<$<BOOL:${USE_CUDA}>:${AMGX_INCLUDE_DIR}>
+)
+target_include_directories(HeatSimulationShared PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    $<$<BOOL:${USE_CUDA}>:${AMGX_INCLUDE_DIR}>
 )
 
-# Compile definitions
+# Common compile definitions
 if(USE_CUDA)
-    # #set paths so downstream users can find amgx
-    # set_target_properties(HeatSimulation PROPERTIES
-    #     INSTALL_RPATH "${AMGX_ROOT}/lib"
-    #     BUILD_RPATH   "${AMGX_ROOT}/lib"
-    # )
-    # set the #define USE_CUDA macro.
-    target_compile_definitions(HeatSimulation PUBLIC 
-        USE_CUDA 
-        EIGEN_NO_CUDA # disable eigen __host__ __device__ keywords which produce warnings
-        AMGX_CONFIG_DIR="${CMAKE_SOURCE_DIR}") # so that we can find the amgx_config.txt file
+    foreach(lib HeatSimulationStatic HeatSimulationShared)
+        target_compile_definitions(${lib} PUBLIC 
+            USE_CUDA
+            EIGEN_NO_CUDA
+            AMGX_CONFIG_DIR="${CMAKE_SOURCE_DIR}")
+    endforeach()
 endif()
 
-# Libraries
+# Common libraries
 set(HEATSIM_LIBS
     Eigen3::Eigen
 )
-
 if(USE_CUDA)
     list(APPEND HEATSIM_LIBS
-        CUDA::cudart    
-        ${AMGX_LIBRARY}    
+        CUDA::cudart
+        ${AMGX_LIBRARY}
         CUDA::cusparse
         CUDA::cusolver
-        CUDA::cublas    
+        CUDA::cublas
         dl
     )
 endif()
-target_link_libraries(HeatSimulation PUBLIC ${HEATSIM_LIBS})
 
-# Enable OpenMP
-enable_openmp(HeatSimulation)
+target_link_libraries(HeatSimulationStatic PUBLIC ${HEATSIM_LIBS})
+target_link_libraries(HeatSimulationShared PUBLIC ${HEATSIM_LIBS})
 
-# Set CUDA standard explicitly (optional but recommended)
-set_target_properties(HeatSimulation PROPERTIES
-    CUDA_STANDARD 17
-    CUDA_STANDARD_REQUIRED ON
-)
+# Enable OpenMP for both
+enable_openmp(HeatSimulationStatic)
+enable_openmp(HeatSimulationShared)
+
+# CUDA standard
+set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+set_target_properties(HeatSimulationShared PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main
 # ──────────────────────────────────────────────────────────────
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE HeatSimulation::HeatSimulation)
+target_link_libraries(main PRIVATE HeatSimulation::Shared)
 
 # ──────────────────────────────────────────────────────────────
 # Unit tests (GoogleTest via FetchContent)
@@ -161,7 +169,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(FEM_Unit_Tests
         PRIVATE
-            HeatSimulation::HeatSimulation
+            HeatSimulation::Shared
             GTest::gtest_main
     )
 
@@ -173,7 +181,7 @@ if(BUILD_TESTING)
         )
         target_link_libraries(GPUSolver_Unit_Tests
             PRIVATE
-                HeatSimulation::HeatSimulation
+                HeatSimulation::Shared
                 GTest::gtest_main
         )
     endif()
@@ -195,7 +203,7 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
         matlab_add_mex(NAME MEX_Heat_Simulation
             SRC src/MEX_Heat_Simulation.cpp
         )
-        target_link_libraries(MEX_Heat_Simulation HeatSimulation::HeatSimulation)
+        target_link_libraries(MEX_Heat_Simulation HeatSimulation::Static)
 
         set_target_properties(MEX_Heat_Simulation PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -213,7 +221,7 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
         matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
             SRC src/MEX_Heat_Simulation_MultiStep.cpp
         )
-        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::HeatSimulation)
+        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::Static)
 
         set_target_properties(MEX_Heat_Simulation_MultiStep PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -240,7 +248,7 @@ endif()
 # Install headers
 install(DIRECTORY include/ DESTINATION include)
 
-install(TARGETS HeatSimulation
+install(TARGETS HeatSimulationShared HeatSimulationStatic
         EXPORT HeatSimulationTargets     # <-- this line creates the export set
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
