@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=20g
 #SBATCH -J "TimeTest"
 #SBATCH -o /home/nepacheco/scratch/mexTimeTest-%j.log
@@ -10,9 +10,8 @@
 #SBATCH -t 2:00:00
 #SBATCH --gres=gpu:1
 
-$use_gpu=false
-$use_all_cpus=false
-$alpha=0.5
+filename="/scratch/${USER}/mexTimeTestResults.csv"
+echo $filename
 
 # ------------------------------
 # Paths to GCC 12 (Spack)
@@ -28,6 +27,38 @@ module load cuda/12.6.3
 # ------------------------------
 # Run MATLAB with LD_PRELOAD to force GCC 12 libstdc++
 # ------------------------------
+use_gpu=false
+use_all_cpus=false
+alpha=0.5
 LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
- "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha); exit;"
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
 
+use_gpu=true
+use_all_cpus=false
+alpha=0.5
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
+
+use_gpu=false
+use_all_cpus=true
+alpha=0.5
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
+
+use_gpu=false
+use_all_cpus=false
+alpha=1.0
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
+
+use_gpu=true
+use_all_cpus=false
+alpha=1.0
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
+
+use_gpu=false
+use_all_cpus=true
+alpha=1.0
+LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha,'filename','${filename}'); exit;"
