@@ -91,6 +91,7 @@ allSensorTemps(caseNum,:,:) = sensorTemps;
 allDurations(caseNum,end) = toc;
 fprintf("CASE %d: Total Time %0.3f s\n", caseNum, sum(allDurations(caseNum,:)));
 
+clear MEX_Heat_Simulation
 %% CASE 4 - Single call to MEX multiStep 
 % Note that the point of multistep is to handle changing inputs without
 % multiple calls to mex, so it may not be the fastest, but it will be

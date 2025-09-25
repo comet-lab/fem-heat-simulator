@@ -1,4 +1,4 @@
-clc; clear; close all;  
+clear; close all;  
 
 clear MEX_Heat_Simulation
 clear MEX_Heat_Simulation_MultiStep
@@ -6,6 +6,7 @@ clear MEX_Heat_Simulation_MultiStep
 useAllCPUs = false;
 useGPU = true;
 silentMode = true;
+alpha = 0.5;
 
 numTimeSteps = 20;
 deltaT = 0.05;
@@ -14,7 +15,6 @@ tissueSize = [5.0,5.0,1.0];
 nodesPerAxis = [101,101,100];
 ambientTemp = 24;
 T0 = single(20*ones(nodesPerAxis));
-alpha = 1/2;
 tFinal = single(0.05);
 w0 = 0.0168;
 focalPoint = 35;
@@ -40,8 +40,8 @@ BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
 flux = 0;
 
 %% Timing Tests
-useCPU = false; useGPU = true; alpha = 0.5;
-[CaseSensorTemps, durationVec] = runMexTimeTest(useCPU, useGPU, alpha);
+[CaseSensorTemps, durationVec] = runMexTimeTest(useAllCPUs, useGPU, alpha,...
+    silentMode=silentMode);
 nCases = size(CaseSensorTemps,1);
 
 %% Plot Sensor Temps to confirm the different methods produce the same result
