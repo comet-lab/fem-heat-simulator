@@ -490,7 +490,7 @@ public:
         gpuHandle->setAlpha(simulator.alpha);
         gpuHandle->setDeltaT(simulator.deltaT);
         gpuHandle->setModel(&simulator);
-        std::cout << "Model Assigned" << std::endl;
+//         std::cout << "Model Assigned" << std::endl;
         gpuHandle->initializeWithModel();
     }
 #endif 

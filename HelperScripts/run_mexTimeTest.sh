@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -n 1
-#SBATCH --cpus-per-task=1
+#SBATCH --cpus-per-task=10
 #SBATCH --mem=20g
 #SBATCH -J "TimeTest"
 #SBATCH -o /home/nepacheco/scratch/mexTimeTest-%j.log
@@ -9,6 +9,10 @@
 #SBATCH -p short
 #SBATCH -t 2:00:00
 #SBATCH --gres=gpu:1
+
+$use_gpu=false
+$use_all_cpus=false
+$alpha=0.5
 
 # ------------------------------
 # Paths to GCC 12 (Spack)
@@ -25,5 +29,5 @@ module load cuda/12.6.3
 # Run MATLAB with LD_PRELOAD to force GCC 12 libstdc++
 # ------------------------------
 LD_PRELOAD=$GCC12_LIB matlab -nodisplay -nosplash -noFigureWindows -nodesktop -batch \
- "addpath('/home/nepacheco/Repositories/fem-heat-simulator/'); run('MexTesting/MultiStepTest.m'); exit;"
+ "addpath(genpath('/home/nepacheco/Repositories/fem-heat-simulator/')); runMexTimeTest($use_all_cpus,$use_gpu,$alpha); exit;"
 
