@@ -116,7 +116,7 @@ public:
     *
     * 
     */
-    matlab::data::TypedArray<float> convertVectorToMatlabArray(const std::vector<std::vector<std::vector<float>>>& vec) {
+    matlab::data::TypedArray<float> convert3DVectorToMatlabArray(const std::vector<std::vector<std::vector<float>>>& vec) {
         // Get dimensions of the input vector
         size_t dim1 = vec.size();
         size_t dim2 = (dim1 > 0) ? vec[0].size() : 0;
@@ -135,6 +135,69 @@ public:
             }
         }
 
+        return matlabArray;
+    }
+
+    /** @brief Convert a 2D std::vector to a matlab array
+    *
+    * 
+    */
+    matlab::data::TypedArray<float> convert2DVectorToMatlabArray(const std::vector<std::vector<float>>& vec) {
+        // Get dimensions of the input vector
+        size_t dim1 = vec.size();
+        size_t dim2 = (dim1 > 0) ? vec[0].size() : 0;
+
+        matlab::data::ArrayFactory factory;
+        // Create MATLAB array with appropriate dimensions
+        matlab::data::TypedArray<float> matlabArray = factory.createArray<float>({ dim1, dim2 });
+
+        // Fill MATLAB array with vector data
+        for (size_t i = 0; i < dim1; ++i) {
+            for (size_t j = 0; j < dim2; ++j) {
+                matlabArray[i][j] = vec[i][j];
+            }
+        }
+
+        return matlabArray;
+    }
+
+    /** @brief Convert a 1D std::vector to a matlab array
+    *
+    * 
+    */
+    matlab::data::TypedArray<float> convert1DVectorToMatlabArray(const std::vector<float>& vec) {
+        // Get dimensions of the input vector
+        size_t dim1 = vec.size();
+
+        matlab::data::ArrayFactory factory;
+        // Create MATLAB array with appropriate dimensions
+        matlab::data::TypedArray<float> matlabArray = factory.createArray<float>({ 1, dim1 });
+        // Fill MATLAB array with vector data
+        for (size_t i = 0; i < dim1; ++i) {
+            matlabArray[0][i] = vec[i];
+        }
+
+        return matlabArray;
+    }
+
+        /** @brief Convert a matlab array to a Eigen::MatrixXf
+    *
+    *
+    */
+    matlab::data::TypedArray<float> convertEigenMatrixToMatlabArray(const Eigen::MatrixXf& matrix) {
+        
+        const size_t rows = matrix.rows();
+        const size_t cols = matrix.cols();
+
+        matlab::data::ArrayFactory factory;
+        // Create MATLAB array with appropriate dimensions
+        matlab::data::TypedArray<float> matlabArray = factory.createArray<float>({ rows, cols });
+        
+        for (size_t j = 0; j < cols; ++j) {
+            for (size_t i = 0; i < rows; ++i) {
+                matlabArray[i][j] = matrix(i, j);
+            }
+        }
         return matlabArray;
     }
 
@@ -324,12 +387,18 @@ public:
         }
         printDuration("MEX: Matrices Built -- ");
 
-        /* Now perform time stepping with singele steps */
+        int nodesPerAxis[3] = {this->simulator.nodesPerAxis[0], this->simulator.nodesPerAxis[1], this->simulator.nodesPerAxis[2]};
+        /* Initialize sensor data collection*/
         int numSteps = timeVec.size() - 1; // if time is of size 2, then we only have 1 step.
         this->simulator.initializeSensorTemps(numSteps);
         this->simulator.updateTemperatureSensors(0);
+        Eigen::MatrixXf surfaceTemps(nodesPerAxis[0]*nodesPerAxis[1],numSteps+1);
+        surfaceTemps.col(0) = this->simulator.Temp.head(nodesPerAxis[0] * nodesPerAxis[1]);
+        /* Now perform time stepping with singele steps */
         for (int t = 1; t <= numSteps; t++) {
             // we are simulating going from step t-1 to t. In the first case this is going from t[0] to t[1]. 
+            stream << "Step " << t << " of " << numSteps << std::endl;
+            displayOnMATLAB(stream);
             try {
                 this->simulator.deltaT = timeVec[t] - timeVec[t - 1]; // set deltaT
                 // fluence rate is set based on parameters at time = t. This is because for single step
@@ -346,6 +415,7 @@ public:
                 }                
                 
                 this->simulator.updateTemperatureSensors(t);
+                surfaceTemps.col(t) = this->simulator.Temp.head(nodesPerAxis[0] * nodesPerAxis[1]);
             }
             catch (const std::exception& e) {
                 stream << "MEX: Error in performTimeStepping() " << std::endl;
@@ -353,24 +423,23 @@ public:
                 displayError(e.what());
                 return;
             }
-            stream << "Step " << t << " of " << numSteps << std::endl;
-            displayOnMATLAB(stream);
         }
         printDuration("MEX: Time Stepping Complete -- ");
 
         // Have to convert the std::vector to a matlab array for output
         //display3DVector(this->simulator.Temp, "Final Temp: ");
         std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.getTemp();
-        matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
+        matlab::data::TypedArray<float> finalTemp = convert3DVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
-        matlab::data::ArrayFactory factory;
-        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator.sensorTemps.size(), this->simulator.sensorTemps[0].size()});
-        for (size_t i = 0; i < this->simulator.sensorTemps.size(); ++i) {
-            for (size_t j = 0; j < this->simulator.sensorTemps[i].size(); ++j) {
-                sensorTempsOutput[i][j] = this->simulator.sensorTemps[i][j];
-            }
-        }
+
+        matlab::data::TypedArray<float> sensorTempsOutput = convert2DVectorToMatlabArray(this->simulator.sensorTemps);
         outputs[1] = sensorTempsOutput;
+
+        if (outputs.size() > 2)
+        {
+            matlab::data::TypedArray<float> surfaceTempsOutput = convertEigenMatrixToMatlabArray(surfaceTemps);
+            outputs[2] = surfaceTempsOutput;
+        }
         
         printDuration("MEX: End of MEX function -- ");
     }
@@ -390,7 +459,7 @@ public:
                 "Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower, "
                 "(layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d)");
         }
-        if (outputs.size() > 2) {
+        if (outputs.size() > 3) {
             displayError("Too many outputs specified.");
         }
         if (outputs.size() < 2) {
