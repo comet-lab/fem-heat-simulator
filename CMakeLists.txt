@@ -17,6 +17,7 @@ message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 # ──────────────────────────────────────────────────────────────
 # Dependencies
@@ -138,8 +139,11 @@ enable_openmp(HeatSimulationStatic)
 enable_openmp(HeatSimulationShared)
 
 # CUDA standard
-set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+
+
 set_target_properties(HeatSimulationShared PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
+
 
 
 # ──────────────────────────────────────────────────────────────
@@ -169,7 +173,7 @@ if(BUILD_TESTING)
     )
     target_link_libraries(FEM_Unit_Tests
         PRIVATE
-            HeatSimulation::Shared
+            HeatSimulation::Static
             GTest::gtest_main
     )
 
@@ -181,7 +185,7 @@ if(BUILD_TESTING)
         )
         target_link_libraries(GPUSolver_Unit_Tests
             PRIVATE
-                HeatSimulation::Shared
+                HeatSimulation::Static
                 GTest::gtest_main
         )
     endif()
