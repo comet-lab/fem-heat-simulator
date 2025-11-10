@@ -61,10 +61,12 @@ endif()
 
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
+    src/MatrixBuilder.cpp
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
+    include/MatrixBuilder.h
 )
 
 # GPU sources (conditionally)
@@ -175,6 +177,14 @@ if(BUILD_TESTING)
         PRIVATE
             HeatSimulation::Static
             GTest::gtest_main
+    )
+
+    add_executable(MatrixBuilderTests
+        test/MatrixBuilderTests.cpp
+    )
+    target_link_libraries(MatrixBuilderTests
+        HeatSimulation::Static    
+        GTest::gtest_main
     )
 
     if (USE_CUDA)

@@ -7,6 +7,14 @@
 #include <chrono>
 #include <stdexcept>
 
+
+enum BoundaryType {
+	NONE,
+	HEATSINK,
+	FLUX,
+	CONVECTION
+};
+
 struct Node {
 	double x;
 	double y;
@@ -16,13 +24,6 @@ struct Node {
 
 struct Element {
 	std::vector<Node> nodes;
-};
-
-enum BoundaryType {
-	NONE,
-	HEATSINK, 
-	FLUX, 
-	CONVECTION
 };
 
 enum GeometricOrder {
@@ -38,30 +39,41 @@ enum Shape {
 class MatrixBuilder
 {
 public:
-	void MatrixBuilder() Default;
-	void MatrixBuilder(std::vector<Node> nodeList, std::vector<Element> elemList);
-	void MatrixBuilder(std::string filename);
+
+	MatrixBuilder();
+	MatrixBuilder(std::vector<Node> nodeList, std::vector<Element> elemList);
+	MatrixBuilder(std::string filename);
 
 	void resetMatrices();
 	void buildMatrices();
-	void calculateHexFunction1D(float xi, int A);
-	void calculateHexFunction3D(float[3] xi, int A);
-	void calculateShapeFunctionDeriv1D(float xi, int A);
-	void calculateShapeFunctionDeriv3D(float[3] xi, int A);
-	void calculateKe(Element elem);
-	void calculateMe(Element elem);
-	void calculateJ(Element elem);
-	void calculateJs(Element elem, int face);
-	void calculateQe(Element elem);
+	float calculateHexFunction1D(float xi, int A);
+	float calculateHexFunction3D(const std::array<float, 3>& xi, int A);
+	float calculateHexFunctionDeriv1D(float xi, int A);
+	Eigen::Vector3f calculateHexFunctionDeriv3D(const std::array<float, 3>& xi, int A);
+	Eigen::Matrix<float, 8, 8> calculateKe(const Element& elem);
+	Eigen::Matrix<float, 8, 8> calculateMe(Element elem);
+	void calculateJ(const Element& elem, const std::array<float, 3>& xi);
+	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
+	void calculateJs(const Element& elem, int face);
+	void calculateQe(const Element& elem);
 
 
-	
+
 	void setMesh(std::vector<Node> nodeList, std::vector<Element> elemList, std::vector<BoundaryType> boundary);
 	void setNodeMap();
 	void setNodeList(std::vector<Node> nodeList);
 	void setElementList(std::vector<Element> elemList);
 	void setBoundary(std::vector<BoundaryType> boundary);
-	
+	template <class F>
+	void integrateHex8(const Element& elem, F&& body);
+
+	std::vector<Node> nodeList() { return nodeList_; }
+	std::vector<Element> elemList() { return elemList_; }
+	std::vector<BoundaryType> boundary() { return boundary_; }
+	std::vector<long> nodeMap() { return nodeMap_; }
+	GeometricOrder order() { return order_; }
+
+	Eigen::Matrix<float, 3, 3> J() { return J_; };
 
 
 private:
@@ -70,12 +82,14 @@ private:
 	std::vector<BoundaryType> boundary_;
 	GeometricOrder order_ = LINEAR;
 	int nN1D_ = 2;
-	Shape elementShape_ = HEXAHEDRAL; 
+	Shape elementShape_ = HEXAHEDRAL;
 	//std::vector<long> validNodes_; // global indicies on non-dirichlet boundary nodes
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
-	std::vector<long> validNodes;
+	std::vector<long> validNodes_;
+
+	Eigen::Matrix3f J_; // Jacobian of our current element
 
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
@@ -98,4 +112,45 @@ private:
 	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	std::array<Eigen::MatrixXf, 6> Qe_; // Elemental construction of KConv
 
+
 };
+
+
+template <class F>
+inline void MatrixBuilder::integrateHex8(const Element& elem, F&& body)
+{
+	const float g = 1.0f / std::sqrt(3.0f);
+	const float gp[8][3] = {
+		{-g,-g,-g}, { g,-g,-g}, { g, g,-g}, {-g, g,-g},
+		{-g,-g, g}, { g,-g, g}, { g, g, g}, {-g, g, g}
+	};
+
+	for (int k = 0; k < 8; k++)
+	{
+		// Parent-domain coordinates
+		std::array<float,3> xi = { gp[k][0], gp[k][1], gp[k][2] };
+
+		// Compute shape data
+		float N[8];
+		Eigen::Vector3f dN_dxi[8];
+
+		for (int A = 0; A < 8; A++)
+		{
+			N[A] = calculateHexFunction3D(xi, A);
+			dN_dxi[A] = calculateHexFunctionDeriv3D(xi, A);
+		}
+
+		// Compute Jacobian using your dedicated function
+		calculateJ(elem, xi);       // fills J_
+
+		float detJ = J_.determinant();
+		if (detJ <= 0.0f)
+			throw std::runtime_error("Negative Jacobian in integrateHex8().");
+
+		// All Gaussian weights = 1, so weight = detJ
+		float weight = detJ;
+
+		// Call user integrand
+		body(N, dN_dxi, weight);
+	}
+}
