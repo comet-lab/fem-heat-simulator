@@ -24,6 +24,7 @@ struct Node {
 
 struct Element {
 	std::vector<Node> nodes;
+	std::array<BoundaryType, 6> faceBoundary = { NONE,NONE,NONE,NONE,NONE,NONE };
 };
 
 enum GeometricOrder {
@@ -51,11 +52,12 @@ public:
 	float calculateHexFunctionDeriv1D(float xi, int A);
 	Eigen::Vector3f calculateHexFunctionDeriv3D(const std::array<float, 3>& xi, int A);
 	Eigen::Matrix<float, 8, 8> calculateKe(const Element& elem);
+	Eigen::Matrix<float, 8, 1> calculateFeq(const Element& elem, int faceIndex, float q);
 	Eigen::Matrix<float, 8, 8> calculateMe(Element elem);
 	void calculateJ(const Element& elem, const std::array<float, 3>& xi);
 	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
 	void calculateJs(const Element& elem, int face);
-	void calculateQe(const Element& elem);
+	
 
 
 
@@ -66,6 +68,8 @@ public:
 	void setBoundary(std::vector<BoundaryType> boundary);
 	template <class F>
 	void integrateHex8(const Element& elem, F&& body);
+	template <class F>
+	void integrateHexFace4(const Element& elem, int faceIndex, F&& body)
 
 	std::vector<Node> nodeList() { return nodeList_; }
 	std::vector<Element> elemList() { return elemList_; }
@@ -93,7 +97,7 @@ private:
 
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
 
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_; // Internal nodal heat generation (aka laser)
 	Eigen::VectorXf FirrElem_; // forcing function due to irradiance when using elemental fluence rate
@@ -153,4 +157,68 @@ inline void MatrixBuilder::integrateHex8(const Element& elem, F&& body)
 		// Call user integrand
 		body(N, dN_dxi, weight);
 	}
+}
+
+
+template <class F>
+inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex, F&& body)
+{
+	// Hex8 face local node indices
+	constexpr int faceNodes[6][4] = {
+		{0,1,2,3}, {4,5,6,7}, {0,1,5,4},
+		{2,3,7,6}, {0,3,7,4}, {1,2,6,5}
+	};
+	const int* nodesOnFace = faceNodes[faceIndex];
+
+	constexpr float g = 1.0f / std::sqrt(3.0f);
+	float gp[2] = { -g, g }; // 2-point Gauss quadrature in each parametric direction
+
+	// Loop over 2x2 Gauss points
+	for (int i = 0; i < 2; ++i)
+		for (int j = 0; j < 2; ++j)
+		{
+			float xi_face[2] = { gp[i], gp[j] };
+
+			// Map 2D face coordinates to 3D element parent coordinates
+			float xi[3];
+			switch (faceIndex)
+			{
+			case 0: xi[0] = xi_face[0]; xi[1] = xi_face[1]; xi[2] = -1.0f; break; // bottom
+			case 1: xi[0] = xi_face[0]; xi[1] = xi_face[1]; xi[2] = 1.0f; break; // top
+			case 2: xi[0] = xi_face[0]; xi[1] = -1.0f;   xi[2] = xi_face[1]; break; // front
+			case 3: xi[0] = xi_face[0]; xi[1] = 1.0f;   xi[2] = xi_face[1]; break; // back
+			case 4: xi[0] = -1.0f;   xi[1] = xi_face[0]; xi[2] = xi_face[1]; break; // left
+			case 5: xi[0] = 1.0f;   xi[1] = xi_face[0]; xi[2] = xi_face[1]; break; // right
+			}
+
+			// Compute shape functions and derivatives for the 4 face nodes
+			float N_face[4];
+			Eigen::Vector3f dN_dxi[4];
+			for (int a = 0; a < 4; ++a)
+			{
+				int nodeIdx = nodesOnFace[a];
+				N_face[a] = calculateHexFunction3D(xi, nodeIdx);
+				dN_dxi[a] = calculateHexFunctionDeriv3D(xi, nodeIdx);
+			}
+
+			// Compute Jacobian for the face
+			Eigen::Matrix3f J_face = Eigen::Matrix3f::Zero();
+			for (int a = 0; a < 4; ++a)
+			{
+				const Node& n = elem.nodes[nodesOnFace[a]];
+				J_face(0, 0) += dN_dxi[a][0] * n.x; J_face(0, 1) += dN_dxi[a][0] * n.y; J_face(0, 2) += dN_dxi[a][0] * n.z;
+				J_face(1, 0) += dN_dxi[a][1] * n.x; J_face(1, 1) += dN_dxi[a][1] * n.y; J_face(1, 2) += dN_dxi[a][1] * n.z;
+				J_face(2, 0) += dN_dxi[a][2] * n.x; J_face(2, 1) += dN_dxi[a][2] * n.y; J_face(2, 2) += dN_dxi[a][2] * n.z;
+			}
+
+			// Approximate surface area element: ||cross vectors along the parametric directions||
+			Eigen::Vector3f t1 = J_face.col(0);
+			Eigen::Vector3f t2 = J_face.col(1);
+			float dS = t1.cross(t2).norm();
+
+			float weight = dS; // 2x2 Gauss weights = 1*1
+
+			// Call user integrand
+			body(N_face, nodesOnFace, weight);
+		}
 }

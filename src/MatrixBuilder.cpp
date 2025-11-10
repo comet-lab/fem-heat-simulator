@@ -153,6 +153,19 @@ Eigen::Matrix<float, 8, 8> MatrixBuilder::calculateKe(const Element& elem)
 	return Ke_;
 }
 
+Eigen::Matrix<float, 8, 1> MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, float q)
+{
+	Eigen::Matrix<float, 8, 1> Feq = Eigen::Matrix<float, 8, 1>::Zero();
+
+	integrateHexFace4(elem, faceIndex, [&](const float N_face[4], const int* nodesOnFace, float w)
+		{
+			for (int a = 0; a < 4; ++a)
+				Feq(nodesOnFace[a]) += N_face[a] * q * w;
+		});
+
+	return Feq;
+}
+
 void MatrixBuilder::calculateJ(const Element& elem, const std::array<float, 3>& xi)
 {
 	J_.setZero();
@@ -193,3 +206,4 @@ void MatrixBuilder::setElementList(std::vector<Element> elemList)
 {
 	elemList_ = elemList;
 }
+
