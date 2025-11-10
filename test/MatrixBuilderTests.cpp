@@ -161,3 +161,86 @@ TEST_F(BaseClass, testCalculateJacobian)
 		}
 	}
 }
+
+/*
+* Testing the calculation of Me. For the single element we have it should be straightforward
+* detJ should be 1/8. Diagonal elements should be 1/8 * ( 8/27). 
+*/
+TEST_F(BaseClass, testCalculateHexLinMe)
+{
+
+	Eigen::Matrix<float, 8, 8> Me = mb.calculateMe(elem);
+
+	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
+	float scale[8] = { 1.0f, 2.0f, 2.0f, 4.0f, 2.0f, 4.0f, 4.0f, 8.0f };
+	for (int Ai = 0; Ai < 8; Ai++) 
+	{
+		EXPECT_FLOAT_EQ(1/27.0f,Me(Ai, Ai));
+		EXPECT_FLOAT_EQ((1 / (scale[Ai]*27.0f)), Me(Ai, 0));
+	}
+	
+}
+
+/*
+* Testing the calculation of Ke. For the single element we have it should be straightforward
+*
+*/
+TEST_F(BaseClass, testCalculateHexLinKe)
+{
+
+	Eigen::Matrix<float, 8, 8> Ke = mb.calculateKe(elem);
+
+	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
+	float scale[8] = { 1.0f, 0.0f, 0.0f, -1/4.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
+	float tolerance = 0.000001;
+	for (int Ai = 0; Ai < 8; Ai++)
+	{
+		EXPECT_FLOAT_EQ(1 / 3.0f, Ke(Ai, Ai));
+		EXPECT_NEAR( (scale[Ai] / 3.0f), Ke(Ai, 0),tolerance);
+	}
+
+}
+
+TEST_F(BaseClass, TestInd2Sub1)
+{
+	std::array<long,3> sub;
+	long index = 0;
+	std::array<long,3> size = { 10,10,10 };
+	sub = mb.ind2sub(index, size);
+	EXPECT_FLOAT_EQ(0, sub[0]);
+	EXPECT_FLOAT_EQ(0, sub[1]);
+	EXPECT_FLOAT_EQ(0, sub[2]);
+}
+
+TEST_F(BaseClass, TestInd2Sub2)
+{
+	std::array<long, 3> sub;
+	long index = 10;
+	std::array<long, 3> size = { 10,10,10 };
+	sub = mb.ind2sub(index, size);
+	EXPECT_FLOAT_EQ(0, sub[0]);
+	EXPECT_FLOAT_EQ(1, sub[1]);
+	EXPECT_FLOAT_EQ(0, sub[2]);
+}
+
+TEST_F(BaseClass, TestInd2Sub3)
+{
+	std::array<long, 3> sub;
+	long index = 100;
+	std::array<long, 3> size = { 10,10,10 };
+	sub = mb.ind2sub(index, size);
+	EXPECT_FLOAT_EQ(0, sub[0]);
+	EXPECT_FLOAT_EQ(0, sub[1]);
+	EXPECT_FLOAT_EQ(1, sub[2]);
+}
+
+TEST_F(BaseClass, TestInd2Sub4)
+{
+	std::array<long, 3> sub;
+	long index = 521;
+	std::array<long, 3> size = { 10,10,10 };
+	sub = mb.ind2sub(index, size);
+	EXPECT_FLOAT_EQ(1, sub[0]);
+	EXPECT_FLOAT_EQ(2, sub[1]);
+	EXPECT_FLOAT_EQ(5, sub[2]);
+}
