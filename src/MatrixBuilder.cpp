@@ -267,44 +267,37 @@ Eigen::Vector3f MatrixBuilder::calculateTetFunctionDeriv3D(const std::array<floa
 
 Eigen::MatrixXf MatrixBuilder::calculateMe(Element elem)
 {
-	Me_ = Eigen::Matrix<float, 8, 8>::Zero();
+	Eigen::MatrixXf Me = Eigen::Matrix<float, 8, 8>::Zero();
 
-	integrateHex8(elem, [&](const float N[8],
-						const Eigen::Vector3f dN_dxi[8],
+	integrateHex8(elem, false, [&](const float N[8],
+						const Eigen::Vector3f dN_dx[8],
 						float w)
 	{
 		for (int a = 0; a < 8; ++a)
 		{
 			for (int b = 0; b < 8; ++b)
 			{
-				Me_(a, b) += N[a] * N[b] * w;
+				Me(a, b) += N[a] * N[b] * w;
 			}
 		}
 	});
 
-	return Me_;
+	return Me;
 }
 
 Eigen::MatrixXf MatrixBuilder::calculateKe(const Element& elem)
 {
-	Ke_ = Eigen::Matrix<float, 8, 8>::Zero();
+	Eigen::MatrixXf Ke = Eigen::Matrix<float, 8, 8>::Zero();
 
-	integrateHex8(elem, [&](const float N[8], const Eigen::Vector3f dN_dxi[8], float w)
+	integrateHex8(elem, true, [&](const float N[8], const Eigen::Vector3f dN_dx[8], float w)
 		{
-			// Compute derivatives in physical space
-			Eigen::Matrix3f Jinv = J_.inverse();
-
-			Eigen::Vector3f dN_dx[8];
-			for (int a = 0; a < 8; ++a)
-				dN_dx[a] = Jinv * dN_dxi[a];  // chain rule: dN/dx = J^-1 * dN/dxi
-
 			// Assemble K_e
 			for (int a = 0; a < 8; ++a)
 				for (int b = 0; b < 8; ++b)
-					Ke_(a, b) += dN_dx[a].dot(dN_dx[b]) * w;
+					Ke(a, b) += dN_dx[a].dot(dN_dx[b]) * w;
 		});
 
-	return Ke_;
+	return Ke;
 }
 
 Eigen::MatrixXf MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, float q)
@@ -322,28 +315,45 @@ Eigen::MatrixXf MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, 
 
 Eigen::MatrixXf MatrixBuilder::calculateFeConv(const Element& elem, int faceIndex)
 {
-	return Eigen::MatrixXf();
+	Eigen::Matrix<float, 8, 8> Qe = Eigen::Matrix<float, 8, 8>::Zero();
+
+	// Integrate over the specified face
+	integrateHexFace4(elem, faceIndex, [&](const float N[4], const int* nodesOnFace, float w) {
+		// Local 4x4 face contribution
+		Eigen::Matrix4f Qf = Eigen::Matrix4f::Zero();
+		for (int i = 0; i < 4; ++i)
+			for (int j = 0; j < 4; ++j)
+				Qf(i, j) = N[i] * N[j] * w;
+
+		// Scatter local 4x4 into 8x8 element matrix
+		for (int i = 0; i < 4; ++i)
+			for (int j = 0; j < 4; ++j)
+				Qe(nodesOnFace[i], nodesOnFace[j]) += Qf(i, j);
+		});
+
+	return Qe;
 }
 
-void MatrixBuilder::calculateJ(const Element& elem, const std::array<float, 3>& xi)
+Eigen::Matrix3f MatrixBuilder::calculateJ(const Element& elem, const std::array<float, 3>& xi)
 {
-	J_.setZero();
+	Eigen::Matrix3f J = Eigen::Matrix3f::Zero();
 
 	for (int a = 0; a < 8; ++a)
 	{
 		Eigen::Vector3f dN = calculateHexFunctionDeriv3D(xi, a);
-		J_(0, 0) += dN(0) * nodeList_[elem.nodes[a]].x;
-		J_(0, 1) += dN(0) * nodeList_[elem.nodes[a]].y;
-		J_(0, 2) += dN(0) * nodeList_[elem.nodes[a]].z;
+		J(0, 0) += dN(0) * nodeList_[elem.nodes[a]].x;
+		J(0, 1) += dN(0) * nodeList_[elem.nodes[a]].y;
+		J(0, 2) += dN(0) * nodeList_[elem.nodes[a]].z;
 
-		J_(1, 0) += dN(1) * nodeList_[elem.nodes[a]].x;
-		J_(1, 1) += dN(1) * nodeList_[elem.nodes[a]].y;
-		J_(1, 2) += dN(1) * nodeList_[elem.nodes[a]].z;
+		J(1, 0) += dN(1) * nodeList_[elem.nodes[a]].x;
+		J(1, 1) += dN(1) * nodeList_[elem.nodes[a]].y;
+		J(1, 2) += dN(1) * nodeList_[elem.nodes[a]].z;
 
-		J_(2, 0) += dN(2) * nodeList_[elem.nodes[a]].x;
-		J_(2, 1) += dN(2) * nodeList_[elem.nodes[a]].y;
-		J_(2, 2) += dN(2) * nodeList_[elem.nodes[a]].z;
+		J(2, 0) += dN(2) * nodeList_[elem.nodes[a]].x;
+		J(2, 1) += dN(2) * nodeList_[elem.nodes[a]].y;
+		J(2, 2) += dN(2) * nodeList_[elem.nodes[a]].z;
 	}
+	return J;
 }
 
 std::array<long, 3> MatrixBuilder::ind2sub(long idx,const std::array<long,3>& size) {

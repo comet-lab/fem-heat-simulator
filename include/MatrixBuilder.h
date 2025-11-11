@@ -63,7 +63,7 @@ public:
 	Eigen::MatrixXf calculateFeq(const Element& elem, int faceIndex, float q);
 	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex);
 	Eigen::MatrixXf calculateMe(Element elem);
-	void calculateJ(const Element& elem, const std::array<float, 3>& xi);
+	Eigen::Matrix3f calculateJ(const Element& elem, const std::array<float, 3>& xi);
 	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
 	void calculateJs(const Element& elem, int face);
 	
@@ -76,7 +76,7 @@ public:
 	void setElementList(std::vector<Element> elemList);
 	void setBoundary(std::vector<BoundaryType> boundary);
 	template <class F>
-	void integrateHex8(const Element& elem, F&& body);
+	void integrateHex8(const Element& elem, bool needDeriv, F&& body);
 	template <class F>
 	void integrateHexFace4(const Element& elem, int faceIndex, F&& body);
 
@@ -96,13 +96,13 @@ private:
 	GeometricOrder order_ = LINEAR;
 	int nN1D_ = 2;
 	Shape elementShape_ = HEXAHEDRAL;
-	//std::vector<long> validNodes_; // global indicies on non-dirichlet boundary nodes
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
+	// contains the global indicies of every non-dirichlet node
 	std::vector<long> validNodes_;
 
-	Eigen::Matrix3f J_; // Jacobian of our current element
+	//Eigen::Matrix3f J_; // Jacobian of our current element
 
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
@@ -122,23 +122,23 @@ private:
 	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
 	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
 
-	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	Eigen::MatrixXf Ke_; // Elemental Construction of Kint
-	Eigen::MatrixXf Me_; // Elemental construction of M
-	Eigen::MatrixXf FeInt_; // Elemental Construction of FirrElem
-	// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf FeQ_; // Element Construction of Fq
-	// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	Eigen::MatrixXf FeConv_; // Elemental Construction of FConv
-	// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
-	std::array<Eigen::MatrixXf, 6> Qe_; // Elemental construction of KConv
+	//// because of our assumptions, these don't need to be recalculated every time and can be class variables.
+	//Eigen::MatrixXf Ke_; // Elemental Construction of Kint
+	//Eigen::MatrixXf Me_; // Elemental construction of M
+	//Eigen::MatrixXf FeInt_; // Elemental Construction of FirrElem
+	//// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	//Eigen::MatrixXf FeQ_; // Element Construction of Fq
+	//// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
+	//Eigen::MatrixXf FeConv_; // Elemental Construction of FConv
+	//// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
+	//std::array<Eigen::MatrixXf, 6> Qe_; // Elemental construction of KConv
 
 
 };
 
 
 template <class F>
-inline void MatrixBuilder::integrateHex8(const Element& elem, F&& body)
+inline void MatrixBuilder::integrateHex8(const Element& elem, bool needDeriv, F&& body)
 {
 	const float g = 1.0f / std::sqrt(3.0f);
 	const float gp[8][3] = {
@@ -158,21 +158,32 @@ inline void MatrixBuilder::integrateHex8(const Element& elem, F&& body)
 		for (int A = 0; A < 8; A++)
 		{
 			N[A] = calculateHexFunction3D(xi, A);
-			dN_dxi[A] = calculateHexFunctionDeriv3D(xi, A);
+			if (needDeriv)
+				dN_dxi[A] = calculateHexFunctionDeriv3D(xi, A);
 		}
 
 		// Compute Jacobian using your dedicated function
-		calculateJ(elem, xi);       // fills J_
+		Eigen::Matrix3f J = calculateJ(elem, xi);       // fills J_
 
 		float detJ = J_.determinant();
 		if (detJ <= 0.0f)
 			throw std::runtime_error("Negative Jacobian in integrateHex8().");
 
+
+		// Compute derivatives in physical space
+		Eigen::Vector3f dN_dx[8];
+		if (needDeriv)
+		{
+			Eigen::Matrix3f Jinv = J.inverse();		
+			for (int a = 0; a < 8; ++a)
+				dN_dx[a] = Jinv * dN_dxi[a];  // chain rule: dN/dx = J^-1 * dN/dxi
+		}
+
 		// All Gaussian weights = 1, so weight = detJ
 		float weight = detJ;
 
 		// Call user integrand
-		body(N, dN_dxi, weight);
+		body(N, dN_dx, weight);
 	}
 }
 
