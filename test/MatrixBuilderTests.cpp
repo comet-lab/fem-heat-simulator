@@ -142,9 +142,8 @@ TEST_F(BaseClass, testCalculateHexFunctionDeriv3D)
 */
 TEST_F(BaseClass, testCalculateJacobian)
 {
-	mb.calculateJ(elem, { 1.0f,-1.0f,0.0f }); // position (xi) doesn't matter in this test case
+	Eigen::Matrix3f J = mb.calculateJ(elem, { 1.0f,-1.0f,0.0f }); // position (xi) doesn't matter in this test case
 
-	Eigen::Matrix3f J = mb.J();
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++)
 		{

@@ -86,9 +86,6 @@ public:
 	std::vector<long> nodeMap() { return nodeMap_; }
 	GeometricOrder order() { return order_; }
 
-	Eigen::Matrix<float, 3, 3> J() { return J_; };
-
-
 private:
 	std::vector<Node> nodeList_;
 	std::vector<Element> elemList_;
@@ -165,7 +162,7 @@ inline void MatrixBuilder::integrateHex8(const Element& elem, bool needDeriv, F&
 		// Compute Jacobian using your dedicated function
 		Eigen::Matrix3f J = calculateJ(elem, xi);       // fills J_
 
-		float detJ = J_.determinant();
+		float detJ = J.determinant();
 		if (detJ <= 0.0f)
 			throw std::runtime_error("Negative Jacobian in integrateHex8().");
 
