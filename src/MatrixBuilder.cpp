@@ -16,16 +16,26 @@ MatrixBuilder::MatrixBuilder(std::string filename)
 
 void MatrixBuilder::resetMatrices()
 {
+	// The number of non-zeros per column assuming hexahedral elements
 	int nRelatedNodes = pow((nN1D_ * 2 - 1), 3);
+	//  number of non-dirichlet nodes
 	int nValidNodes = validNodes_.size();
+	// total number of nodes
 	int nNodes = nodeList_.size();
 	// Initialize matrices so that we don't have to resize them later
-	FirrElem_ = Eigen::VectorXf::Zero(nValidNodes);
+	FintElem_ = Eigen::SparseMatrix<float>(nValidNodes, elemList_.size());
+	FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nN1D_*nN1D_*nN1D_));
+
 	Fint_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
-	Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes)); // at most 27 non-zero entries per column
-	// TODO: make these three vectors sparse because they will only be non zero on the boundary nodes
-	Fconv_ = Eigen::VectorXf::Zero(nValidNodes);
-	Fk_ = Eigen::VectorXf::Zero(nValidNodes);
+	Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes)); 
+	
+	Fconv_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+	Fconv_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+
+	Fk_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+	Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+
+	Fflux_ = Eigen::VectorXf::Zero(nValidNodes);
 	Fq_ = Eigen::VectorXf::Zero(nValidNodes);
 
 	// M and K will be sparse matrices because nodes are shared by relatively few elements
@@ -36,6 +46,109 @@ void MatrixBuilder::resetMatrices()
 	// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
 	Q_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
 	Q_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+}
+
+void MatrixBuilder::buildMatrices()
+{
+	resetMatrices();
+
+	long nElem = elemList_.size();
+	for (int elemIdx = 0; elemIdx < nElem; elemIdx++)
+	{
+		Element elem = elemList_[elemIdx];
+		applyElement(elem, elemIdx);
+		applyBoundary(elem);
+	}
+}
+
+void MatrixBuilder::applyElement(Element elem, long elemIdx)
+{
+	int nodesPerElem = elem.nodes.size();
+	long matrixRow = 0;
+	long matrixCol = 0;
+	Eigen::MatrixXf Me = calculateMe(elem);
+	Eigen::MatrixXf Fe = calculateMe(elem);
+	Eigen::MatrixXf Ke = calculateKe(elem);
+
+	for (int A = 0; A < nodesPerElem; A++)
+	{
+		Node currNode = nodeList_[elem.nodes[A]];
+		if (!currNode.isDirichlet)
+		{
+			// handle node-neighbor interactions
+			matrixRow = nodeMap_[elem.nodes[A]];
+			for (int B = 0; B < nodesPerElem; B++)
+			{
+				long neighborIdx = elem.nodes[B];
+				matrixCol = nodeMap_[neighborIdx];
+				Node neighbor = nodeList_[neighborIdx];
+				// Add effect of nodal fluence rate 
+				Fint_.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
+				// Add effect of element fluence rate
+				FintElem_.coeffRef(matrixRow, elemIdx) += Fe(A, B);
+				if (!neighbor.isDirichlet)
+				{
+					// add effect of mass matrix
+					M_.coeffRef(matrixRow, matrixCol) += Me(A, B);
+					// add effect of conductivity matrix
+					K_.coeffRef(matrixRow, matrixCol) += Ke(A, B);
+				}
+				else
+				{
+					// add conductivity as a forcing effect
+					Fk_.coeffRef(matrixRow, neighborIdx) -= Ke(A, B);
+				}
+			} // for each neighbor node
+		} // if node is not dirichlet
+	} // for each node in element
+}
+
+void MatrixBuilder::applyBoundary(Element elem)
+{
+	int nodesPerElem = elem.nodes.size();
+	long matrixRow = 0;
+	long matrixCol = 0;
+	// handle boundary conditions of element
+	for (int f; f < 6; f++) // iterate over faces
+	{
+		if (elem.faceBoundary[f] == BoundaryType::CONVECTION)
+		{
+			Eigen::VectorXf Feflux = calculateFeq(elem, f, 1);
+			Eigen::VectorXf FeConv = calculateFeConv(elem, f);
+			for (int A = 0; A < nodesPerElem; A++)
+			{
+				matrixRow = nodeMap_[elem.nodes[A]];
+				// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
+				// needs to be multiplied by htc and ambient temp to be the correct value.
+				Fq_(matrixRow) += Feflux(A);
+				for (int B = 0; B < nodesPerElem; B++)
+				{
+					long neighborIdx = elem.nodes[B];
+					matrixCol = nodeMap_[neighborIdx];
+					Node neighbor = nodeList_[neighborIdx];
+					if (!neighbor.isDirichlet)
+					{
+						// add effect of node temperature on convection
+						Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
+					}
+					else
+					{
+						// Add effect of node temperature as forcing function
+						Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
+					}
+				}
+			}
+		}
+		else if (elem.faceBoundary[f] == BoundaryType::FLUX)
+		{
+			Eigen::VectorXf Feflux = calculateFeq(elem, f, 1);
+			for (int A = 0; A < nodesPerElem; A++)
+			{
+				matrixRow = nodeMap_[elem.nodes[A]];
+				this->Fflux_(matrixRow) += Feflux(A);
+			}
+		}
+	}
 }
 
 float MatrixBuilder::calculateHexFunction1D(float xi, int A)
@@ -111,7 +224,48 @@ Eigen::Vector3f MatrixBuilder::calculateHexFunctionDeriv3D(const std::array<floa
 	return NA_dot;
 }
 
-Eigen::Matrix<float, 8, 8> MatrixBuilder::calculateMe(Element elem)
+float MatrixBuilder::calculateTetFunction3D(const std::array<float, 3>& xi, int A)
+{ 
+	switch (A) {
+	case 0:
+		return 1.0f - xi[0] - xi[1] - xi[2]; // N0
+	case 1:
+		return xi[0];                       // N1
+	case 2:
+		return xi[1];                       // N2
+	case 3:
+		return xi[2];                       // N3
+	default:
+		throw std::out_of_range("Bad node index in calculateTetFunction3D");
+	}
+}
+
+Eigen::Vector3f MatrixBuilder::calculateTetFunctionDeriv3D(const std::array<float, 3>& xi, int A)
+{
+	Eigen::Vector3f dN;
+
+	switch (A) {
+	case 0:
+		dN << -1.0f, -1.0f, -1.0f;
+		break;
+	case 1:
+		dN << 1.0f, 0.0f, 0.0f;
+		break;
+	case 2:
+		dN << 0.0f, 1.0f, 0.0f;
+		break;
+	case 3:
+		dN << 0.0f, 0.0f, 1.0f;
+		break;
+	default:
+		throw std::out_of_range("Bad node index in calculateTetFunctionDeriv3D");
+	}
+
+	return dN;
+}
+
+
+Eigen::MatrixXf MatrixBuilder::calculateMe(Element elem)
 {
 	Me_ = Eigen::Matrix<float, 8, 8>::Zero();
 
@@ -131,7 +285,7 @@ Eigen::Matrix<float, 8, 8> MatrixBuilder::calculateMe(Element elem)
 	return Me_;
 }
 
-Eigen::Matrix<float, 8, 8> MatrixBuilder::calculateKe(const Element& elem)
+Eigen::MatrixXf MatrixBuilder::calculateKe(const Element& elem)
 {
 	Ke_ = Eigen::Matrix<float, 8, 8>::Zero();
 
@@ -153,7 +307,7 @@ Eigen::Matrix<float, 8, 8> MatrixBuilder::calculateKe(const Element& elem)
 	return Ke_;
 }
 
-Eigen::Matrix<float, 8, 1> MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, float q)
+Eigen::MatrixXf MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, float q)
 {
 	Eigen::Matrix<float, 8, 1> Feq = Eigen::Matrix<float, 8, 1>::Zero();
 
@@ -166,6 +320,11 @@ Eigen::Matrix<float, 8, 1> MatrixBuilder::calculateFeq(const Element& elem, int 
 	return Feq;
 }
 
+Eigen::MatrixXf MatrixBuilder::calculateFeConv(const Element& elem, int faceIndex)
+{
+	return Eigen::MatrixXf();
+}
+
 void MatrixBuilder::calculateJ(const Element& elem, const std::array<float, 3>& xi)
 {
 	J_.setZero();
@@ -173,17 +332,17 @@ void MatrixBuilder::calculateJ(const Element& elem, const std::array<float, 3>& 
 	for (int a = 0; a < 8; ++a)
 	{
 		Eigen::Vector3f dN = calculateHexFunctionDeriv3D(xi, a);
-		J_(0, 0) += dN(0) * elem.nodes[a].x;
-		J_(0, 1) += dN(0) * elem.nodes[a].y;
-		J_(0, 2) += dN(0) * elem.nodes[a].z;
+		J_(0, 0) += dN(0) * nodeList_[elem.nodes[a]].x;
+		J_(0, 1) += dN(0) * nodeList_[elem.nodes[a]].y;
+		J_(0, 2) += dN(0) * nodeList_[elem.nodes[a]].z;
 
-		J_(1, 0) += dN(1) * elem.nodes[a].x;
-		J_(1, 1) += dN(1) * elem.nodes[a].y;
-		J_(1, 2) += dN(1) * elem.nodes[a].z;
+		J_(1, 0) += dN(1) * nodeList_[elem.nodes[a]].x;
+		J_(1, 1) += dN(1) * nodeList_[elem.nodes[a]].y;
+		J_(1, 2) += dN(1) * nodeList_[elem.nodes[a]].z;
 
-		J_(2, 0) += dN(2) * elem.nodes[a].x;
-		J_(2, 1) += dN(2) * elem.nodes[a].y;
-		J_(2, 2) += dN(2) * elem.nodes[a].z;
+		J_(2, 0) += dN(2) * nodeList_[elem.nodes[a]].x;
+		J_(2, 1) += dN(2) * nodeList_[elem.nodes[a]].y;
+		J_(2, 2) += dN(2) * nodeList_[elem.nodes[a]].z;
 	}
 }
 

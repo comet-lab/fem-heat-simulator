@@ -7,7 +7,9 @@
 #include <chrono>
 #include <stdexcept>
 
-
+/*static const std::array<std::array<int, 3>, 8> A_HEX_LIN = { { {-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},{-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1} } };
+static const std::array<std::array<int, 3>, 4> A_TET_LIN = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1} } };
+static const std::array<std::array<int, 3>, 10> A_TET_QUAD = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1},{0.5,0,0},{0.5,0.5,0},{0,0.5,0},{0,0,0.5},{0.5,0,0.5},{0,0.5,0.5} } };*/
 enum BoundaryType {
 	NONE,
 	HEATSINK,
@@ -19,11 +21,11 @@ struct Node {
 	double x;
 	double y;
 	double z;
-	BoundaryType boundary = BoundaryType::NONE;
+	bool isDirichlet = false;
 };
 
 struct Element {
-	std::vector<Node> nodes;
+	std::vector<long> nodes; // index in node list used in element
 	std::array<BoundaryType, 6> faceBoundary = { NONE,NONE,NONE,NONE,NONE,NONE };
 };
 
@@ -41,19 +43,26 @@ class MatrixBuilder
 {
 public:
 
+
 	MatrixBuilder();
 	MatrixBuilder(std::vector<Node> nodeList, std::vector<Element> elemList);
 	MatrixBuilder(std::string filename);
 
 	void resetMatrices();
 	void buildMatrices();
+	void applyElement(Element elem, long elemIdx);
+	void applyBoundary(Element elem);
 	float calculateHexFunction1D(float xi, int A);
 	float calculateHexFunction3D(const std::array<float, 3>& xi, int A);
 	float calculateHexFunctionDeriv1D(float xi, int A);
 	Eigen::Vector3f calculateHexFunctionDeriv3D(const std::array<float, 3>& xi, int A);
-	Eigen::Matrix<float, 8, 8> calculateKe(const Element& elem);
-	Eigen::Matrix<float, 8, 1> calculateFeq(const Element& elem, int faceIndex, float q);
-	Eigen::Matrix<float, 8, 8> calculateMe(Element elem);
+	float calculateTetFunction3D(const std::array<float, 3>& xi, int A);
+	Eigen::Vector3f calculateTetFunctionDeriv3D(const std::array<float, 3>& xi, int A);
+
+	Eigen::MatrixXf calculateKe(const Element& elem);
+	Eigen::MatrixXf calculateFeq(const Element& elem, int faceIndex, float q);
+	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex);
+	Eigen::MatrixXf calculateMe(Element elem);
 	void calculateJ(const Element& elem, const std::array<float, 3>& xi);
 	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
 	void calculateJs(const Element& elem, int face);
@@ -69,7 +78,7 @@ public:
 	template <class F>
 	void integrateHex8(const Element& elem, F&& body);
 	template <class F>
-	void integrateHexFace4(const Element& elem, int faceIndex, F&& body)
+	void integrateHexFace4(const Element& elem, int faceIndex, F&& body);
 
 	std::vector<Node> nodeList() { return nodeList_; }
 	std::vector<Element> elemList() { return elemList_; }
@@ -99,11 +108,19 @@ private:
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
 
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_; // Internal nodal heat generation (aka laser)
-	Eigen::VectorXf FirrElem_; // forcing function due to irradiance when using elemental fluence rate
-	Eigen::VectorXf Fconv_; // forcing functino due to convection
-	Eigen::VectorXf Fk_; // Forcing Function due to conductivity matrix on dirichlet nodes
-	Eigen::VectorXf Fq_; // forcing function due to constant heatFlux boundary
+	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
+	// vector dictating the fluence experienced at each node. 
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_; 
+	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
+	// by a vector dictating the fluence experienced by each element
+	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem_; 
+	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
+	// by a vector specifying the fixed temperature at each element.
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv_;
+	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_; 
+	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
+	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
 
 	// because of our assumptions, these don't need to be recalculated every time and can be class variables.
 	Eigen::MatrixXf Ke_; // Elemental Construction of Kint
@@ -170,7 +187,7 @@ inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex,
 	};
 	const int* nodesOnFace = faceNodes[faceIndex];
 
-	constexpr float g = 1.0f / std::sqrt(3.0f);
+	const float g = 1.0f / std::sqrt(3.0f);
 	float gp[2] = { -g, g }; // 2-point Gauss quadrature in each parametric direction
 
 	// Loop over 2x2 Gauss points
@@ -180,7 +197,7 @@ inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex,
 			float xi_face[2] = { gp[i], gp[j] };
 
 			// Map 2D face coordinates to 3D element parent coordinates
-			float xi[3];
+			std::array<float,3> xi;
 			switch (faceIndex)
 			{
 			case 0: xi[0] = xi_face[0]; xi[1] = xi_face[1]; xi[2] = -1.0f; break; // bottom
@@ -205,7 +222,7 @@ inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex,
 			Eigen::Matrix3f J_face = Eigen::Matrix3f::Zero();
 			for (int a = 0; a < 4; ++a)
 			{
-				const Node& n = elem.nodes[nodesOnFace[a]];
+				const Node& n = nodeList_[elem.nodes[nodesOnFace[a]]];
 				J_face(0, 0) += dN_dxi[a][0] * n.x; J_face(0, 1) += dN_dxi[a][0] * n.y; J_face(0, 2) += dN_dxi[a][0] * n.z;
 				J_face(1, 0) += dN_dxi[a][1] * n.x; J_face(1, 1) += dN_dxi[a][1] * n.y; J_face(1, 2) += dN_dxi[a][1] * n.z;
 				J_face(2, 0) += dN_dxi[a][2] * n.x; J_face(2, 1) += dN_dxi[a][2] * n.y; J_face(2, 2) += dN_dxi[a][2] * n.z;

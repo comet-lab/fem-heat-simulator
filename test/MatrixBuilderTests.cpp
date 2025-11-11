@@ -14,7 +14,7 @@ protected:
 			nodeList[i].x = 0 + i%2;
 			nodeList[i].y = 0 + (i/2)%2;
 			nodeList[i].z = 0 + (i/4);
-			elem.nodes.push_back(nodeList[i]);
+			elem.nodes.push_back(i);
 		}
 		mb.setNodeList(nodeList);
 		mb.setElementList({ elem });
