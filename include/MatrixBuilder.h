@@ -60,7 +60,7 @@ public:
 	Eigen::Vector3f calculateTetFunctionDeriv3D(const std::array<float, 3>& xi, int A);
 
 	Eigen::MatrixXf calculateKe(const Element& elem);
-	Eigen::MatrixXf calculateFeq(const Element& elem, int faceIndex, float q);
+	Eigen::MatrixXf calculateFeFlux(const Element& elem, int faceIndex, float q);
 	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex);
 	Eigen::MatrixXf calculateMe(Element elem);
 	Eigen::Matrix3f calculateJ(const Element& elem, const std::array<float, 3>& xi);
@@ -190,10 +190,11 @@ inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex,
 {
 	// Hex8 face local node indices
 	constexpr int faceNodes[6][4] = {
-		{0,1,2,3}, {4,5,6,7}, {0,1,5,4},
-		{2,3,7,6}, {0,3,7,4}, {1,2,6,5}
+		{0,1,3,2}, {4,5,6,7}, {0,1,5,4},
+		{3,2,6,7}, {0,2,6,4}, {1,3,7,5}
 	};
 	const int* nodesOnFace = faceNodes[faceIndex];
+	//std::cout << "Nodes on Face: " << nodesOnFace[0] << ", " << nodesOnFace[1] << ", " << nodesOnFace[2] << ", " << nodesOnFace[3] << std::endl;
 
 	const float g = 1.0f / std::sqrt(3.0f);
 	float gp[2] = { -g, g }; // 2-point Gauss quadrature in each parametric direction
@@ -227,18 +228,17 @@ inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex,
 			}
 
 			// Compute Jacobian for the face
-			Eigen::Matrix3f J_face = Eigen::Matrix3f::Zero();
-			for (int a = 0; a < 4; ++a)
+			Eigen::Matrix3f J = calculateJ(elem, xi);
+			Eigen::Vector3f t1, t2;
+			switch (faceIndex)
 			{
-				const Node& n = nodeList_[elem.nodes[nodesOnFace[a]]];
-				J_face(0, 0) += dN_dxi[a][0] * n.x; J_face(0, 1) += dN_dxi[a][0] * n.y; J_face(0, 2) += dN_dxi[a][0] * n.z;
-				J_face(1, 0) += dN_dxi[a][1] * n.x; J_face(1, 1) += dN_dxi[a][1] * n.y; J_face(1, 2) += dN_dxi[a][1] * n.z;
-				J_face(2, 0) += dN_dxi[a][2] * n.x; J_face(2, 1) += dN_dxi[a][2] * n.y; J_face(2, 2) += dN_dxi[a][2] * n.z;
+			case 0: t1 = J.col(0); t2 = J.col(1); break; // bot face
+			case 1: t1 = J.col(0); t2 = J.col(1); break; // top face
+			case 2: t1 = J.col(0); t2 = J.col(2); break; // front face
+			case 3: t1 = J.col(0); t2 = J.col(2); break; // back face
+			case 4: t1 = J.col(1); t2 = J.col(2); break; // left face
+			case 5: t1 = J.col(1); t2 = J.col(2); break; // right face
 			}
-
-			// Approximate surface area element: ||cross vectors along the parametric directions||
-			Eigen::Vector3f t1 = J_face.col(0);
-			Eigen::Vector3f t2 = J_face.col(1);
 			float dS = t1.cross(t2).norm();
 
 			float weight = dS; // 2x2 Gauss weights = 1*1

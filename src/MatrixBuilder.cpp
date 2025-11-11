@@ -113,7 +113,7 @@ void MatrixBuilder::applyBoundary(Element elem)
 	{
 		if (elem.faceBoundary[f] == BoundaryType::CONVECTION)
 		{
-			Eigen::VectorXf Feflux = calculateFeq(elem, f, 1);
+			Eigen::VectorXf Feflux = calculateFeFlux(elem, f, 1);
 			Eigen::VectorXf FeConv = calculateFeConv(elem, f);
 			for (int A = 0; A < nodesPerElem; A++)
 			{
@@ -141,7 +141,7 @@ void MatrixBuilder::applyBoundary(Element elem)
 		}
 		else if (elem.faceBoundary[f] == BoundaryType::FLUX)
 		{
-			Eigen::VectorXf Feflux = calculateFeq(elem, f, 1);
+			Eigen::VectorXf Feflux = calculateFeFlux(elem, f, 1);
 			for (int A = 0; A < nodesPerElem; A++)
 			{
 				matrixRow = nodeMap_[elem.nodes[A]];
@@ -300,7 +300,7 @@ Eigen::MatrixXf MatrixBuilder::calculateKe(const Element& elem)
 	return Ke;
 }
 
-Eigen::MatrixXf MatrixBuilder::calculateFeq(const Element& elem, int faceIndex, float q)
+Eigen::MatrixXf MatrixBuilder::calculateFeFlux(const Element& elem, int faceIndex, float q)
 {
 	Eigen::Matrix<float, 8, 1> Feq = Eigen::Matrix<float, 8, 1>::Zero();
 
