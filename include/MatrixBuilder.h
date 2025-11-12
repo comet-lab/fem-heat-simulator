@@ -6,52 +6,22 @@
 #include <Eigen/Sparse>
 #include <chrono>
 #include <stdexcept>
+#include "Mesh.hpp"
 
 /*static const std::array<std::array<int, 3>, 8> A_HEX_LIN = { { {-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},{-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1} } };
 static const std::array<std::array<int, 3>, 4> A_TET_LIN = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1} } };
 static const std::array<std::array<int, 3>, 10> A_TET_QUAD = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1},{0.5,0,0},{0.5,0.5,0},{0,0.5,0},{0,0,0.5},{0.5,0,0.5},{0,0.5,0.5} } };*/
-enum BoundaryType {
-	NONE,
-	HEATSINK,
-	FLUX,
-	CONVECTION
-};
-
-struct Node {
-	double x;
-	double y;
-	double z;
-	bool isDirichlet = false;
-};
-
-struct Element {
-	std::vector<long> nodes; // index in node list used in element
-	std::array<BoundaryType, 6> faceBoundary = { NONE,NONE,NONE,NONE,NONE,NONE };
-};
-
-enum GeometricOrder {
-	LINEAR,
-	QUADRATIC
-};
-
-enum Shape {
-	TETRAHEDRAL,
-	HEXAHEDRAL
-};
 
 class MatrixBuilder
 {
 public:
 
-
-	MatrixBuilder();
-	MatrixBuilder(std::vector<Node> nodeList, std::vector<Element> elemList);
-	MatrixBuilder(std::string filename);
+	MatrixBuilder(const Mesh& mesh);
 
 	void resetMatrices();
 	void buildMatrices();
 	void applyElement(Element elem, long elemIdx);
-	void applyBoundary(Element elem);
+	void applyBoundary(BoundaryFace face);
 	float calculateHexFunction1D(float xi, int A);
 	float calculateHexFunction3D(const std::array<float, 3>& xi, int A);
 	float calculateHexFunctionDeriv1D(float xi, int A);
@@ -65,34 +35,19 @@ public:
 	Eigen::MatrixXf calculateMe(Element elem);
 	Eigen::Matrix3f calculateJ(const Element& elem, const std::array<float, 3>& xi);
 	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
-	void calculateJs(const Element& elem, int face);
-	
 
-
-
-	void setMesh(std::vector<Node> nodeList, std::vector<Element> elemList, std::vector<BoundaryType> boundary);
 	void setNodeMap();
-	void setNodeList(std::vector<Node> nodeList);
-	void setElementList(std::vector<Element> elemList);
-	void setBoundary(std::vector<BoundaryType> boundary);
 	template <class F>
 	void integrateHex8(const Element& elem, bool needDeriv, F&& body);
 	template <class F>
 	void integrateHexFace4(const Element& elem, int faceIndex, F&& body);
 
-	std::vector<Node> nodeList() { return nodeList_; }
-	std::vector<Element> elemList() { return elemList_; }
-	std::vector<BoundaryType> boundary() { return boundary_; }
 	std::vector<long> nodeMap() { return nodeMap_; }
-	GeometricOrder order() { return order_; }
+
 
 private:
-	std::vector<Node> nodeList_;
-	std::vector<Element> elemList_;
-	std::vector<BoundaryType> boundary_;
-	GeometricOrder order_ = LINEAR;
+	const Mesh& mesh_;
 	int nN1D_ = 2;
-	Shape elementShape_ = HEXAHEDRAL;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
@@ -129,7 +84,6 @@ private:
 	//Eigen::MatrixXf FeConv_; // Elemental Construction of FConv
 	//// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
 	//std::array<Eigen::MatrixXf, 6> Qe_; // Elemental construction of KConv
-
 
 };
 

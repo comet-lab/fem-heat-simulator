@@ -5,31 +5,51 @@
 
 class BaseClass : public testing::Test {
 protected:
-	std::vector<Node> nodeList;
-	MatrixBuilder mb = MatrixBuilder();
+	std::vector<Node> nodes;
+	std::vector<BoundaryFace> boundaryFaces;
+	MatrixBuilder* mb;
+	Mesh mesh;
 	Element elem;
 	void SetUp() override {
-		nodeList.resize(8);
+		nodes.resize(8);
 		for (int i = 0; i < 8; i++) {
-			nodeList[i].x = 0 + i%2;
-			nodeList[i].y = 0 + (i/2)%2;
-			nodeList[i].z = 0 + (i/4);
+			nodes[i].x = 0 + i%2;
+			nodes[i].y = 0 + (i/2)%2;
+			nodes[i].z = 0 + (i/4);
 			elem.nodes.push_back(i);
 		}
-		mb.setNodeList(nodeList);
-		mb.setElementList({ elem });
+		mesh.setNodes(nodes);
+		mesh.setElements({ elem });
+
+		boundaryFaces.resize(6);
+		for (int i = 0; i < 6; i++) {
+			boundaryFaces[i].elemID = 0;
+			boundaryFaces[i].localFaceID = i;
+			boundaryFaces[i].nodes.assign(FaceConnectivity::HEX8[i].begin(), FaceConnectivity::HEX8[i].end());
+			boundaryFaces[i].type = FLUX;
+			boundaryFaces[i].value = 1;
+		}
+		mesh.setBoundaryFaces(boundaryFaces);
+
+		mb = new MatrixBuilder(mesh);
 	};
 
-	void TearDown() override {};
+	void TearDown() override 
+	{
+		if (mb) {
+			delete mb;
+			mb = nullptr;
+		}
+	};
 };
 
 TEST_F(BaseClass, testSetNodeList)
 {
 	for (int i = 0; i < 8; i++)
 	{
-		ASSERT_EQ(nodeList[i].x, mb.nodeList()[i].x);
-		ASSERT_EQ(nodeList[i].y, mb.nodeList()[i].y);
-		ASSERT_EQ(nodeList[i].z, mb.nodeList()[i].z);
+		ASSERT_EQ(nodes[i].x, mesh.nodes()[i].x);
+		ASSERT_EQ(nodes[i].y, mesh.nodes()[i].y);
+		ASSERT_EQ(nodes[i].z, mesh.nodes()[i].z);
 	}
 }
 
@@ -46,7 +66,7 @@ TEST_F(BaseClass, testCalculateHexFunction1D)
 	{
 		for (int j = 0; j < 2; j++)
 		{
-			EXPECT_EQ(mb.calculateHexFunction1D(xi[i],A[j]), truthVal[i][j]) << "xi[i]: " << xi[i] << " A[j]: " << A[j];
+			EXPECT_EQ(mb->calculateHexFunction1D(xi[i],A[j]), truthVal[i][j]) << "xi[i]: " << xi[i] << " A[j]: " << A[j];
 		}
 	}
 }
@@ -70,9 +90,9 @@ TEST_F(BaseClass, testCalculateHexFunction3D)
 	std::array<std::array<float, 3>, 8> xi2 = { { {1,1,1},{-1,1,1},{1,-1,1},{-1,-1,1},
 												  {1,1,-1},{-1,1,-1},{1,-1,-1},{-1,-1,-1} } };
 	for (int Ai = 0; Ai < Nne; Ai++) {
-		float output1 = mb.calculateHexFunction3D(xi1[Ai], Ai);
-		float output2 = mb.calculateHexFunction3D(xi2[Ai], Ai);
-		float output3 = mb.calculateHexFunction3D({ 0,0,0 }, Ai);
+		float output1 = mb->calculateHexFunction3D(xi1[Ai], Ai);
+		float output2 = mb->calculateHexFunction3D(xi2[Ai], Ai);
+		float output3 = mb->calculateHexFunction3D({ 0,0,0 }, Ai);
 
 		EXPECT_FLOAT_EQ(1.0f, output1);
 		EXPECT_FLOAT_EQ(0.0f, output2);
@@ -87,10 +107,10 @@ TEST_F(BaseClass, testCalculateHexFunctionDeriv1D)
 {
 	for (int Ai = 0; Ai < 2; Ai++) {
 
-		float output1 = mb.calculateHexFunctionDeriv1D(-1, Ai);
-		float output2 = mb.calculateHexFunctionDeriv1D(0, Ai);
-		float output3 = mb.calculateHexFunctionDeriv1D(1, Ai);
-		float output4 = mb.calculateHexFunctionDeriv1D(-0.5, Ai);
+		float output1 = mb->calculateHexFunctionDeriv1D(-1, Ai);
+		float output2 = mb->calculateHexFunctionDeriv1D(0, Ai);
+		float output3 = mb->calculateHexFunctionDeriv1D(1, Ai);
+		float output4 = mb->calculateHexFunctionDeriv1D(-0.5, Ai);
 
 		if (Ai == 0) {
 			EXPECT_FLOAT_EQ(-1 / 2.0f, output1);
@@ -125,8 +145,8 @@ TEST_F(BaseClass, testCalculateHexFunctionDeriv3D)
 
 	for (int Ai = 0; Ai < Nne; Ai++) 
 	{	
-		Eigen::Vector3f output1 = mb.calculateHexFunctionDeriv3D(xi1[Ai], Ai);
-		Eigen::Vector3f output2 = mb.calculateHexFunctionDeriv3D({0.0f,0.0f,0.0f}, Ai);
+		Eigen::Vector3f output1 = mb->calculateHexFunctionDeriv3D(xi1[Ai], Ai);
+		Eigen::Vector3f output2 = mb->calculateHexFunctionDeriv3D({0.0f,0.0f,0.0f}, Ai);
 
 		for (int i = 0; i < 3; i++) 
 		{
@@ -142,7 +162,7 @@ TEST_F(BaseClass, testCalculateHexFunctionDeriv3D)
 */
 TEST_F(BaseClass, testCalculateJacobian)
 {
-	Eigen::Matrix3f J = mb.calculateJ(elem, { 1.0f,-1.0f,0.0f }); // position (xi) doesn't matter in this test case
+	Eigen::Matrix3f J = mb->calculateJ(elem, { 1.0f,-1.0f,0.0f }); // position (xi) doesn't matter in this test case
 
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++)
@@ -168,7 +188,7 @@ TEST_F(BaseClass, testCalculateJacobian)
 TEST_F(BaseClass, testCalculateHexLinMe)
 {
 
-	Eigen::Matrix<float, 8, 8> Me = mb.calculateMe(elem);
+	Eigen::Matrix<float, 8, 8> Me = mb->calculateMe(elem);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 2.0f, 2.0f, 4.0f, 2.0f, 4.0f, 4.0f, 8.0f };
@@ -187,7 +207,7 @@ TEST_F(BaseClass, testCalculateHexLinMe)
 TEST_F(BaseClass, testCalculateHexLinKe)
 {
 
-	Eigen::Matrix<float, 8, 8> Ke = mb.calculateKe(elem);
+	Eigen::Matrix<float, 8, 8> Ke = mb->calculateKe(elem);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 0.0f, 0.0f, -1/4.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
@@ -208,7 +228,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 {
 
 	//Face 0: Bottom Face
-	Eigen::Vector<float, 8> FeFlux = mb.calculateFeFlux(elem,0,1);
+	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux(elem,0,1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 4) || (A == 5) || (A == 6) || (A == 7))
@@ -218,7 +238,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 	}
 
 	//Face 1: Top Face
-	FeFlux = mb.calculateFeFlux(elem, 1, 1);
+	FeFlux = mb->calculateFeFlux(elem, 1, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
@@ -228,7 +248,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 	}
 
 	//Face 2: Front Face
-	FeFlux = mb.calculateFeFlux(elem, 2, 1);
+	FeFlux = mb->calculateFeFlux(elem, 2, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
@@ -238,7 +258,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 	}
 
 	//Face 3: Back Face
-	FeFlux = mb.calculateFeFlux(elem, 3, 1);
+	FeFlux = mb->calculateFeFlux(elem, 3, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
@@ -248,7 +268,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 	}
 
 	//Face 4: Left Face
-	FeFlux = mb.calculateFeFlux(elem, 4, 1);
+	FeFlux = mb->calculateFeFlux(elem, 4, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
@@ -258,7 +278,7 @@ TEST_F(BaseClass, testCalculateFeFlux)
 	}
 
 	//Face 5: Right Face
-	FeFlux = mb.calculateFeFlux(elem, 5, 1);
+	FeFlux = mb->calculateFeFlux(elem, 5, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
@@ -286,7 +306,7 @@ TEST_F(BaseClass, testCalculateFeConv)
 	int B = 0;
 	for (int f = 0; f < 6; f++)
 	{
-		Eigen::MatrixXf FeConv = mb.calculateFeConv(elem, f);
+		Eigen::MatrixXf FeConv = mb->calculateFeConv(elem, f);
 		// all of these nodes should be scaled relative to scale matrix
 		const int* nodes = faceNodes[f];
 		for (int i = 0; i < 4; i++)
@@ -322,7 +342,7 @@ TEST_F(BaseClass, TestInd2Sub1)
 	std::array<long,3> sub;
 	long index = 0;
 	std::array<long,3> size = { 10,10,10 };
-	sub = mb.ind2sub(index, size);
+	sub = mb->ind2sub(index, size);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(0, sub[1]);
 	EXPECT_FLOAT_EQ(0, sub[2]);
@@ -333,7 +353,7 @@ TEST_F(BaseClass, TestInd2Sub2)
 	std::array<long, 3> sub;
 	long index = 10;
 	std::array<long, 3> size = { 10,10,10 };
-	sub = mb.ind2sub(index, size);
+	sub = mb->ind2sub(index, size);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(1, sub[1]);
 	EXPECT_FLOAT_EQ(0, sub[2]);
@@ -344,7 +364,7 @@ TEST_F(BaseClass, TestInd2Sub3)
 	std::array<long, 3> sub;
 	long index = 100;
 	std::array<long, 3> size = { 10,10,10 };
-	sub = mb.ind2sub(index, size);
+	sub = mb->ind2sub(index, size);
 	EXPECT_FLOAT_EQ(0, sub[0]);
 	EXPECT_FLOAT_EQ(0, sub[1]);
 	EXPECT_FLOAT_EQ(1, sub[2]);
@@ -355,7 +375,7 @@ TEST_F(BaseClass, TestInd2Sub4)
 	std::array<long, 3> sub;
 	long index = 521;
 	std::array<long, 3> size = { 10,10,10 };
-	sub = mb.ind2sub(index, size);
+	sub = mb->ind2sub(index, size);
 	EXPECT_FLOAT_EQ(1, sub[0]);
 	EXPECT_FLOAT_EQ(2, sub[1]);
 	EXPECT_FLOAT_EQ(5, sub[2]);

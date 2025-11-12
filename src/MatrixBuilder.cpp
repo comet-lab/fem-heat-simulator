@@ -1,16 +1,9 @@
 #include "MatrixBuilder.h"
 
 
-MatrixBuilder::MatrixBuilder()
+MatrixBuilder::MatrixBuilder(const Mesh& mesh) : mesh_(mesh)
 {
-}
-
-MatrixBuilder::MatrixBuilder(std::vector<Node> nodeList, std::vector<Element> elemList)
-{
-}
-
-MatrixBuilder::MatrixBuilder(std::string filename)
-{
+	setNodeMap();
 }
 
 
@@ -21,9 +14,9 @@ void MatrixBuilder::resetMatrices()
 	//  number of non-dirichlet nodes
 	int nValidNodes = validNodes_.size();
 	// total number of nodes
-	int nNodes = nodeList_.size();
+	int nNodes = mesh_.nodes().size();
 	// Initialize matrices so that we don't have to resize them later
-	FintElem_ = Eigen::SparseMatrix<float>(nValidNodes, elemList_.size());
+	FintElem_ = Eigen::SparseMatrix<float>(nValidNodes, mesh_.elements().size());
 	FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nN1D_*nN1D_*nN1D_));
 
 	Fint_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
@@ -51,13 +44,16 @@ void MatrixBuilder::resetMatrices()
 void MatrixBuilder::buildMatrices()
 {
 	resetMatrices();
-
-	long nElem = elemList_.size();
-	for (int elemIdx = 0; elemIdx < nElem; elemIdx++)
+	std::vector<Element> elements = mesh_.elements();
+	long nElem = mesh_.elements().size();
+	for (int elemIdx = 0; elemIdx < mesh_.elements().size(); elemIdx++)
 	{
-		Element elem = elemList_[elemIdx];
+		Element elem = elements[elemIdx];
 		applyElement(elem, elemIdx);
-		applyBoundary(elem);
+	}
+	for (int f = 0; f < mesh_.boundaryFaces().size(); f++)
+	{
+		applyBoundary(mesh_.boundaryFaces()[f]);
 	}
 }
 
@@ -72,21 +68,22 @@ void MatrixBuilder::applyElement(Element elem, long elemIdx)
 
 	for (int A = 0; A < nodesPerElem; A++)
 	{
-		Node currNode = nodeList_[elem.nodes[A]];
-		if (!currNode.isDirichlet)
+		Node currNode = mesh_.nodes()[elem.nodes[A]];
+		matrixRow = nodeMap_[elem.nodes[A]];
+		if (matrixRow >= 0)
 		{
 			// handle node-neighbor interactions
-			matrixRow = nodeMap_[elem.nodes[A]];
+			
 			for (int B = 0; B < nodesPerElem; B++)
 			{
 				long neighborIdx = elem.nodes[B];
 				matrixCol = nodeMap_[neighborIdx];
-				Node neighbor = nodeList_[neighborIdx];
+				Node neighbor = mesh_.nodes()[neighborIdx];
 				// Add effect of nodal fluence rate 
 				Fint_.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
 				// Add effect of element fluence rate
 				FintElem_.coeffRef(matrixRow, elemIdx) += Fe(A, B);
-				if (!neighbor.isDirichlet)
+				if (matrixCol >= 0) // non dirichlet node
 				{
 					// add effect of mass matrix
 					M_.coeffRef(matrixRow, matrixCol) += Me(A, B);
@@ -103,50 +100,49 @@ void MatrixBuilder::applyElement(Element elem, long elemIdx)
 	} // for each node in element
 }
 
-void MatrixBuilder::applyBoundary(Element elem)
+void MatrixBuilder::applyBoundary(BoundaryFace face)
 {
-	int nodesPerElem = elem.nodes.size();
-	long matrixRow = 0;
-	long matrixCol = 0;
-	// handle boundary conditions of element
-	for (int f; f < 6; f++) // iterate over faces
+	if (face.type == CONVECTION)
 	{
-		if (elem.faceBoundary[f] == BoundaryType::CONVECTION)
+		long matrixRow = 0;
+		long matrixCol = 0;
+		Element elem = mesh_.elements()[face.elemID];
+		int nodesPerElem = elem.nodes.size();
+		Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
+		Eigen::VectorXf FeConv = calculateFeConv(elem, face.localFaceID);
+		for (int A = 0; A < nodesPerElem; A++)
 		{
-			Eigen::VectorXf Feflux = calculateFeFlux(elem, f, 1);
-			Eigen::VectorXf FeConv = calculateFeConv(elem, f);
-			for (int A = 0; A < nodesPerElem; A++)
+			long matrixRow = nodeMap_[elem.nodes[A]];
+			// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
+			// needs to be multiplied by htc and ambient temp to be the correct value.
+			Fq_(matrixRow) += Feflux(A);
+			for (int B = 0; B < nodesPerElem; B++)
 			{
-				matrixRow = nodeMap_[elem.nodes[A]];
-				// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
-				// needs to be multiplied by htc and ambient temp to be the correct value.
-				Fq_(matrixRow) += Feflux(A);
-				for (int B = 0; B < nodesPerElem; B++)
+				long neighborIdx = elem.nodes[B];
+				matrixCol = nodeMap_[neighborIdx];
+				Node neighbor = mesh_.nodes()[neighborIdx];
+				if (matrixCol >= 0) // non dirichlet node
 				{
-					long neighborIdx = elem.nodes[B];
-					matrixCol = nodeMap_[neighborIdx];
-					Node neighbor = nodeList_[neighborIdx];
-					if (!neighbor.isDirichlet)
-					{
-						// add effect of node temperature on convection
-						Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
-					}
-					else
-					{
-						// Add effect of node temperature as forcing function
-						Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
-					}
+					// add effect of node temperature on convection
+					Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
+				}
+				else
+				{
+					// Add effect of node temperature as forcing function
+					Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
 				}
 			}
 		}
-		else if (elem.faceBoundary[f] == BoundaryType::FLUX)
+	}
+	else if (face.type == FLUX)
+	{
+		Element elem = mesh_.elements()[face.elemID];
+		long matrixRow = 0;
+		Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
+		for (int A : face.nodes)
 		{
-			Eigen::VectorXf Feflux = calculateFeFlux(elem, f, 1);
-			for (int A = 0; A < nodesPerElem; A++)
-			{
-				matrixRow = nodeMap_[elem.nodes[A]];
-				this->Fflux_(matrixRow) += Feflux(A);
-			}
+			matrixRow = nodeMap_[A];
+			this->Fflux_(matrixRow) += Feflux(A);
 		}
 	}
 }
@@ -341,17 +337,17 @@ Eigen::Matrix3f MatrixBuilder::calculateJ(const Element& elem, const std::array<
 	for (int a = 0; a < 8; ++a)
 	{
 		Eigen::Vector3f dN = calculateHexFunctionDeriv3D(xi, a);
-		J(0, 0) += dN(0) * nodeList_[elem.nodes[a]].x;
-		J(0, 1) += dN(0) * nodeList_[elem.nodes[a]].y;
-		J(0, 2) += dN(0) * nodeList_[elem.nodes[a]].z;
+		J(0, 0) += dN(0) * mesh_.nodes()[elem.nodes[a]].x;
+		J(0, 1) += dN(0) * mesh_.nodes()[elem.nodes[a]].y;
+		J(0, 2) += dN(0) * mesh_.nodes()[elem.nodes[a]].z;
 
-		J(1, 0) += dN(1) * nodeList_[elem.nodes[a]].x;
-		J(1, 1) += dN(1) * nodeList_[elem.nodes[a]].y;
-		J(1, 2) += dN(1) * nodeList_[elem.nodes[a]].z;
+		J(1, 0) += dN(1) * mesh_.nodes()[elem.nodes[a]].x;
+		J(1, 1) += dN(1) * mesh_.nodes()[elem.nodes[a]].y;
+		J(1, 2) += dN(1) * mesh_.nodes()[elem.nodes[a]].z;
 
-		J(2, 0) += dN(2) * nodeList_[elem.nodes[a]].x;
-		J(2, 1) += dN(2) * nodeList_[elem.nodes[a]].y;
-		J(2, 2) += dN(2) * nodeList_[elem.nodes[a]].z;
+		J(2, 0) += dN(2) * mesh_.nodes()[elem.nodes[a]].x;
+		J(2, 1) += dN(2) * mesh_.nodes()[elem.nodes[a]].y;
+		J(2, 2) += dN(2) * mesh_.nodes()[elem.nodes[a]].z;
 	}
 	return J;
 }
@@ -366,13 +362,37 @@ std::array<long, 3> MatrixBuilder::ind2sub(long idx,const std::array<long,3>& si
 	return sub;
 }
 
-void MatrixBuilder::setNodeList(std::vector<Node> nodeList)
-{
-	nodeList_ = nodeList;
-}
 
-void MatrixBuilder::setElementList(std::vector<Element> elemList)
+
+/**
+* @brief sets the mapping between index in global matrices and node global index
+*/
+void MatrixBuilder::setNodeMap()
 {
-	elemList_ = elemList;
+	nodeMap_.resize(mesh_.nodes().size());
+	std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
+	// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
+	for (BoundaryFace face : mesh_.boundaryFaces())
+	{
+		if (face.type == HEATSINK)
+		{
+			for (long n : face.nodes)
+			{
+				nodeMap_[n] = -1;
+			}
+		}
+	}
+	// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
+	// Also, store the index of the valid node. 
+	long counter = 0;
+	for (int i = 0; i < mesh_.nodes().size(); i++)
+	{
+		if (nodeMap_[i] == 0)
+		{
+			nodeMap_[i] = counter;
+			validNodes_.push_back(i);
+			counter++;
+		}
+	}
 }
 
