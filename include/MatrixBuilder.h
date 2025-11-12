@@ -8,39 +8,371 @@
 #include <stdexcept>
 #include "Mesh.hpp"
 
-/*static const std::array<std::array<int, 3>, 8> A_HEX_LIN = { { {-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},{-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1} } };
-static const std::array<std::array<int, 3>, 4> A_TET_LIN = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1} } };
-static const std::array<std::array<int, 3>, 10> A_TET_QUAD = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1},{0.5,0,0},{0.5,0.5,0},{0,0.5,0},{0,0,0.5},{0.5,0,0.5},{0,0.5,0.5} } };*/
-
+template <typename ShapeFunc>
 class MatrixBuilder
 {
 public:
 
-	MatrixBuilder(const Mesh& mesh);
+	MatrixBuilder(const Mesh& mesh) : mesh_(mesh) { setNodeMap(); }
 
-	void resetMatrices();
-	void buildMatrices();
-	void applyElement(Element elem, long elemIdx);
-	void applyBoundary(BoundaryFace face);
-	float calculateHexFunction1D(float xi, int A);
-	float calculateHexFunction3D(const std::array<float, 3>& xi, int A);
-	float calculateHexFunctionDeriv1D(float xi, int A);
-	Eigen::Vector3f calculateHexFunctionDeriv3D(const std::array<float, 3>& xi, int A);
-	float calculateTetFunction3D(const std::array<float, 3>& xi, int A);
-	Eigen::Vector3f calculateTetFunctionDeriv3D(const std::array<float, 3>& xi, int A);
+	void resetMatrices()
+	{
+		// The number of non-zeros per column this should be a safe number
+		int nRelatedNodes = ShapeFunc::nNodes * ShapeFunc::nNodes * ShapeFunc::nNodes;
+		//  number of non-dirichlet nodes
+		int nValidNodes = validNodes_.size();
+		// total number of nodes
+		int nNodes = mesh_.nodes().size();
+		int nodesPerElem = ShapeFunc::nNodes;
+		// Initialize matrices so that we don't have to resize them later
+		FintElem_ = Eigen::SparseMatrix<float>(nValidNodes, mesh_.elements().size());
+		FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
 
-	Eigen::MatrixXf calculateKe(const Element& elem);
-	Eigen::MatrixXf calculateFeFlux(const Element& elem, int faceIndex, float q);
-	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex);
-	Eigen::MatrixXf calculateMe(Element elem);
-	Eigen::Matrix3f calculateJ(const Element& elem, const std::array<float, 3>& xi);
-	std::array<long, 3> ind2sub(long idx, const std::array<long, 3>& size);
+		Fint_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-	void setNodeMap();
-	template <class F>
-	void integrateHex8(const Element& elem, bool needDeriv, F&& body);
-	template <class F>
-	void integrateHexFace4(const Element& elem, int faceIndex, F&& body);
+		Fconv_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fconv_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+
+		Fk_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+
+		Fflux_ = Eigen::VectorXf::Zero(nValidNodes);
+		Fq_ = Eigen::VectorXf::Zero(nValidNodes);
+
+		// M and K will be sparse matrices because nodes are shared by relatively few elements
+		M_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
+		M_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+		K_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
+		K_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+		// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
+		Q_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
+		Q_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+	}
+
+
+	void buildMatrices()
+	{
+		resetMatrices();
+		std::vector<Element> elements = mesh_.elements();
+		long nElem = mesh_.elements().size();
+		for (int elemIdx = 0; elemIdx < mesh_.elements().size(); elemIdx++)
+		{
+			Element elem = elements[elemIdx];
+			applyElement(elem, elemIdx);
+		}
+		for (int f = 0; f < mesh_.boundaryFaces().size(); f++)
+		{
+			applyBoundary(mesh_.boundaryFaces()[f]);
+		}
+	}
+
+	void applyElement(Element elem, long elemIdx)
+	{
+		int nodesPerElem = ShapeFunc::nNodes;
+		long matrixRow = 0;
+		long matrixCol = 0;
+		Eigen::MatrixXf Me = calculateMe(elem);
+		Eigen::MatrixXf Fe = calculateMe(elem);
+		Eigen::MatrixXf Ke = calculateKe(elem);
+
+		for (int A = 0; A < nodesPerElem; A++)
+		{
+			Node currNode = mesh_.nodes()[elem.nodes[A]];
+			matrixRow = nodeMap_[elem.nodes[A]];
+			if (matrixRow >= 0)
+			{
+				// handle node-neighbor interactions
+
+				for (int B = 0; B < nodesPerElem; B++)
+				{
+					long neighborIdx = elem.nodes[B];
+					matrixCol = nodeMap_[neighborIdx];
+					Node neighbor = mesh_.nodes()[neighborIdx];
+					// Add effect of nodal fluence rate 
+					Fint_.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
+					// Add effect of element fluence rate
+					FintElem_.coeffRef(matrixRow, elemIdx) += Fe(A, B);
+					if (matrixCol >= 0) // non dirichlet node
+					{
+						// add effect of mass matrix
+						M_.coeffRef(matrixRow, matrixCol) += Me(A, B);
+						// add effect of conductivity matrix
+						K_.coeffRef(matrixRow, matrixCol) += Ke(A, B);
+					}
+					else
+					{
+						// add conductivity as a forcing effect
+						Fk_.coeffRef(matrixRow, neighborIdx) -= Ke(A, B);
+					}
+				} // for each neighbor node
+			} // if node is not dirichlet
+		} // for each node in element
+	}
+
+	void applyBoundary(BoundaryFace face)
+	{
+		if (face.type == CONVECTION)
+		{
+			long matrixRow = 0;
+			long matrixCol = 0;
+			Element elem = mesh_.elements()[face.elemID];
+			int nodesPerElem = ShapeFunc::nNodes;
+			Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
+			Eigen::VectorXf FeConv = calculateFeConv(elem, face.localFaceID);
+			for (int A = 0; A < nodesPerElem; A++)
+			{
+				long matrixRow = nodeMap_[elem.nodes[A]];
+				// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
+				// needs to be multiplied by htc and ambient temp to be the correct value.
+				Fq_(matrixRow) += Feflux(A);
+				for (int B = 0; B < nodesPerElem; B++)
+				{
+					long neighborIdx = elem.nodes[B];
+					matrixCol = nodeMap_[neighborIdx];
+					Node neighbor = mesh_.nodes()[neighborIdx];
+					if (matrixCol >= 0) // non dirichlet node
+					{
+						// add effect of node temperature on convection
+						Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
+					}
+					else
+					{
+						// Add effect of node temperature as forcing function
+						Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
+					}
+				}
+			}
+		}
+		else if (face.type == FLUX)
+		{
+			Element elem = mesh_.elements()[face.elemID];
+			long matrixRow = 0;
+			Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
+			for (int A : face.nodes)
+			{
+				matrixRow = nodeMap_[A];
+				this->Fflux_(matrixRow) += Feflux(A);
+			}
+		}
+	}
+
+	Eigen::MatrixXf calculateMe(const Element& elem) 
+	{
+
+		Eigen::MatrixXf Me = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
+
+		// simple 2-point Gauss integration in each axis (example)
+		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
+		const std::vector<std::array<float, 3>>& w = ShapeFunc::weights();
+
+		for (int i = 0; i < ShapeFunc::nGP; i++)
+		{
+			std::array<float, 3> xi = gp[i];
+			std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
+			std::array<float,ShapeFunc::nNodes> Nvals;
+			for (int a = 0; a < ShapeFunc::nNodes; a++)
+			{
+				Nvals[a] = ShapeFunc::N(xi, a);
+				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
+			}
+			// Jacobian and determinant (simplified)
+			Eigen::Matrix3f J = calculateJ(elem, dNdxi);
+			float detJ = J.determinant();
+			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
+
+			for (int a = 0; a < ShapeFunc::nNodes; a++)
+				for (int b = 0; b < ShapeFunc::nNodes; b++)
+					Me(a, b) += Nvals[a] * Nvals[b] * weight;
+		}
+
+		return Me;
+	}
+
+	Eigen::MatrixXf calculateKe(const Element& elem)
+	{
+		Eigen::MatrixXf Ke = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
+
+		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
+		const std::vector<std::array<float, 3>>& w = ShapeFunc::weights();
+
+		for (int i = 0; i < ShapeFunc::nGP; ++i)
+		{
+			const std::array<float, 3>& xi = gp[i];
+
+			// Shape function derivatives in reference coordinates
+			std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
+			for (int a = 0; a < ShapeFunc::nNodes; ++a)
+				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
+
+			// Compute Jacobian and inverse
+			Eigen::Matrix3f J = calculateJ(elem, dNdxi);
+			Eigen::Matrix3f Jinv = J.inverse();
+			float detJ = J.determinant();
+
+			// Derivatives in physical coordinates
+			std::array<Eigen::Vector3f, ShapeFunc::nNodes> dNdx;
+			for (int a = 0; a < ShapeFunc::nNodes; ++a)
+				dNdx[a] = Jinv * dNdxi[a];
+
+			// Weight for this Gauss point
+			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
+
+			// Assemble stiffness matrix
+			for (int a = 0; a < ShapeFunc::nNodes; ++a)
+				for (int b = 0; b < ShapeFunc::nNodes; ++b)
+					Ke(a, b) += dNdx[a].dot(dNdx[b]) * weight;
+		}
+
+		return Ke;
+	}
+
+	Eigen::MatrixXf calculateFeFlux(const Element& elem, int faceIndex, float q)
+	{
+		Eigen::Matrix<float, ShapeFunc::nNodes, 1> Fe = Eigen::Matrix<float, ShapeFunc::nNodes, 1>::Zero();
+
+		const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
+		const auto& w = ShapeFunc::faceWeights(faceIndex);
+
+		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
+		{
+			std::array<float, ShapeFunc::nFaceNodes> N_face;
+			std::array<Eigen::Vector2f, ShapeFunc::nFaceNodes> dN_dxi_eta;
+
+			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
+			{
+				N_face[a] = ShapeFunc::N_face(gp[i], a, faceIndex);
+				dN_dxi_eta[a] = ShapeFunc::dNdxi_face(gp[i], a, faceIndex);
+			}
+
+			// Compute 2x3 surface Jacobian
+			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
+			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
+			{
+				const Node& n = mesh_.nodes()[faceNodes[a]];
+				Eigen::Vector3f nodePos(n.x, n.y, n.z);
+				JFace.row(0) += dN_dxi_eta * nodePos.transpose();
+				JFace.row(1) += dN_dxi_eta * nodePos.transpose();
+			}
+
+			// Surface determinant: norm of cross product of rows
+			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
+
+			float weight = w[i][0] * w[i][1] * detJ;
+
+			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
+				Fe(ShapeFunc::faceNodeIndex(faceIndex, a)) += N_face[a] * q * weight;
+		}
+
+		return Fe;
+	}
+
+	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex)
+	{
+		constexpr int nNodes = ShapeFunc::nNodes;
+		constexpr int nFaceNodes = ShapeFunc::nFaceNodes;
+
+		Eigen::Matrix<float, nNodes, nNodes> Qe = Eigen::Matrix<float, nNodes, nNodes>::Zero();
+
+		const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
+		const auto& w = ShapeFunc::faceWeights(faceIndex);
+
+		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
+		{
+			std::array<float, nFaceNodes> N_face;
+			std::array<Eigen::Vector2f, nFaceNodes> dN_dxi_eta;
+
+			for (int a = 0; a < nFaceNodes; ++a)
+			{
+				N_face[a] = ShapeFunc::N_face(gp[i], a, faceIndex);
+				dN_dxi_eta[a] = ShapeFunc::dNdxi_face(gp[i], a, faceIndex); // returns 2D derivatives in 
+			}
+
+			// Get node positions for this face
+			std::vector<Node> faceNodes;
+			for (int a = 0; a < nFaceNodes; ++a)
+				faceNodes.push_back(mesh_.nodes()[elem.nodes[ShapeFunc::faceNodeIndex(faceIndex, a)]]);
+
+			// Compute surface Jacobian
+			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
+			for (int a = 0; a < nFaceNodes; ++a)
+			{
+				Eigen::Vector3f nodePos(faceNodes[a].x, faceNodes[a].y, faceNodes[a].z);
+				JFace.row(0) += dN_dxi_eta[a][0] * nodePos.transpose();
+				JFace.row(1) += dN_dxi_eta[a][1] * nodePos.transpose();
+			}
+
+			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
+
+			float weight = w[i][0] * w[i][1] * detJ;
+
+			// Assemble local face contribution
+			for (int a = 0; a < nFaceNodes; ++a)
+			{
+				int globalA = ShapeFunc::faceNodeIndex(faceIndex, a);
+				for (int b = 0; b < nFaceNodes; ++b)
+				{
+					int globalB = ShapeFunc::faceNodeIndex(faceIndex, b);
+					Qe(globalA, globalB) += N_face[a] * N_face[b] * weight;
+				}
+			}
+		}
+
+		return Qe;
+	}
+	
+	Eigen::Matrix3f calculateJ(const Element& elem, const std::vector<Eigen::Vector3f> dNdxi)
+	{
+		Eigen::Matrix3f J = Eigen::Matrix3f::Zero();
+
+		for (int a = 0; a < ShapeFunc::nNodes; ++a)
+		{
+			const Node& n = mesh_.nodes()[elem.nodes[a]];
+			Eigen::Vector3f nodePos(n.x, n.y, n.z);
+			J += dNdxi[a] * nodePos.transpose();
+			/*J(0, 0) += dN(0) * mesh_.nodes()[elem.nodes[a]].x;
+			J(0, 1) += dN(0) * mesh_.nodes()[elem.nodes[a]].y;
+			J(0, 2) += dN(0) * mesh_.nodes()[elem.nodes[a]].z;
+
+			J(1, 0) += dN(1) * mesh_.nodes()[elem.nodes[a]].x;
+			J(1, 1) += dN(1) * mesh_.nodes()[elem.nodes[a]].y;
+			J(1, 2) += dN(1) * mesh_.nodes()[elem.nodes[a]].z;
+
+			J(2, 0) += dN(2) * mesh_.nodes()[elem.nodes[a]].x;
+			J(2, 1) += dN(2) * mesh_.nodes()[elem.nodes[a]].y;
+			J(2, 2) += dN(2) * mesh_.nodes()[elem.nodes[a]].z;*/
+		}
+		return J;
+	}
+
+	void setNodeMap()
+	{
+		nodeMap_.resize(mesh_.nodes().size());
+		std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
+		// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
+		for (BoundaryFace face : mesh_.boundaryFaces())
+		{
+			if (face.type == HEATSINK)
+			{
+				for (long n : face.nodes)
+				{
+					nodeMap_[n] = -1;
+				}
+			}
+		}
+		// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
+		// Also, store the index of the valid node. 
+		long counter = 0;
+		for (int i = 0; i < mesh_.nodes().size(); i++)
+		{
+			if (nodeMap_[i] == 0)
+			{
+				nodeMap_[i] = counter;
+				validNodes_.push_back(i);
+				counter++;
+			}
+		}
+	}
 
 	std::vector<long> nodeMap() { return nodeMap_; }
 	std::vector<long> validNodes() { return validNodes_; }
@@ -48,7 +380,6 @@ public:
 
 private:
 	const Mesh& mesh_;
-	int nN1D_ = 2;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
@@ -75,130 +406,4 @@ private:
 	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
 	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
 
-	//// because of our assumptions, these don't need to be recalculated every time and can be class variables.
-	//Eigen::MatrixXf Ke_; // Elemental Construction of Kint
-	//Eigen::MatrixXf Me_; // Elemental construction of M
-	//Eigen::MatrixXf FeInt_; // Elemental Construction of FirrElem
-	//// FeQ is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	//Eigen::MatrixXf FeQ_; // Element Construction of Fq
-	//// FeConv is a 4x1 vector for each face, but we save it as an 8x6 matrix so we can take advantage of having A
-	//Eigen::MatrixXf FeConv_; // Elemental Construction of FConv
-	//// KeConv is a 4x4 matrix for each face, but we save it as a vector of 8x8 matrices so we can take advantage of having local node coordinates A 
-	//std::array<Eigen::MatrixXf, 6> Qe_; // Elemental construction of KConv
-
 };
-
-
-template <class F>
-inline void MatrixBuilder::integrateHex8(const Element& elem, bool needDeriv, F&& body)
-{
-	const float g = 1.0f / std::sqrt(3.0f);
-	const float gp[8][3] = {
-		{-g,-g,-g}, { g,-g,-g}, { g, g,-g}, {-g, g,-g},
-		{-g,-g, g}, { g,-g, g}, { g, g, g}, {-g, g, g}
-	};
-
-	for (int k = 0; k < 8; k++)
-	{
-		// Parent-domain coordinates
-		std::array<float,3> xi = { gp[k][0], gp[k][1], gp[k][2] };
-
-		// Compute shape data
-		float N[8];
-		Eigen::Vector3f dN_dxi[8];
-
-		for (int A = 0; A < 8; A++)
-		{
-			N[A] = calculateHexFunction3D(xi, A);
-			if (needDeriv)
-				dN_dxi[A] = calculateHexFunctionDeriv3D(xi, A);
-		}
-
-		// Compute Jacobian using your dedicated function
-		Eigen::Matrix3f J = calculateJ(elem, xi);       // fills J_
-
-		float detJ = J.determinant();
-		if (detJ <= 0.0f)
-			throw std::runtime_error("Negative Jacobian in integrateHex8().");
-
-
-		// Compute derivatives in physical space
-		Eigen::Vector3f dN_dx[8];
-		if (needDeriv)
-		{
-			Eigen::Matrix3f Jinv = J.inverse();		
-			for (int a = 0; a < 8; ++a)
-				dN_dx[a] = Jinv * dN_dxi[a];  // chain rule: dN/dx = J^-1 * dN/dxi
-		}
-
-		// All Gaussian weights = 1, so weight = detJ
-		float weight = detJ;
-
-		// Call user integrand
-		body(N, dN_dx, weight);
-	}
-}
-
-
-template <class F>
-inline void MatrixBuilder::integrateHexFace4(const Element& elem, int faceIndex, F&& body)
-{
-	// Hex8 face local node indices
-	constexpr int faceNodes[6][4] = {
-		{0,1,3,2}, {4,5,6,7}, {0,1,5,4},
-		{3,2,6,7}, {0,2,6,4}, {1,3,7,5}
-	};
-	const int* nodesOnFace = faceNodes[faceIndex];
-	//std::cout << "Nodes on Face: " << nodesOnFace[0] << ", " << nodesOnFace[1] << ", " << nodesOnFace[2] << ", " << nodesOnFace[3] << std::endl;
-
-	const float g = 1.0f / std::sqrt(3.0f);
-	float gp[2] = { -g, g }; // 2-point Gauss quadrature in each parametric direction
-
-	// Loop over 2x2 Gauss points
-	for (int i = 0; i < 2; ++i)
-		for (int j = 0; j < 2; ++j)
-		{
-			float xi_face[2] = { gp[i], gp[j] };
-
-			// Map 2D face coordinates to 3D element parent coordinates
-			std::array<float,3> xi;
-			switch (faceIndex)
-			{
-			case 0: xi[0] = xi_face[0]; xi[1] = xi_face[1]; xi[2] = -1.0f; break; // bottom
-			case 1: xi[0] = xi_face[0]; xi[1] = xi_face[1]; xi[2] = 1.0f; break; // top
-			case 2: xi[0] = xi_face[0]; xi[1] = -1.0f;   xi[2] = xi_face[1]; break; // front
-			case 3: xi[0] = xi_face[0]; xi[1] = 1.0f;   xi[2] = xi_face[1]; break; // back
-			case 4: xi[0] = -1.0f;   xi[1] = xi_face[0]; xi[2] = xi_face[1]; break; // left
-			case 5: xi[0] = 1.0f;   xi[1] = xi_face[0]; xi[2] = xi_face[1]; break; // right
-			}
-
-			// Compute shape functions and derivatives for the 4 face nodes
-			float N_face[4];
-			Eigen::Vector3f dN_dxi[4];
-			for (int a = 0; a < 4; ++a)
-			{
-				int nodeIdx = nodesOnFace[a];
-				N_face[a] = calculateHexFunction3D(xi, nodeIdx);
-				dN_dxi[a] = calculateHexFunctionDeriv3D(xi, nodeIdx);
-			}
-
-			// Compute Jacobian for the face
-			Eigen::Matrix3f J = calculateJ(elem, xi);
-			Eigen::Vector3f t1, t2;
-			switch (faceIndex)
-			{
-			case 0: t1 = J.col(0); t2 = J.col(1); break; // bot face
-			case 1: t1 = J.col(0); t2 = J.col(1); break; // top face
-			case 2: t1 = J.col(0); t2 = J.col(2); break; // front face
-			case 3: t1 = J.col(0); t2 = J.col(2); break; // back face
-			case 4: t1 = J.col(1); t2 = J.col(2); break; // left face
-			case 5: t1 = J.col(1); t2 = J.col(2); break; // right face
-			}
-			float dS = t1.cross(t2).norm();
-
-			float weight = dS; // 2x2 Gauss weights = 1*1
-
-			// Call user integrand
-			body(N_face, nodesOnFace, weight);
-		}
-}

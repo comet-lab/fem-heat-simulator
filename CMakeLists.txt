@@ -61,12 +61,14 @@ endif()
 
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
-    src/MatrixBuilder.cpp
+    src/Mesh.cpp
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
     include/MatrixBuilder.h
+    include/ShapeFunctions/HexLinear.hpp
+
 )
 
 # GPU sources (conditionally)
@@ -85,14 +87,14 @@ endif()
 # ──────────────────────────────
 # STATIC LIBRARY
 # ──────────────────────────────
-add_library(HeatSimulationStatic STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS} "src/Mesh.cpp")
+add_library(HeatSimulationStatic STATIC ${HEATSIM_SRC} ${HEATSIM_HEADERS})
 add_library(HeatSimulation::Static ALIAS HeatSimulationStatic)
 set_target_properties(HeatSimulationStatic PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ──────────────────────────────
 # SHARED LIBRARY
 # ──────────────────────────────
-add_library(HeatSimulationShared SHARED ${HEATSIM_SRC} ${HEATSIM_HEADERS} "src/Mesh.cpp")
+add_library(HeatSimulationShared SHARED ${HEATSIM_SRC} ${HEATSIM_HEADERS})
 add_library(HeatSimulation::Shared ALIAS HeatSimulationShared)
 set_target_properties(HeatSimulationShared PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
@@ -172,7 +174,7 @@ if(BUILD_TESTING)
     add_executable(FEM_Unit_Tests
         test/FEM_Unit_Tests.cpp
         test/BaseSim.cpp
-     "src/Mesh.cpp")
+    )
     target_link_libraries(FEM_Unit_Tests
         PRIVATE
             HeatSimulation::Static
@@ -181,7 +183,7 @@ if(BUILD_TESTING)
 
     add_executable(MatrixBuilderTests
         test/MatrixBuilderTests.cpp
-     "src/Mesh.cpp")
+    )
     target_link_libraries(MatrixBuilderTests
         HeatSimulation::Static    
         GTest::gtest_main
