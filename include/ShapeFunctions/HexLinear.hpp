@@ -10,6 +10,12 @@ namespace ShapeFunctions {
         static constexpr int nNodes = 8;
         static constexpr int nGP = 8;
         static constexpr int nFaceGP = 4;
+        static constexpr int nFaceNodes = 4;
+
+        static inline int faceNodeIndex(int faceIdx, int a)
+        {
+            return FaceConnectivity::HEX8[faceIdx][a];
+        }
 
         // Evaluate shape function
         static inline float N(const std::array<float, 3>& xi, int A)

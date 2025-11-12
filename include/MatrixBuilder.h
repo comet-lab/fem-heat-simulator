@@ -1,5 +1,6 @@
 #pragma once
 #include <vector> 
+#include <array>
 #include <algorithm>
 #include <functional>
 #include <Eigen/Dense>
@@ -249,10 +250,9 @@ public:
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
-				const Node& n = mesh_.nodes()[faceNodes[a]];
+				const Node& n = mesh_.nodes()[ShapeFunc::faceNodeIndex(faceIndex, a)];
 				Eigen::Vector3f nodePos(n.x, n.y, n.z);
-				JFace.row(0) += dN_dxi_eta * nodePos.transpose();
-				JFace.row(1) += dN_dxi_eta * nodePos.transpose();
+				JFace += dN_dxi_eta[a] * nodePos.transpose();
 			}
 
 			// Surface determinant: norm of cross product of rows
@@ -298,8 +298,7 @@ public:
 			for (int a = 0; a < nFaceNodes; ++a)
 			{
 				Eigen::Vector3f nodePos(faceNodes[a].x, faceNodes[a].y, faceNodes[a].z);
-				JFace.row(0) += dN_dxi_eta[a][0] * nodePos.transpose();
-				JFace.row(1) += dN_dxi_eta[a][1] * nodePos.transpose();
+				JFace += dN_dxi_eta[a] * nodePos.transpose();
 			}
 
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();

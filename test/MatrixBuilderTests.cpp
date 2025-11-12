@@ -163,26 +163,32 @@ TEST_F(BaseClass, testCalculateHexFunctionDeriv3D)
 * Calculating the Jacobian. Based on the element we created, the Jacobian should simply be
 * a diagonal element with 0.5 for each diagonal element
 */
-//TEST_F(BaseClass, testCalculateJacobian)
-//{
-//	Eigen::Matrix3f J = mb->calculateJ(elem, { 1.0f,-1.0f,0.0f }); // position (xi) doesn't matter in this test case
-//
-//	for (int i = 0; i < 3; i++) {
-//		for (int j = 0; j < 3; j++)
-//		{
-//			if (i == j)
-//			{
-//				// diagonal should be 1
-//				EXPECT_FLOAT_EQ(J(i, j), 0.5f);
-//			}
-//			else
-//			{
-//				// off diagonal should be 0
-//				EXPECT_FLOAT_EQ(J(i, j), 0);
-//			}
-//		}
-//	}
-//}
+TEST_F(BaseClass, testCalculateJacobian)
+{
+	std::vector<Eigen::Vector3f> dNdxi(8);
+	for (int a = 0; a < 8; a++)
+	{
+		dNdxi[a] = ShapeFunctions::HexLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
+	}
+	
+	Eigen::Matrix3f J = mb->calculateJ(elem, dNdxi); // position (xi) doesn't matter in this test case
+
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++)
+		{
+			if (i == j)
+			{
+				// diagonal should be 1
+				EXPECT_FLOAT_EQ(J(i, j), 0.5f);
+			}
+			else
+			{
+				// off diagonal should be 0
+				EXPECT_FLOAT_EQ(J(i, j), 0);
+			}
+		}
+	}
+}
 
 /*
 * Testing the calculation of Me. For the single element we have it should be straightforward
@@ -224,178 +230,134 @@ TEST_F(BaseClass, testCalculateHexLinKe)
 }
 
 /*
+* Testing the calculation of Feflux for single HexLinear Element
+*
+*/
+TEST_F(BaseClass, testCalculateFeFlux)
+{
+
+	//Face 0: Bottom Face
+	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux(elem,0,1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 4) || (A == 5) || (A == 6) || (A == 7))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+
+	//Face 1: Top Face
+	FeFlux = mb->calculateFeFlux(elem, 1, 1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+
+	//Face 2: Front Face
+	FeFlux = mb->calculateFeFlux(elem, 2, 1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+
+	//Face 3: Back Face
+	FeFlux = mb->calculateFeFlux(elem, 3, 1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+
+	//Face 4: Left Face
+	FeFlux = mb->calculateFeFlux(elem, 4, 1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+
+	//Face 5: Right Face
+	FeFlux = mb->calculateFeFlux(elem, 5, 1);
+	for (int A = 0; A < 8; A++)
+	{
+		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+		else
+			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
+	}
+}
+
+/*
 * Testing the calculation of Feflux. For the single element we have it should be straightforward
 *
 */
-//TEST_F(BaseClass, testCalculateFeFlux)
-//{
-//
-//	//Face 0: Bottom Face
-//	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux(elem,0,1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 4) || (A == 5) || (A == 6) || (A == 7))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//
-//	//Face 1: Top Face
-//	FeFlux = mb->calculateFeFlux(elem, 1, 1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//
-//	//Face 2: Front Face
-//	FeFlux = mb->calculateFeFlux(elem, 2, 1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//
-//	//Face 3: Back Face
-//	FeFlux = mb->calculateFeFlux(elem, 3, 1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//
-//	//Face 4: Left Face
-//	FeFlux = mb->calculateFeFlux(elem, 4, 1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//
-//	//Face 5: Right Face
-//	FeFlux = mb->calculateFeFlux(elem, 5, 1);
-//	for (int A = 0; A < 8; A++)
-//	{
-//		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
-//		else
-//			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
-//	}
-//}
-//
-///*
-//* Testing the calculation of Feflux. For the single element we have it should be straightforward
-//*
-//*/
-//TEST_F(BaseClass, testCalculateFeConv)
-//{
-//	constexpr int faceNodes[6][4] = {
-//		{0,1,2,3}, {4,5,6,7}, {0,1,4,5},
-//		{2,3,6,7}, {0,2,4,6}, {1,3,5,7}
-//	};
-//	std::array<std::array<float, 4>, 4> scale = { {	{ 1, 1 / 2.0f, 1 / 2.0f, 1 / 4.0f},
-//													{ 1 / 2.0f, 1, 1 / 4.0f, 1 / 2.0f},
-//													{ 1 / 2.0f, 1 / 4.0f, 1, 1 / 2.0f},
-//													{ 1 / 4.0f, 1 / 2.0f, 1 / 2.0f, 1} } };
-//	int A = 0;
-//	int B = 0;
-//	for (int f = 0; f < 6; f++)
-//	{
-//		Eigen::MatrixXf FeConv = mb->calculateFeConv(elem, f);
-//		// all of these nodes should be scaled relative to scale matrix
-//		const int* nodes = faceNodes[f];
-//		for (int i = 0; i < 4; i++)
-//		{
-//			for (int j = 0; j < 4; j++)
-//			{
-//				A = nodes[i];
-//				B = nodes[j];
-//				EXPECT_FLOAT_EQ(FeConv(A, B), scale[i][j] / 9.0f);
-//			}
-//		}
-//		// All of these nodes should be on the opposite face so have nodes
-//		// that should have a 0 value in the matrix
-//		if (f % 2)
-//			f = (f - 1);
-//		else
-//			f = (f + 1);
-//		nodes = faceNodes[f];
-//		for (int i = 0; i < 4; i++)
-//		{
-//			for (int j = 0; j < 4; j++)
-//			{
-//				A = nodes[i];
-//				B = nodes[j];
-//				EXPECT_FLOAT_EQ(FeConv(A, B), 0);
-//			}
-//		}
-//	}
-//}
-//
-//TEST_F(BaseClass, testSetNodeMap)
-//{
-//	// only bottom face is dirichlet
-//	std::vector<long> trueMap = { -1 ,-1,-1,-1, 0, 1, 2, 3 };
-//	std::vector<long> trueValid = { 4,5,6,7 };
-//	for (int i = 0; i < 8; i++)
-//	{
-//		EXPECT_EQ(trueMap[i], mb->nodeMap()[i]);
-//	}
-//	for (int i = 0; i < 4; i++)
-//	{
-//		EXPECT_EQ(trueValid[i], mb->validNodes()[i]);
-//	}
-//	EXPECT_EQ(trueValid.size(), mb->validNodes().size());
-//}
-//
-//TEST_F(BaseClass, TestInd2Sub1)
-//{
-//	std::array<long,3> sub;
-//	long index = 0;
-//	std::array<long,3> size = { 10,10,10 };
-//	sub = mb->ind2sub(index, size);
-//	EXPECT_FLOAT_EQ(0, sub[0]);
-//	EXPECT_FLOAT_EQ(0, sub[1]);
-//	EXPECT_FLOAT_EQ(0, sub[2]);
-//}
-//
-//TEST_F(BaseClass, TestInd2Sub2)
-//{
-//	std::array<long, 3> sub;
-//	long index = 10;
-//	std::array<long, 3> size = { 10,10,10 };
-//	sub = mb->ind2sub(index, size);
-//	EXPECT_FLOAT_EQ(0, sub[0]);
-//	EXPECT_FLOAT_EQ(1, sub[1]);
-//	EXPECT_FLOAT_EQ(0, sub[2]);
-//}
-//
-//TEST_F(BaseClass, TestInd2Sub3)
-//{
-//	std::array<long, 3> sub;
-//	long index = 100;
-//	std::array<long, 3> size = { 10,10,10 };
-//	sub = mb->ind2sub(index, size);
-//	EXPECT_FLOAT_EQ(0, sub[0]);
-//	EXPECT_FLOAT_EQ(0, sub[1]);
-//	EXPECT_FLOAT_EQ(1, sub[2]);
-//}
-//
-//TEST_F(BaseClass, TestInd2Sub4)
-//{
-//	std::array<long, 3> sub;
-//	long index = 521;
-//	std::array<long, 3> size = { 10,10,10 };
-//	sub = mb->ind2sub(index, size);
-//	EXPECT_FLOAT_EQ(1, sub[0]);
-//	EXPECT_FLOAT_EQ(2, sub[1]);
-//	EXPECT_FLOAT_EQ(5, sub[2]);
-//}
+TEST_F(BaseClass, testCalculateFeConv)
+{
+	constexpr int faceNodes[6][4] = {
+		{0,1,2,3}, {4,5,6,7}, {0,1,4,5},
+		{2,3,6,7}, {0,2,4,6}, {1,3,5,7}
+	};
+	std::array<std::array<float, 4>, 4> scale = { {	{ 1, 1 / 2.0f, 1 / 2.0f, 1 / 4.0f},
+													{ 1 / 2.0f, 1, 1 / 4.0f, 1 / 2.0f},
+													{ 1 / 2.0f, 1 / 4.0f, 1, 1 / 2.0f},
+													{ 1 / 4.0f, 1 / 2.0f, 1 / 2.0f, 1} } };
+	int A = 0;
+	int B = 0;
+	for (int f = 0; f < 6; f++)
+	{
+		Eigen::MatrixXf FeConv = mb->calculateFeConv(elem, f);
+		// all of these nodes should be scaled relative to scale matrix
+		const int* nodes = faceNodes[f];
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				A = nodes[i];
+				B = nodes[j];
+				EXPECT_FLOAT_EQ(FeConv(A, B), scale[i][j] / 9.0f);
+			}
+		}
+		// All of these nodes should be on the opposite face so have nodes
+		// that should have a 0 value in the matrix
+		if (f % 2)
+			f = (f - 1);
+		else
+			f = (f + 1);
+		nodes = faceNodes[f];
+		for (int i = 0; i < 4; i++)
+		{
+			for (int j = 0; j < 4; j++)
+			{
+				A = nodes[i];
+				B = nodes[j];
+				EXPECT_FLOAT_EQ(FeConv(A, B), 0);
+			}
+		}
+	}
+}
+
+TEST_F(BaseClass, testSetNodeMap)
+{
+	// only bottom face is dirichlet
+	std::vector<long> trueMap = { -1 ,-1,-1,-1, 0, 1, 2, 3 };
+	std::vector<long> trueValid = { 4,5,6,7 };
+	for (int i = 0; i < 8; i++)
+	{
+		EXPECT_EQ(trueMap[i], mb->nodeMap()[i]);
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		EXPECT_EQ(trueValid[i], mb->validNodes()[i]);
+	}
+	EXPECT_EQ(trueValid.size(), mb->validNodes().size());
+}
