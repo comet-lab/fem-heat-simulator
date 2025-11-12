@@ -43,6 +43,7 @@ public:
 	void integrateHexFace4(const Element& elem, int faceIndex, F&& body);
 
 	std::vector<long> nodeMap() { return nodeMap_; }
+	std::vector<long> validNodes() { return validNodes_; }
 
 
 private:

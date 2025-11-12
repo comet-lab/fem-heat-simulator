@@ -29,6 +29,7 @@ protected:
 			boundaryFaces[i].type = FLUX;
 			boundaryFaces[i].value = 1;
 		}
+		boundaryFaces[0].type = HEATSINK;
 		mesh.setBoundaryFaces(boundaryFaces);
 
 		mb = new MatrixBuilder(mesh);
@@ -335,6 +336,22 @@ TEST_F(BaseClass, testCalculateFeConv)
 			}
 		}
 	}
+}
+
+TEST_F(BaseClass, testSetNodeMap)
+{
+	// only bottom face is dirichlet
+	std::vector<long> trueMap = { -1 ,-1,-1,-1, 0, 1, 2, 3 };
+	std::vector<long> trueValid = { 4,5,6,7 };
+	for (int i = 0; i < 8; i++)
+	{
+		EXPECT_EQ(trueMap[i], mb->nodeMap()[i]);
+	}
+	for (int i = 0; i < 4; i++)
+	{
+		EXPECT_EQ(trueValid[i], mb->validNodes()[i]);
+	}
+	EXPECT_EQ(trueValid.size(), mb->validNodes().size());
 }
 
 TEST_F(BaseClass, TestInd2Sub1)
