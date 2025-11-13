@@ -36,7 +36,6 @@ struct BoundaryFace {
 // FACE CONNECTIVITY NAMESPACE
 // =============================
 namespace FaceConnectivity {
-	extern const std::array<std::array<int, 4>, 6> HEX8;
 	extern const std::array<std::array<int, 8>, 6> HEX20;
 	extern const std::array<std::array<int, 3>, 4> TET4;
 	extern const std::array<std::array<int, 6>, 4> TET10;

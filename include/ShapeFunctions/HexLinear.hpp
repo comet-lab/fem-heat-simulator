@@ -2,7 +2,7 @@
 #include <array>
 #include <vector>
 #include <Eigen/Dense>
-#include "../Mesh.hpp"  // your mesh/nodes definition
+//#include "../Mesh.hpp"  // your mesh/nodes definition
 
 namespace ShapeFunctions {
 
@@ -11,11 +11,14 @@ namespace ShapeFunctions {
         static constexpr int nGP = 8;
         static constexpr int nFaceGP = 4;
         static constexpr int nFaceNodes = 4;
-
-        static inline int faceNodeIndex(int faceIdx, int a)
-        {
-            return FaceConnectivity::HEX8[faceIdx][a];
-        }
+        static constexpr std::array<std::array<int, 4>, 6> faceConnectivity = { {
+            {0, 1, 3, 2},
+            {4, 5, 7, 6},
+            {0, 1, 5, 4},
+            {2, 3, 7, 6},
+            {0, 2, 6, 4},
+            {1, 3, 7, 5}
+        } };
 
         // Evaluate shape function
         static inline float N(const std::array<float, 3>& xi, int A)
@@ -37,7 +40,7 @@ namespace ShapeFunctions {
         static inline float N_face(const std::array<float, 2>& gp, int nodeIdx, int face)
         {
             // A will be a value between 0 and 3. Face will be a value between 0 and 5
-            int A = FaceConnectivity::HEX8[face][nodeIdx];
+            int A = faceConnectivity[face][nodeIdx];
             std::array<float, 3> xi = mapFaceGPtoXi(gp, face);
             return N(xi, A);
         }
@@ -62,7 +65,7 @@ namespace ShapeFunctions {
 
         static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& gp, int nodeIdx, int face)
         {
-            int A = FaceConnectivity::HEX8[face][nodeIdx];
+            int A = faceConnectivity[face][nodeIdx];
 
             // Construct the full xi for the element, with the fixed coordinate for this face
             std::array<float, 3> xi = mapFaceGPtoXi(gp, face);

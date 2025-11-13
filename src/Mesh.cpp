@@ -4,14 +4,7 @@
 // =============================
 // FACE CONNECTIVITY DEFINITIONS
 // =============================
-const std::array<std::array<int, 4>, 6> FaceConnectivity::HEX8 = { {
-	{0, 1, 3, 2},
-	{4, 5, 7, 6},
-	{0, 1, 5, 4},
-	{2, 3, 7, 6},
-	{0, 2, 6, 4},
-	{1, 3, 7, 5}
-} };
+
 
 const std::array<std::array<int, 8>, 6> FaceConnectivity::HEX20 = { {
 	{0, 1, 3, 2, 8, 9, 11, 10},

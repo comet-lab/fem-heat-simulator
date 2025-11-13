@@ -250,7 +250,7 @@ public:
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
-				const Node& n = mesh_.nodes()[ShapeFunc::faceNodeIndex(faceIndex, a)];
+				const Node& n = mesh_.nodes()[ShapeFunc::faceConnectivity[faceIndex][a]];
 				Eigen::Vector3f nodePos(n.x, n.y, n.z);
 				JFace += dN_dxi_eta[a] * nodePos.transpose();
 			}
@@ -261,7 +261,7 @@ public:
 			float weight = w[i][0] * w[i][1] * detJ;
 
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
-				Fe(ShapeFunc::faceNodeIndex(faceIndex, a)) += N_face[a] * q * weight;
+				Fe(ShapeFunc::faceConnectivity[faceIndex][a]) += N_face[a] * q * weight;
 		}
 
 		return Fe;
@@ -291,7 +291,7 @@ public:
 			// Get node positions for this face
 			std::vector<Node> faceNodes;
 			for (int a = 0; a < nFaceNodes; ++a)
-				faceNodes.push_back(mesh_.nodes()[elem.nodes[ShapeFunc::faceNodeIndex(faceIndex, a)]]);
+				faceNodes.push_back(mesh_.nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]]);
 
 			// Compute surface Jacobian
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
@@ -308,10 +308,10 @@ public:
 			// Assemble local face contribution
 			for (int a = 0; a < nFaceNodes; ++a)
 			{
-				int globalA = ShapeFunc::faceNodeIndex(faceIndex, a);
+				int globalA = ShapeFunc::faceConnectivity[faceIndex][a];
 				for (int b = 0; b < nFaceNodes; ++b)
 				{
-					int globalB = ShapeFunc::faceNodeIndex(faceIndex, b);
+					int globalB = ShapeFunc::faceConnectivity[faceIndex][b];
 					Qe(globalA, globalB) += N_face[a] * N_face[b] * weight;
 				}
 			}

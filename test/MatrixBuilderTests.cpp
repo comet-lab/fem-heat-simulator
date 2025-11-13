@@ -27,7 +27,7 @@ protected:
 		for (int i = 0; i < 6; i++) {
 			boundaryFaces[i].elemID = 0;
 			boundaryFaces[i].localFaceID = i;
-			boundaryFaces[i].nodes.assign(FaceConnectivity::HEX8[i].begin(), FaceConnectivity::HEX8[i].end());
+			boundaryFaces[i].nodes.assign(testHexLin.faceConnectivity[i].begin(), testHexLin.faceConnectivity[i].end());
 			boundaryFaces[i].type = FLUX;
 			boundaryFaces[i].value = 1;
 		}
