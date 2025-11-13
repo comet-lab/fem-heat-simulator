@@ -223,6 +223,7 @@ public:
 			for (int a = 0; a < ShapeFunc::nNodes; ++a)
 				for (int b = 0; b < ShapeFunc::nNodes; ++b)
 					Ke(a, b) += dNdx[a].dot(dNdx[b]) * weight;
+				
 		}
 
 		return Ke;
