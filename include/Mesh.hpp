@@ -61,6 +61,7 @@ public:
 	const Shape elementShape() const { return elementShape_; }
 
 	static Mesh buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> nodesPerAxis, std::array<BoundaryType,6> bc);
+	static Mesh buildCubeMesh(std::vector<float> xPos, std::vector<float> yPos, std::vector<float> zPos, std::array<BoundaryType, 6> bc);
 
 private:
 	std::vector<Node> nodes_; // nodes in mesh

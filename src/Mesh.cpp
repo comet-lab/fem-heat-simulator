@@ -64,26 +64,45 @@ void Mesh::setOrderAndShape()
 
 Mesh Mesh::buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> nodesPerAxis, std::array<BoundaryType, 6> bc)
 {
-    const long Nx = nodesPerAxis[0];
-    const long Ny = nodesPerAxis[1];
-    const long Nz = nodesPerAxis[2];
+    std::vector<float> xPos(nodesPerAxis[0]); 
+    std::vector<float> yPos(nodesPerAxis[1]);
+    std::vector<float> zPos(nodesPerAxis[2]);
+    float x = -tissueSize[0] / 2.0f;
+    float dx = tissueSize[0] / (nodesPerAxis[0] - 1.0f);
+    for (int i = 0; i < nodesPerAxis[0]; i++, x+=dx)
+    {
+        xPos[i] = x;
+    }
+    float y = -tissueSize[1] / 2.0f;
+    float dy = tissueSize[1] / (nodesPerAxis[1] - 1.0f);
+    for (int i = 0; i < nodesPerAxis[1]; i++, y += dy)
+    {
+        yPos[i] = y;
+    }
+    float z = 0;
+    float dz = tissueSize[2] / (nodesPerAxis[2] - 1.0f);
+    for (int i = 0; i < nodesPerAxis[2]; i++, z += dz)
+    {
+        zPos[i] = z;
+    }
+    return buildCubeMesh(xPos, yPos, zPos, bc);
+}
+
+
+Mesh Mesh::buildCubeMesh(std::vector<float> xPos, std::vector<float> yPos, std::vector<float> zPos, std::array<BoundaryType, 6> bc)
+{
+    const long Nx = xPos.size();
+    const long Ny = yPos.size();
+    const long Nz = zPos.size();
 
     const long numNodes = Nx * Ny * Nz;
 
     std::vector<Node> nodes;
     nodes.reserve(numNodes);
-
-    float dx = tissueSize[0] / (Nx - 1);
-    float dy = tissueSize[1] / (Ny - 1);
-    float dz = tissueSize[2] / (Nz - 1);
-
-    float z = 0;
-    for (long k = 0; k < Nz; k++, z += dz) {
-        float y = -tissueSize[1] / 2.0f;
-        for (long j = 0; j < Ny; j++, y += dy) {
-            float x = -tissueSize[0] / 2.0f;
-            for (long i = 0; i < Nx; i++, x += dx) {
-                nodes.push_back(Node{ x, y, z });
+    for (long k = 0; k < Nz; k++) {
+        for (long j = 0; j < Ny; j++) {
+            for (long i = 0; i < Nx; i++) {
+                nodes.push_back(Node{ xPos[i], yPos[j] , zPos[k] });
             }
         }
     }
