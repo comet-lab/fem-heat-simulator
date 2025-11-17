@@ -60,6 +60,8 @@ public:
 	const GeometricOrder order() const { return order_; }
 	const Shape elementShape() const { return elementShape_; }
 
+	static Mesh buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> nodesPerAxis, std::array<BoundaryType,6> bc);
+
 private:
 	std::vector<Node> nodes_; // nodes in mesh
 	std::vector<Element> elements_; // elements in mesh
