@@ -23,8 +23,8 @@ namespace ShapeFunctions {
         * Node order on a face should produce a vector pointing inward 
         */
         static constexpr std::array<std::array<int, 4>, 6> faceConnectivity = { {
-            {0, 1, 3, 2}, // top face 
-            {4, 6, 7, 5},  // bottom face
+            {0, 2, 3, 1}, // top face 
+            {4, 5, 7, 6},  // bottom face
             {0, 1, 5, 4}, // back face
             {2, 6, 7, 3}, // front face
             {0, 4, 6, 2}, // Left face
