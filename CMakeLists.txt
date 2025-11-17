@@ -5,7 +5,7 @@ project(HeatSimulation VERSION 4.0 LANGUAGES CXX)
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" ON)
+option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" OFF)
 option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" OFF)
 set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files are")
 # Local install folder
@@ -173,7 +173,7 @@ if(BUILD_TESTING)
 
     add_executable(FEM_Unit_Tests
         test/FEM_Unit_Tests.cpp
-        test/BaseSim.cpp
+        
     )
     target_link_libraries(FEM_Unit_Tests
         PRIVATE
@@ -185,6 +185,14 @@ if(BUILD_TESTING)
         test/MatrixBuilderTests.cpp
     )
     target_link_libraries(MatrixBuilderTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
+    add_executable(HexLinearTests
+        test/ShapeFunctions/HexLinearTests.cpp
+    )
+    target_link_libraries(HexLinearTests
         HeatSimulation::Static    
         GTest::gtest_main
     )

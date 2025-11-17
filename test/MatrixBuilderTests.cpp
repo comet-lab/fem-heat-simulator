@@ -61,7 +61,7 @@ protected:
 		nodes[1].x = 2; nodes[1].y = 0; nodes[1].z = 0;
 		nodes[2].x = 0; nodes[2].y = 2; nodes[2].z = 0;
 		nodes[3].x = 0; nodes[3].y = 0; nodes[3].z = 2;
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < 4; i++) {
 			elem.nodes.push_back(i);
 		}
 		mesh.setNodes(nodes);
@@ -97,65 +97,6 @@ TEST_F(HexBuilder, testSetNodeList)
 		ASSERT_EQ(nodes[i].x, mesh.nodes()[i].x);
 		ASSERT_EQ(nodes[i].y, mesh.nodes()[i].y);
 		ASSERT_EQ(nodes[i].z, mesh.nodes()[i].z);
-	}
-}
-
-
-/**
-* Tests the 3D tri-linear shape function for hexahedral elements.
-* We are enforcing the order here as well that 
-* A[0] = (0,0,0)
-* A[1] = (1,0,0)
-* A[2] = (0,1,0)
-* A[3] = (1,1,0)
-* A[4] = (0,0,1) ... etc.
-*/
-TEST_F(HexBuilder, testCalculateHexFunction3D)
-{
-	int Nne = 8; // 8 nodes in hexahedral elements with linear shape functions
-	// xi1 has the coordinates at the nodal locations in the element
-	std::array<std::array<float, 3>, 8> xi1 = { { {-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},
-												  {-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1} } };
-	// xi2 has the coordinates of a different node
-	std::array<std::array<float, 3>, 8> xi2 = { { {1,1,1},{-1,1,1},{1,-1,1},{-1,-1,1},
-												  {1,1,-1},{-1,1,-1},{1,-1,-1},{-1,-1,-1} } };
-	for (int Ai = 0; Ai < Nne; Ai++) {
-		float output1 = testHexLin.N(xi1[Ai], Ai);
-		float output2 = testHexLin.N(xi2[Ai], Ai);
-		float output3 = testHexLin.N({ 0,0,0 }, Ai);
-
-		EXPECT_FLOAT_EQ(1.0f, output1);
-		EXPECT_FLOAT_EQ(0.0f, output2);
-		EXPECT_FLOAT_EQ(1/8.0f, output3);
-	}
-}
-
-/*
-* Testing the derivative of the 3D shape function for hexahedral elements
-* Same A layout as before. We treat it as a binary of from x,y,z
-*/
-TEST_F(HexBuilder, testCalculateHexFunctionDeriv3D)
-{
-	int Nn1d = 2;
-	int Nne = 8;
-	std::array<std::array<float, 3>, 8> truthTable = { { {-1/2.0f,-1 / 2.0f,-1 / 2.0f}, {1 / 2.0f,-1 / 2.0f,-1 / 2.0f}, 
-														 {-1 / 2.0f,1 / 2.0f,-1 / 2.0f},{1 / 2.0f,1 / 2.0f,-1 / 2.0f},
-														 {-1 / 2.0f,-1 / 2.0f,1 / 2.0f},{1 / 2.0f,-1 / 2.0f,1 / 2.0f},
-														 {-1 / 2.0f,1 / 2.0f,1 / 2.0f},{1 / 2.0f,1 / 2.0f,1 / 2.0f} } };
-
-	std::array<std::array<float, 3>, 8> xi1 = { { {-1,-1,-1},{1,-1,-1},{-1,1,-1},{1,1,-1},
-												  {-1,-1,1},{1,-1,1},{-1,1,1},{1,1,1} } };
-
-	for (int Ai = 0; Ai < Nne; Ai++) 
-	{	
-		Eigen::Vector3f output1 = testHexLin.dNdxi(xi1[Ai], Ai);
-		Eigen::Vector3f output2 = testHexLin.dNdxi({0.0f,0.0f,0.0f}, Ai);
-
-		for (int i = 0; i < 3; i++) 
-		{
-			EXPECT_FLOAT_EQ(truthTable[Ai][i], output1(i)) << "Ai: " << Ai << " i: " << i;
-			EXPECT_FLOAT_EQ(truthTable[Ai][i]/4.0f, output2(i)) << "Ai: " << Ai << " i: " << i;
-		}
 	}
 }
 
@@ -357,6 +298,12 @@ TEST_F(HexBuilder, testSetNodeMap)
 		EXPECT_EQ(trueMap[i], mb->nodeMap()[i]);
 	}
 	EXPECT_EQ(trueValid.size(), mb->nNonDirichlet());
+}
+
+TEST_F(HexBuilder, testBuildMatrices)
+{
+	mb->buildMatrices();
+	// This test really just makes sure the function runs, we should add checks on the matrix construction
 }
 
 
@@ -580,4 +527,10 @@ TEST_F(TetBuilder, testCalculateFeConv)
 			EXPECT_FLOAT_EQ(FeConv(j, zeroNodes[f]), 0);
 		}
 	}
+}
+
+TEST_F(TetBuilder, testBuildMatrices)
+{
+	mb->buildMatrices();
+	// This test really just makes sure the function runs, we should add checks on the matrix construction
 }
