@@ -8,74 +8,103 @@
 #include <chrono>
 #include <stdexcept>
 #include "Mesh.hpp"
+#include "ShapeFunctions/HexLinear.hpp"
+#include "ShapeFunctions/TetLinear.hpp"
 
-template <typename ShapeFunc>
 class MatrixBuilder
 {
 public:
 
-	MatrixBuilder(const Mesh& mesh) : mesh_(mesh) { setNodeMap(); }
+	MatrixBuilder(const Mesh& mesh) : mesh_(mesh) {}
 
+	void buildMatrices()
+	{
+		if ((mesh_.order() == GeometricOrder::LINEAR) && (mesh_.elementShape() == Shape::HEXAHEDRAL))
+		{
+			buildMatricesT<ShapeFunctions::HexLinear>();
+		}
+		else if ((mesh_.order() == GeometricOrder::LINEAR) && (mesh_.elementShape() == Shape::TETRAHEDRAL))
+		{
+			buildMatricesT<ShapeFunctions::TetLinear>();
+		}
+	}
+
+	void setNodeMap()
+	{
+		// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
+		// A value of -1 at index i, indicates that global node i is a dirichlet node. 
+		nodeMap_.resize(mesh_.nodes().size());
+		std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
+		// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
+		for (BoundaryFace face : mesh_.boundaryFaces())
+		{
+			if (face.type == HEATSINK)
+			{
+				for (long n : face.nodes)
+				{
+					nodeMap_[n] = -1;
+				}
+			}
+		}
+		// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
+		// Also, store the index of the valid node. 
+		nNonDirichlet_ = 0;
+		for (int i = 0; i < mesh_.nodes().size(); i++)
+		{
+			if (nodeMap_[i] == 0)
+			{
+				nodeMap_[i] = nNonDirichlet_;
+				//validNodes_.push_back(i);
+				nNonDirichlet_++;
+			}
+		}
+	}
+
+	template <typename ShapeFunc>
 	void resetMatrices()
 	{
 		// The number of non-zeros per column this should be a safe number
 		int nRelatedNodes = ShapeFunc::nNodes * ShapeFunc::nNodes * ShapeFunc::nNodes;
 		//  number of non-dirichlet nodes
-		int nValidNodes = validNodes_.size();
 		// total number of nodes
 		int nNodes = mesh_.nodes().size();
 		int nodesPerElem = ShapeFunc::nNodes;
 		// Initialize matrices so that we don't have to resize them later
-		FintElem_ = Eigen::SparseMatrix<float>(nValidNodes, mesh_.elements().size());
+		FintElem_ = Eigen::SparseMatrix<float>(nNonDirichlet_, mesh_.elements().size());
 		FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
 
-		Fint_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fint_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
 		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fconv_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fconv_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
 		Fconv_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fk_ = Eigen::SparseMatrix<float>(nValidNodes, nNodes);
+		Fk_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
 		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fflux_ = Eigen::VectorXf::Zero(nValidNodes);
-		Fq_ = Eigen::VectorXf::Zero(nValidNodes);
+		Fflux_ = Eigen::VectorXf::Zero(nNonDirichlet_);
+		Fq_ = Eigen::VectorXf::Zero(nNonDirichlet_);
 
 		// M and K will be sparse matrices because nodes are shared by relatively few elements
-		M_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
-		M_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
-		K_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
-		K_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+		M_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
+		M_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
+		K_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
+		K_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
 		// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
-		Q_ = Eigen::SparseMatrix<float>(nValidNodes, nValidNodes);
-		Q_.reserve(Eigen::VectorXi::Constant(nValidNodes, nRelatedNodes)); // at most 27 non-zero entries per column
+		Q_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
+		Q_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
 	}
 
 
-	void buildMatrices()
-	{
-		resetMatrices();
-		std::vector<Element> elements = mesh_.elements();
-		long nElem = mesh_.elements().size();
-		for (int elemIdx = 0; elemIdx < mesh_.elements().size(); elemIdx++)
-		{
-			Element elem = elements[elemIdx];
-			applyElement(elem, elemIdx);
-		}
-		for (int f = 0; f < mesh_.boundaryFaces().size(); f++)
-		{
-			applyBoundary(mesh_.boundaryFaces()[f]);
-		}
-	}
-
+	template <typename ShapeFunc>
 	void applyElement(Element elem, long elemIdx)
 	{
 		int nodesPerElem = ShapeFunc::nNodes;
 		long matrixRow = 0;
 		long matrixCol = 0;
-		Eigen::MatrixXf Me = calculateMe(elem);
-		Eigen::MatrixXf Fe = calculateMe(elem);
-		Eigen::MatrixXf Ke = calculateKe(elem);
+		Eigen::MatrixXf Me = calculateMe<ShapeFunc>(elem);
+		Eigen::MatrixXf Fe = calculateMe<ShapeFunc>(elem);
+		Eigen::MatrixXf Ke = calculateKe<ShapeFunc>(elem);
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
@@ -111,6 +140,7 @@ public:
 		} // for each node in element
 	}
 
+	template <typename ShapeFunc>
 	void applyBoundary(BoundaryFace face)
 	{
 		if (face.type == CONVECTION)
@@ -119,8 +149,8 @@ public:
 			long matrixCol = 0;
 			Element elem = mesh_.elements()[face.elemID];
 			int nodesPerElem = ShapeFunc::nNodes;
-			Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
-			Eigen::VectorXf FeConv = calculateFeConv(elem, face.localFaceID);
+			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
+			Eigen::VectorXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
 			for (int A = 0; A < nodesPerElem; A++)
 			{
 				long matrixRow = nodeMap_[elem.nodes[A]];
@@ -149,7 +179,7 @@ public:
 		{
 			Element elem = mesh_.elements()[face.elemID];
 			long matrixRow = 0;
-			Eigen::VectorXf Feflux = calculateFeFlux(elem, face.localFaceID, 1);
+			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
 			for (int A : face.nodes)
 			{
 				matrixRow = nodeMap_[A];
@@ -158,6 +188,7 @@ public:
 		}
 	}
 
+	template <typename ShapeFunc>
 	Eigen::MatrixXf calculateMe(const Element& elem) 
 	{
 
@@ -178,7 +209,7 @@ public:
 				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
 			}
 			// Jacobian and determinant (simplified)
-			Eigen::Matrix3f J = calculateJ(elem, dNdxi);
+			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			float detJ = J.determinant();
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
 
@@ -190,6 +221,7 @@ public:
 		return Me;
 	}
 
+	template <typename ShapeFunc>
 	Eigen::MatrixXf calculateKe(const Element& elem)
 	{
 		Eigen::MatrixXf Ke = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
@@ -207,7 +239,7 @@ public:
 				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
 
 			// Compute Jacobian and inverse
-			Eigen::Matrix3f J = calculateJ(elem, dNdxi);
+			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			Eigen::Matrix3f Jinv = J.inverse();
 			float detJ = J.determinant();
 
@@ -229,6 +261,7 @@ public:
 		return Ke;
 	}
 
+	template <typename ShapeFunc>
 	Eigen::MatrixXf calculateFeFlux(const Element& elem, int faceIndex, float q)
 	{
 		Eigen::Matrix<float, ShapeFunc::nNodes, 1> Fe = Eigen::Matrix<float, ShapeFunc::nNodes, 1>::Zero();
@@ -268,6 +301,7 @@ public:
 		return Fe;
 	}
 
+	template <typename ShapeFunc>
 	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex)
 	{
 		constexpr int nNodes = ShapeFunc::nNodes;
@@ -321,6 +355,7 @@ public:
 		return Qe;
 	}
 	
+	template <typename ShapeFunc>
 	Eigen::Matrix3f calculateJ(const Element& elem, const std::vector<Eigen::Vector3f> dNdxi)
 	{
 		Eigen::Matrix3f J = Eigen::Matrix3f::Zero();
@@ -345,46 +380,15 @@ public:
 		return J;
 	}
 
-	void setNodeMap()
-	{
-		nodeMap_.resize(mesh_.nodes().size());
-		std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
-		// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
-		for (BoundaryFace face : mesh_.boundaryFaces())
-		{
-			if (face.type == HEATSINK)
-			{
-				for (long n : face.nodes)
-				{
-					nodeMap_[n] = -1;
-				}
-			}
-		}
-		// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
-		// Also, store the index of the valid node. 
-		long counter = 0;
-		for (int i = 0; i < mesh_.nodes().size(); i++)
-		{
-			if (nodeMap_[i] == 0)
-			{
-				nodeMap_[i] = counter;
-				validNodes_.push_back(i);
-				counter++;
-			}
-		}
-	}
-
 	std::vector<long> nodeMap() { return nodeMap_; }
-	std::vector<long> validNodes() { return validNodes_; }
-
-
+	long nNonDirichlet() { return nNonDirichlet_; }
 private:
+
 	const Mesh& mesh_;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
-	// contains the global indicies of every non-dirichlet node
-	std::vector<long> validNodes_;
+	long nNonDirichlet_ = 0;
 
 	//Eigen::Matrix3f J_; // Jacobian of our current element
 
@@ -405,5 +409,23 @@ private:
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_; 
 	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
 	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
+
+	template <typename ShapeFunc>
+	void buildMatricesT()
+	{
+		setNodeMap();
+		resetMatrices<ShapeFunc>();
+		std::vector<Element> elements = mesh_.elements();
+		long nElem = mesh_.elements().size();
+		for (int elemIdx = 0; elemIdx < mesh_.elements().size(); elemIdx++)
+		{
+			Element elem = elements[elemIdx];
+			applyElement<ShapeFunc>(elem, elemIdx);
+		}
+		for (int f = 0; f < mesh_.boundaryFaces().size(); f++)
+		{
+			applyBoundary<ShapeFunc>(mesh_.boundaryFaces()[f]);
+		}
+	}
 
 };
