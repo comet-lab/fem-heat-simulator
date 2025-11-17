@@ -1,35 +1,6 @@
 #include "Mesh.hpp"
 
 
-// =============================
-// FACE CONNECTIVITY DEFINITIONS
-// =============================
-
-
-const std::array<std::array<int, 8>, 6> FaceConnectivity::HEX20 = { {
-	{0, 1, 3, 2, 8, 9, 11, 10},
-	{4, 5, 7, 6, 12, 13, 15, 14},
-	{0, 1, 5, 4, 8, 17, 12, 16},
-	{2, 3, 7, 6, 10, 19, 14, 18},
-	{0, 2, 6, 4, 16, 18, 14, 12},
-	{1, 3, 7, 5, 17, 19, 15, 13}
-} };
-
-const std::array<std::array<int, 3>, 4> FaceConnectivity::TET4 = { {
-	{0, 2, 1},
-	{0, 1, 3},
-	{1, 2, 3},
-	{2, 0, 3}
-} };
-
-const std::array<std::array<int, 6>, 4> FaceConnectivity::TET10 = { {
-	{0, 2, 1, 6, 5, 4},
-	{0, 1, 3, 4, 8, 7},
-	{1, 2, 3, 5, 9, 8},
-	{2, 0, 3, 6, 7, 9}
-} };
-
-
 Mesh::Mesh()
 {
 }
@@ -91,3 +62,4 @@ void Mesh::setOrderAndShape()
 		}
 	}
 }
+

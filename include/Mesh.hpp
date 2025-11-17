@@ -32,15 +32,6 @@ struct BoundaryFace {
 	double value = 0.0;  // e.g., h or q
 };
 
-// =============================
-// FACE CONNECTIVITY NAMESPACE
-// =============================
-namespace FaceConnectivity {
-	extern const std::array<std::array<int, 8>, 6> HEX20;
-	extern const std::array<std::array<int, 3>, 4> TET4;
-	extern const std::array<std::array<int, 6>, 4> TET10;
-}
-
 enum GeometricOrder {
 	LINEAR,
 	QUADRATIC
@@ -66,6 +57,8 @@ public:
 	const std::vector<Node>& nodes() const { return nodes_; }
 	const std::vector<Element>& elements() const { return elements_; }
 	const std::vector<BoundaryFace>& boundaryFaces() const { return boundaryFaces_; }
+	const GeometricOrder order() const { return order_; }
+	const Shape elementShape() const { return elementShape_; }
 
 private:
 	std::vector<Node> nodes_; // nodes in mesh
