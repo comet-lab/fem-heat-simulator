@@ -181,7 +181,7 @@ public:
             // Extract tissue properties
             float MUA = inputs[VarPlacement::TISSUE_PROP][0];
             float TC = inputs[VarPlacement::TISSUE_PROP][1];
-            float VHC = inputs[VarPlacement::TISSUE_PROP][2];
+            float VHC_ = inputs[VarPlacement::TISSUE_PROP][2];
             float HTC = inputs[VarPlacement::TISSUE_PROP][3];
 
             // Get boundary conditions
@@ -219,12 +219,12 @@ public:
             // set the tissue properties
             this->simulator.setMUA(MUA);
             this->simulator.setTC(TC);
-            this->simulator.setVHC(VHC);
+            this->simulator.setVHC(VHC_);
             this->simulator.setHTC(HTC);
             // set boundary conditions
             this->simulator.setBoundaryConditions(boundaryType);
             // set heatFlux
-            this->simulator.setFlux(heatFlux);
+            this->simulator.setHeatFlux(heatFlux_);
 
             this->simulator.setAmbientTemp(ambientTemp);
         }
@@ -321,15 +321,15 @@ public:
         printDuration("MEX: Time Stepping Complete -- ");
 
         // Have to convert the std::vector to a matlab array for output
-        //display3DVector(this->simulator.Temp, "Final Temp: ");
-        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.getTemp();
+        //display3DVector(this->simulator.Temp_, "Final Temp_: ");
+        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.TempAsVec();
         matlab::data::TypedArray<float> finalTemp = convertVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
         matlab::data::ArrayFactory factory;
-        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator.sensorTemps.size(), this->simulator.sensorTemps[0].size()});
-        for (size_t i = 0; i < this->simulator.sensorTemps.size(); ++i) {
-            for (size_t j = 0; j < this->simulator.sensorTemps[i].size(); ++j) {
-                sensorTempsOutput[i][j] = this->simulator.sensorTemps[i][j];
+        matlab::data::TypedArray<float> sensorTempsOutput = factory.createArray<float>({ this->simulator.sensorTemps_.size(), this->simulator.sensorTemps_[0].size()});
+        for (size_t i = 0; i < this->simulator.sensorTemps_.size(); ++i) {
+            for (size_t j = 0; j < this->simulator.sensorTemps_[i].size(); ++j) {
+                sensorTempsOutput[i][j] = this->simulator.sensorTemps_[i][j];
             }
         }
         outputs[1] = sensorTempsOutput;
@@ -376,7 +376,7 @@ public:
         }
         */
         if ((inputs[VarPlacement::TISSUE_PROP].getDimensions()[0] != 4) || (inputs[VarPlacement::TISSUE_PROP].getDimensions()[1] != 1)) {
-            displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
+            displayError("Tissue Properties must be 4 x 1: MUA_, TC_, VHC_, HTC_");
         }
         if ((inputs[VarPlacement::BC].getDimensions()[0] != 6) || (inputs[VarPlacement::BC].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
@@ -406,7 +406,7 @@ public:
             this->useGPU = tempGPU;
         }
         if (inputs.size() > VarPlacement::ALPHA) {
-            this->simulator.alpha = inputs[VarPlacement::ALPHA][0];
+            this->simulator.alpha_ = inputs[VarPlacement::ALPHA][0];
         }
         if (inputs.size() > VarPlacement::SILENT_MODE) {
             this->silentMode = inputs[VarPlacement::SILENT_MODE][0];
@@ -478,15 +478,15 @@ public:
             gpuHandle = new GPUTimeIntegrator();
         }
         simulator.buildMatrices();
-        gpuHandle->setAlpha(simulator.alpha);
-        gpuHandle->setDeltaT(simulator.deltaT);
+        gpuHandle->setAlpha(simulator.alpha_);
+        gpuHandle->setDeltaT(simulator.deltaT_);
         gpuHandle->setModel(&simulator);
         gpuHandle->initializeWithModel();
     }
 
     void multiStepGPU(float totalTime){
         auto startTime = std::chrono::steady_clock::now();
-        int numSteps = round(totalTime / simulator.deltaT);
+        int numSteps = round(totalTime / simulator.deltaT_);
         simulator.initializeSensorTemps(numSteps);
         simulator.updateTemperatureSensors(0);
         for (int i = 1; i <= numSteps; i++) {

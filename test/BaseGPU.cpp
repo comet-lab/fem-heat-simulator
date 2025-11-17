@@ -10,22 +10,22 @@ protected:
         
         //Example FEM_Simulator initialization
         int nodesPerAxis[3] = { 20, 20, 20 };
-        std::vector<std::vector<std::vector<float>>> Temp(
+        std::vector<std::vector<std::vector<float>>> TempAsVec(
             nodesPerAxis[0], std::vector<std::vector<float>>(
                 nodesPerAxis[1], std::vector<float>(nodesPerAxis[2], 20.0f)));
 
         float tissueSize[3] = { 1, 1, 1 };
-        femSim = new FEM_Simulator(Temp, tissueSize, 1.0f, 1.0f, 1.0f, 1.0f, 2);
-        femSim->alpha = 0.5f;
+        femSim = new FEM_Simulator(TempAsVec, tissueSize, 1.0f, 1.0f, 1.0f, 1.0f, 2);
+        femSim->alpha_ = 0.5f;
         femSim->silentMode = true;
 
         float laserPose[6] = { 0, 0, -25, 0, 0, 0 };
-        femSim->deltaT = 0.05f;
+        femSim->deltaT_ = 0.05f;
         femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
 
         femSim->buildMatrices();
         
-        gpu = new GPUTimeIntegrator(femSim->alpha, femSim->deltaT);
+        gpu = new GPUTimeIntegrator(femSim->alpha_, femSim->deltaT_);
 
         gpu->setModel(femSim);
     }

@@ -277,7 +277,7 @@ public:
             // Extract tissue properties
             float MUA = inputs[VarPlacement::TISSUE_PROP][0];
             float TC = inputs[VarPlacement::TISSUE_PROP][1];
-            float VHC = inputs[VarPlacement::TISSUE_PROP][2];
+            float VHC_ = inputs[VarPlacement::TISSUE_PROP][2];
             float HTC = inputs[VarPlacement::TISSUE_PROP][3];
 
             // Get boundary conditions
@@ -314,12 +314,12 @@ public:
             // set the tissue properties
             this->simulator.setMUA(MUA);
             this->simulator.setTC(TC);
-            this->simulator.setVHC(VHC);
+            this->simulator.setVHC(VHC_);
             this->simulator.setHTC(HTC);
             // set boundary conditions
             this->simulator.setBoundaryConditions(boundaryType);
             // set heatFlux
-            this->simulator.setFlux(heatFlux);
+            this->simulator.setHeatFlux(heatFlux);
             // set ambient temperature
             this->simulator.setAmbientTemp(ambientTemp);
         }
@@ -362,7 +362,7 @@ public:
 
         /* Initialize the model for time = 0 or the first index and build the matrices*/
         try {
-            this->simulator.deltaT = timeVec[1] - timeVec[0]; // set deltaT
+            this->simulator.deltaT_ = timeVec[1] - timeVec[0]; // set deltaT
             this->simulator.setFluenceRate(laserPose.col(0), laserPower[0], beamWaist); // set fluence rate
 #ifdef USE_CUDA
             if (useGPU)
@@ -393,14 +393,14 @@ public:
         this->simulator.initializeSensorTemps(numSteps);
         this->simulator.updateTemperatureSensors(0);
         Eigen::MatrixXf surfaceTemps(nodesPerAxis[0]*nodesPerAxis[1],numSteps+1);
-        surfaceTemps.col(0) = this->simulator.Temp.head(nodesPerAxis[0] * nodesPerAxis[1]);
+        surfaceTemps.col(0) = this->simulator.Temp_.head(nodesPerAxis[0] * nodesPerAxis[1]);
         /* Now perform time stepping with singele steps */
         for (int t = 1; t <= numSteps; t++) {
             // we are simulating going from step t-1 to t. In the first case this is going from t[0] to t[1]. 
             stream << "Step " << t << " of " << numSteps << std::endl;
             displayOnMATLAB(stream);
             try {
-                this->simulator.deltaT = timeVec[t] - timeVec[t - 1]; // set deltaT
+                this->simulator.deltaT_ = timeVec[t] - timeVec[t - 1]; // set deltaT
                 // fluence rate is set based on parameters at time = t. This is because for single step
                 // the explicit portion was actually calculated during the previous call, or during initializeModel()
                 // So now we are really calculating the implicit step (backwards euler or crank-nicolson) which requires future input
@@ -415,7 +415,7 @@ public:
                 }                
                 
                 this->simulator.updateTemperatureSensors(t);
-                surfaceTemps.col(t) = this->simulator.Temp.head(nodesPerAxis[0] * nodesPerAxis[1]);
+                surfaceTemps.col(t) = this->simulator.Temp_.head(nodesPerAxis[0] * nodesPerAxis[1]);
             }
             catch (const std::exception& e) {
                 stream << "MEX: Error in performTimeStepping() " << std::endl;
@@ -427,12 +427,12 @@ public:
         printDuration("MEX: Time Stepping Complete -- ");
 
         // Have to convert the std::vector to a matlab array for output
-        //display3DVector(this->simulator.Temp, "Final Temp: ");
-        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.getTemp();
+        //display3DVector(this->simulator.Temp_, "Final Temp_: ");
+        std::vector<std::vector<std::vector<float>>> TFinal = this->simulator.TempAsVec();
         matlab::data::TypedArray<float> finalTemp = convert3DVectorToMatlabArray(TFinal);
         outputs[0] = finalTemp;
 
-        matlab::data::TypedArray<float> sensorTempsOutput = convert2DVectorToMatlabArray(this->simulator.sensorTemps);
+        matlab::data::TypedArray<float> sensorTempsOutput = convert2DVectorToMatlabArray(this->simulator.sensorTemps_);
         outputs[1] = sensorTempsOutput;
 
         if (outputs.size() > 2)
@@ -465,7 +465,7 @@ public:
         if (outputs.size() < 2) {
             displayError("Not enough outputs specified.");
         }
-        // Check Temp Input
+        // Check Temp_ Input
         if (inputs[VarPlacement::TEMPERATURE].getType() != matlab::data::ArrayType::SINGLE) {
             displayError("T0 must be an Array of type Single.");
         }
@@ -473,7 +473,7 @@ public:
             displayError("Tissue Size must be 3 x 1");
         }
         if ((inputs[VarPlacement::TISSUE_PROP].getDimensions()[0] != 4) || (inputs[VarPlacement::TISSUE_PROP].getDimensions()[1] != 1)) {
-            displayError("Tissue Properties must be 4 x 1: MUA, TC, VHC, HTC");
+            displayError("Tissue Properties must be 4 x 1: MUA_, TC_, VHC_, HTC_");
         }
         if ((inputs[VarPlacement::BC].getDimensions()[0] != 6) || (inputs[VarPlacement::BC].getDimensions()[1] != 1)) {
             displayError("Boundary Conditions Size must be 6 x 1");
@@ -526,7 +526,7 @@ public:
         }
 
         if (inputs.size() > VarPlacement::ALPHA) {
-            this->simulator.alpha = inputs[VarPlacement::ALPHA][0];
+            this->simulator.alpha_ = inputs[VarPlacement::ALPHA][0];
         }
 
         if (inputs.size() > VarPlacement::SILENT_MODE) {
@@ -556,8 +556,8 @@ public:
             gpuHandle = new GPUTimeIntegrator();
         }
         simulator.buildMatrices();
-        gpuHandle->setAlpha(simulator.alpha);
-        gpuHandle->setDeltaT(simulator.deltaT);
+        gpuHandle->setAlpha(simulator.alpha_);
+        gpuHandle->setDeltaT(simulator.deltaT_);
         gpuHandle->setModel(&simulator);
 //         std::cout << "Model Assigned" << std::endl;
         gpuHandle->initializeWithModel();

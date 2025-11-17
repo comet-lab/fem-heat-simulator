@@ -150,29 +150,34 @@ public:
 			Element elem = mesh_.elements()[face.elemID];
 			int nodesPerElem = ShapeFunc::nNodes;
 			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
-			Eigen::VectorXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
+			Eigen::MatrixXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
 			for (int A = 0; A < nodesPerElem; A++)
+			//for (int A : face.nodes)
 			{
 				long matrixRow = nodeMap_[elem.nodes[A]];
-				// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
-				// needs to be multiplied by htc and ambient temp to be the correct value.
-				Fq_(matrixRow) += Feflux(A);
-				for (int B = 0; B < nodesPerElem; B++)
+				if (matrixRow >= 0)
 				{
-					long neighborIdx = elem.nodes[B];
-					matrixCol = nodeMap_[neighborIdx];
-					Node neighbor = mesh_.nodes()[neighborIdx];
-					if (matrixCol >= 0) // non dirichlet node
+					// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
+					// needs to be multiplied by htc and ambient temp to be the correct value.
+					Fq_(matrixRow) += Feflux(A);
+					for (int B = 0; B < nodesPerElem; B++)
 					{
-						// add effect of node temperature on convection
-						Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
-					}
-					else
-					{
-						// Add effect of node temperature as forcing function
-						Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
+						long neighborIdx = elem.nodes[B];
+						matrixCol = nodeMap_[neighborIdx];
+						Node neighbor = mesh_.nodes()[neighborIdx];
+						if (matrixCol >= 0) // non dirichlet node
+						{
+							// add effect of node temperature on convection
+							Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
+						}
+						else
+						{
+							// Add effect of node temperature as forcing function
+							Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
+						}
 					}
 				}
+				
 			}
 		}
 		else if (face.type == FLUX)
@@ -183,7 +188,8 @@ public:
 			for (int A : face.nodes)
 			{
 				matrixRow = nodeMap_[A];
-				this->Fflux_(matrixRow) += Feflux(A);
+				if (matrixRow >= 0)
+					this->Fflux_(matrixRow) += Feflux(A);
 			}
 		}
 	}
@@ -411,14 +417,18 @@ private:
 	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
 	// vector dictating the fluence experienced at each node. 
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_; 
+
 	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
 	// by a vector dictating the fluence experienced by each element
 	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem_; 
+
 	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
 	// by a vector specifying the fixed temperature at each element.
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv_;
+
 	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_; 
+
 	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
 	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
 
@@ -438,6 +448,14 @@ private:
 		{
 			applyBoundary<ShapeFunc>(mesh_.boundaryFaces()[f]);
 		}
+		// compress all sparse matrices
+		K_.makeCompressed();
+		M_.makeCompressed();
+		Q_.makeCompressed();
+		Fint_.makeCompressed();
+		FintElem_.makeCompressed();
+		Fconv_.makeCompressed();
+		Fk_.makeCompressed();
 	}
 
 };
