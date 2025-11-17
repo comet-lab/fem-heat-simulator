@@ -12,7 +12,7 @@ int main()
 {
     std::cout << "Starting Program" << std::endl;
     std::array<float,3> tissueSize = { 5.0f,5.0f,1.0f };
-    std::array<long, 3> nodesPerAxis = { 10,10,10 };
+    std::array<long, 3> nodesPerAxis = { 11,11,11 };
     long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
     long nElems = (nodesPerAxis[0] - 1) * (nodesPerAxis[1] - 1) * (nodesPerAxis[2] - 1);
     std::array<BoundaryType,6> BC = { CONVECTION,HEATSINK,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };

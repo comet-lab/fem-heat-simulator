@@ -20,13 +20,14 @@ namespace ShapeFunctions {
         *       y   z          | 4 --| 5
         *                      |/    |/
         *                      6 --- 7
+        * Node order on a face should produce a vector pointing inward 
         */
         static constexpr std::array<std::array<int, 4>, 6> faceConnectivity = { {
-            {0, 1, 3, 2}, // top face
-            {4, 5, 7, 6},  // bottom face
+            {0, 1, 3, 2}, // top face 
+            {4, 6, 7, 5},  // bottom face
             {0, 1, 5, 4}, // back face
-            {2, 3, 7, 6}, // front face
-            {0, 2, 6, 4}, // Left face
+            {2, 6, 7, 3}, // front face
+            {0, 4, 6, 2}, // Left face
             {1, 3, 7, 5} // right face
         } };
 
@@ -100,11 +101,11 @@ namespace ShapeFunctions {
             std::array<float, 3> xi;
             switch (face)
             {
-            case 0: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = -1.0f; break; // top
+            case 0: xi[0] = gp[1]; xi[1] = gp[0]; xi[2] = -1.0f; break; // top
             case 1: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = 1.0f; break;  // bottom
             case 2: xi[0] = gp[0]; xi[1] = -1.0f; xi[2] = gp[1]; break; // back
-            case 3: xi[0] = gp[0]; xi[1] = 1.0f; xi[2] = gp[1]; break;  // front
-            case 4: xi[0] = -1.0f; xi[1] = gp[0]; xi[2] = gp[1]; break; // left
+            case 3: xi[0] = gp[1]; xi[1] = 1.0f; xi[2] = gp[0]; break;  // front
+            case 4: xi[0] = -1.0f; xi[1] = gp[1]; xi[2] = gp[0]; break; // left
             case 5: xi[0] = 1.0f; xi[1] = gp[0]; xi[2] = gp[1]; break;  // right
             default: throw std::runtime_error("Invalid face index in mapFaceGPtoXi");
             }
@@ -133,8 +134,8 @@ namespace ShapeFunctions {
             std::vector<std::array<float, 2>> gp(4);
             gp[0] = { -a, -a };
             gp[1] = {  a, -a };
-            gp[2] = { -a,  a };
-            gp[3] = {  a,  a };
+            gp[2] = {  a,  a };
+            gp[3] = { -a,  a };
             return gp;
         }
 
