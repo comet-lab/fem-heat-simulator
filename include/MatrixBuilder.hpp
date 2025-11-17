@@ -54,7 +54,7 @@ public:
 			if (nodeMap_[i] == 0)
 			{
 				nodeMap_[i] = nNonDirichlet_;
-				//validNodes_.push_back(i);
+				validNodes_.push_back(i);
 				nNonDirichlet_++;
 			}
 		}
@@ -380,8 +380,19 @@ public:
 		return J;
 	}
 
-	std::vector<long> nodeMap() { return nodeMap_; }
+	const std::vector<long>& nodeMap() { return nodeMap_; }
+	const std::vector<long>& validNodes() { return validNodes_; }
 	long nNonDirichlet() { return nNonDirichlet_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& M() { return M_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& K() { return K_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Q() { return Q_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fint() { return Fint_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& FintElem() { return FintElem_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fconv() { return Fconv_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fk() { return Fk_; }
+	const Eigen::VectorXf& Fflux() { return Fflux_; }
+	const Eigen::VectorXf& Fq() { return Fq_; }
+
 private:
 
 	const Mesh& mesh_;
@@ -389,6 +400,7 @@ private:
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
 	long nNonDirichlet_ = 0;
+	std::vector<long> validNodes_;
 
 	//Eigen::Matrix3f J_; // Jacobian of our current element
 
