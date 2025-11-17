@@ -11,13 +11,23 @@ namespace ShapeFunctions {
         static constexpr int nGP = 8;
         static constexpr int nFaceGP = 4;
         static constexpr int nFaceNodes = 4;
+
+        /*
+        * Origin Reference Frame and shape formation
+        *           * ---- x     0 --- 1
+        *         / |           /|    /|
+        *        /  |          2 --- 3 |
+        *       y   z          | 4 --| 5
+        *                      |/    |/
+        *                      6 --- 7
+        */
         static constexpr std::array<std::array<int, 4>, 6> faceConnectivity = { {
-            {0, 1, 3, 2},
-            {4, 5, 7, 6},
-            {0, 1, 5, 4},
-            {2, 3, 7, 6},
-            {0, 2, 6, 4},
-            {1, 3, 7, 5}
+            {0, 1, 3, 2}, // top face
+            {4, 5, 7, 6},  // bottom face
+            {0, 1, 5, 4}, // back face
+            {2, 3, 7, 6}, // front face
+            {0, 2, 6, 4}, // Left face
+            {1, 3, 7, 5} // right face
         } };
 
         // Evaluate shape function
@@ -90,10 +100,10 @@ namespace ShapeFunctions {
             std::array<float, 3> xi;
             switch (face)
             {
-            case 0: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = -1.0f; break; // bottom
-            case 1: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = 1.0f; break;  // top
-            case 2: xi[0] = gp[0]; xi[1] = -1.0f; xi[2] = gp[1]; break; // front
-            case 3: xi[0] = gp[0]; xi[1] = 1.0f; xi[2] = gp[1]; break;  // back
+            case 0: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = -1.0f; break; // top
+            case 1: xi[0] = gp[0]; xi[1] = gp[1]; xi[2] = 1.0f; break;  // bottom
+            case 2: xi[0] = gp[0]; xi[1] = -1.0f; xi[2] = gp[1]; break; // back
+            case 3: xi[0] = gp[0]; xi[1] = 1.0f; xi[2] = gp[1]; break;  // front
             case 4: xi[0] = -1.0f; xi[1] = gp[0]; xi[2] = gp[1]; break; // left
             case 5: xi[0] = 1.0f; xi[1] = gp[0]; xi[2] = gp[1]; break;  // right
             default: throw std::runtime_error("Invalid face index in mapFaceGPtoXi");
@@ -107,12 +117,12 @@ namespace ShapeFunctions {
             return {
                 {-0.577350269f, -0.577350269f, -0.577350269f},
                 { 0.577350269f, -0.577350269f, -0.577350269f},
-                { 0.577350269f,  0.577350269f, -0.577350269f},
                 {-0.577350269f,  0.577350269f, -0.577350269f},
+                { 0.577350269f,  0.577350269f, -0.577350269f},
                 {-0.577350269f, -0.577350269f,  0.577350269f},
                 { 0.577350269f, -0.577350269f,  0.577350269f},
-                { 0.577350269f,  0.577350269f,  0.577350269f},
-                {-0.577350269f,  0.577350269f,  0.577350269f}
+                {-0.577350269f,  0.577350269f,  0.577350269f},
+                { 0.577350269f,  0.577350269f,  0.577350269f}
             };
         }
 
@@ -122,9 +132,9 @@ namespace ShapeFunctions {
             const float a = 1.0f / std::sqrt(3.0f);
             std::vector<std::array<float, 2>> gp(4);
             gp[0] = { -a, -a };
-            gp[1] = { a, -a };
-            gp[2] = { a,  a };
-            gp[3] = { -a,  a };
+            gp[1] = {  a, -a };
+            gp[2] = { -a,  a };
+            gp[3] = {  a,  a };
             return gp;
         }
 
