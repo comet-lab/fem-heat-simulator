@@ -66,7 +66,7 @@ set(HEATSIM_SRC
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
-    include/MatrixBuilder.h
+    "include/MatrixBuilder.hpp"
     include/ShapeFunctions/HexLinear.hpp
 
 )

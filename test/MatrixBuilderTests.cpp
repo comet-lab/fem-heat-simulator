@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "MatrixBuilder.h"
+#include "MatrixBuilder.hpp"
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
 #include <iostream>
