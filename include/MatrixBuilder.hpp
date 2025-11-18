@@ -188,8 +188,12 @@ public:
 			//for (int A : face.nodes)
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
 			{
-				matrixRow = nodeMap_[A];
+				matrixRow = nodeMap_[elem.nodes[A]];
 				if (matrixRow >= 0)
+					/*by adding here, we are implicitly stating that a positve flux value will add heat to the system
+					* mathematically, we technically should be subtracting, but from a user perspective, it makes more sense
+					* that a positive heat flux will add heat at the boundary. 
+					*/ 
 					Fflux_(matrixRow) += Feflux(A);
 			}
 		}
