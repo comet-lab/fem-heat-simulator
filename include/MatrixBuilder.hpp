@@ -152,7 +152,7 @@ public:
 			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
 			Eigen::MatrixXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
 			for (int A = 0; A < nodesPerElem; A++)
-			//for (int A : face.nodes)
+			//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
 				long matrixRow = nodeMap_[elem.nodes[A]];
 				if (matrixRow >= 0)
@@ -184,9 +184,9 @@ public:
 		{
 			Element elem = mesh_.elements()[face.elemID];
 			long matrixRow = 0;
-			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
-			//for (int A : face.nodes)
+			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);		
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
+			//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
 				matrixRow = nodeMap_[elem.nodes[A]];
 				if (matrixRow >= 0)
