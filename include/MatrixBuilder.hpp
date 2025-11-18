@@ -185,11 +185,12 @@ public:
 			Element elem = mesh_.elements()[face.elemID];
 			long matrixRow = 0;
 			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
-			for (int A : face.nodes)
+			//for (int A : face.nodes)
+			for (int A = 0; A < ShapeFunc::nNodes; A++)
 			{
 				matrixRow = nodeMap_[A];
 				if (matrixRow >= 0)
-					this->Fflux_(matrixRow) += Feflux(A);
+					Fflux_(matrixRow) += Feflux(A);
 			}
 		}
 	}
@@ -290,7 +291,7 @@ public:
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
-				const Node& n = mesh_.nodes()[ShapeFunc::faceConnectivity[faceIndex][a]];
+				const Node& n = mesh_.nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
 				Eigen::Vector3f nodePos(n.x, n.y, n.z);
 				JFace += dN_dxi_eta[a] * nodePos.transpose();
 			}
@@ -339,7 +340,10 @@ public:
 			for (int a = 0; a < nFaceNodes; ++a)
 			{
 				Eigen::Vector3f nodePos(faceNodes[a].x, faceNodes[a].y, faceNodes[a].z);
+				//Eigen::MatrixXf var = dN_dxi_eta[a] * nodePos.transpose();
+				//std::cout << "J" << a << ":\n" << var << std::endl;
 				JFace += dN_dxi_eta[a] * nodePos.transpose();
+				//std::cout << "Jface:\n" << JFace << std::endl;;
 			}
 
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
