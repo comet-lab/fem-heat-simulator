@@ -7,33 +7,14 @@
 
 class HexBuilder : public testing::Test {
 protected:
-	std::vector<Node> nodes;
-	std::vector<BoundaryFace> boundaryFaces;
 	MatrixBuilder* mb;
-	ShapeFunctions::HexLinear testHexLin; 
 	Mesh mesh;
-	Element elem;
 	void SetUp() override {
-		nodes.resize(8);
-		for (int i = 0; i < 8; i++) {
-			nodes[i].x = 0 + i%2;
-			nodes[i].y = 0 + (i/2)%2;
-			nodes[i].z = 0 + (i/4);
-			elem.nodes.push_back(i);
-		}
-		mesh.setNodes(nodes);
-		mesh.setElements({ elem });
-
-		boundaryFaces.resize(6);
-		for (int i = 0; i < 6; i++) {
-			boundaryFaces[i].elemID = 0;
-			boundaryFaces[i].localFaceID = i;
-			boundaryFaces[i].nodes.assign(testHexLin.faceConnectivity[i].begin(), testHexLin.faceConnectivity[i].end());
-			boundaryFaces[i].type = FLUX;
-			boundaryFaces[i].value = 1;
-		}
-		boundaryFaces[0].type = HEATSINK;
-		mesh.setBoundaryFaces(boundaryFaces);
+		std::vector<float> xPos = { -1,0,1 };
+		std::vector<float> yPos = { -1,0,1 };
+		std::vector<float> zPos = { -2,-1,0 };
+		std::array<BoundaryType, 6> bc = { FLUX,HEATSINK,FLUX,CONVECTION,CONVECTION,CONVECTION };
+		mesh = Mesh::buildCubeMesh(xPos,yPos,zPos,bc);
 
 		mb = new MatrixBuilder(mesh);
 	};
@@ -90,19 +71,9 @@ protected:
 	};
 };
 
-TEST_F(HexBuilder, testSetNodeList)
-{
-	for (int i = 0; i < 8; i++)
-	{
-		ASSERT_EQ(nodes[i].x, mesh.nodes()[i].x);
-		ASSERT_EQ(nodes[i].y, mesh.nodes()[i].y);
-		ASSERT_EQ(nodes[i].z, mesh.nodes()[i].z);
-	}
-}
-
 /*
 * Calculating the Jacobian. Based on the element we created, the Jacobian should simply be
-* a diagonal element with 0.5 for each diagonal element
+* a diagonal element with 1 for each diagonal element
 */
 TEST_F(HexBuilder, testCalculateJacobian)
 {
@@ -112,7 +83,7 @@ TEST_F(HexBuilder, testCalculateJacobian)
 		dNdxi[a] = ShapeFunctions::HexLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
 	}
 	
-	Eigen::Matrix3f J = mb->calculateJ<ShapeFunctions::HexLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case
+	Eigen::Matrix3f J = mb->calculateJ<ShapeFunctions::HexLinear>(mesh.elements()[0], dNdxi); // position (xi) doesn't matter in this test case
 
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++)
@@ -138,7 +109,7 @@ TEST_F(HexBuilder, testCalculateJacobian)
 TEST_F(HexBuilder, testCalculateHexLinMe)
 {
 
-	Eigen::Matrix<float, 8, 8> Me = mb->calculateMe<ShapeFunctions::HexLinear>(elem);
+	Eigen::Matrix<float, 8, 8> Me = mb->calculateMe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 2.0f, 2.0f, 4.0f, 2.0f, 4.0f, 4.0f, 8.0f };
@@ -157,7 +128,7 @@ TEST_F(HexBuilder, testCalculateHexLinMe)
 TEST_F(HexBuilder, testCalculateHexLinKe)
 {
 
-	Eigen::Matrix<float, 8, 8> Ke = mb->calculateKe<ShapeFunctions::HexLinear>(elem);
+	Eigen::Matrix<float, 8, 8> Ke = mb->calculateKe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 0.0f, 0.0f, -1/4.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
@@ -178,7 +149,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 {
 
 	//Face 0: Bottom Face
-	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem,0,1);
+	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0],0,1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 4) || (A == 5) || (A == 6) || (A == 7))
@@ -188,7 +159,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 1: Top Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem, 1, 1);
+	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 1, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
@@ -198,7 +169,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 2: Front Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem, 2, 1);
+	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 2, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
@@ -208,7 +179,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 3: Back Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem, 3, 1);
+	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 3, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
@@ -218,7 +189,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 4: Left Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem, 4, 1);
+	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 4, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
@@ -228,7 +199,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 5: Right Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(elem, 5, 1);
+	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 5, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
@@ -256,7 +227,7 @@ TEST_F(HexBuilder, testCalculateFeConv)
 	int B = 0;
 	for (int f = 0; f < 6; f++)
 	{
-		Eigen::MatrixXf FeConv = mb->calculateFeConv<ShapeFunctions::HexLinear>(elem, f);
+		Eigen::MatrixXf FeConv = mb->calculateFeConv<ShapeFunctions::HexLinear>(mesh.elements()[0], f);
 		// all of these nodes should be scaled relative to scale matrix
 		const int* nodes = faceNodes[f];
 		for (int i = 0; i < 4; i++)
@@ -293,11 +264,15 @@ TEST_F(HexBuilder, testSetNodeMap)
 	// only bottom face is dirichlet
 	std::vector<long> trueMap = { -1 ,-1,-1,-1, 0, 1, 2, 3 };
 	std::vector<long> trueValid = { 4,5,6,7 };
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 27; i++)
 	{
-		EXPECT_EQ(trueMap[i], mb->nodeMap()[i]);
+		if (i > 17)
+			EXPECT_EQ(-1, mb->nodeMap()[i]);
+		else
+			EXPECT_EQ(i, mb->nodeMap()[i]);
 	}
-	EXPECT_EQ(trueValid.size(), mb->nNonDirichlet());
+	// 27 nodes total, 9 nodes are dirichlet
+	EXPECT_EQ(18, mb->nNonDirichlet());
 }
 
 TEST_F(HexBuilder, testBuildMatrices)
