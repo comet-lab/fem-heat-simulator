@@ -11,6 +11,7 @@ namespace ShapeFunctions {
         static constexpr int nGP = 8;
         static constexpr int nFaceGP = 4;
         static constexpr int nFaceNodes = 4;
+        static constexpr int nFaces = 6;
 
         /*
         * Origin Reference Frame and shape formation

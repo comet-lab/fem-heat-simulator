@@ -16,6 +16,7 @@ namespace ShapeFunctions {
         static constexpr int nGP = 4; // the conductivity matrix only needs order 1, but M needs order 2
         static constexpr int nFaceGP = 3;   // 1-point quadrature per triangular face
         static constexpr int nFaceNodes = 3;
+        static constexpr int nFaces = 4;
 
         // Face connectivity: 4 faces, 3 nodes each
         static constexpr std::array<std::array<int, 3>, 4> faceConnectivity = { {

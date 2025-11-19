@@ -19,12 +19,21 @@ public:
 	MatrixBuilder(const Mesh& mesh) { setMesh(mesh); }
 	~MatrixBuilder() {} // Destructor should not clear mesh because we don't allocate it in the class
 
+
+	/*
+	* @brief sets the mesh and then calls buildMatrices()
+	* @param mesh a constant reference to a mesh object
+	*/
 	void buildMatrices(const Mesh& mesh)
 	{
 		setMesh(mesh);
 		buildMatrices();
 	}
 
+
+	/*
+	* @brief selects the ShapeFunction to use to build the matrices based on the mesh
+	*/
 	void buildMatrices()
 	{
 		if (!mesh_)
@@ -45,6 +54,9 @@ public:
 		mesh_ = &mesh;
 	}
 
+	/*
+	* @brief goes through the mesh and labels dirichlet nodes so that we can properly size our global matrices and build them
+	*/
 	void setNodeMap()
 	{
 		// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
@@ -76,6 +88,9 @@ public:
 		}
 	}
 
+	/*
+	* @brief sets the size of all the global matrices based on the mesh so that we aren't resizing while building
+	*/
 	template <typename ShapeFunc>
 	void resetMatrices()
 	{
@@ -111,16 +126,20 @@ public:
 		Q_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
 	}
 
-
+	/*
+	* @brief applies the contribution of the given element to the global matrices
+	* @param elem of type Element
+	* @param elemIdx the index of the element in the mesh element list
+	*/
 	template <typename ShapeFunc>
 	void applyElement(Element elem, long elemIdx)
 	{
 		int nodesPerElem = ShapeFunc::nNodes;
 		long matrixRow = 0;
 		long matrixCol = 0;
-		Eigen::MatrixXf Me = calculateMe<ShapeFunc>(elem);
-		Eigen::MatrixXf Fe = calculateMe<ShapeFunc>(elem);
-		Eigen::MatrixXf Ke = calculateKe<ShapeFunc>(elem);
+		Eigen::MatrixXf Me = calculateIntNaNb<ShapeFunc>(elem);
+		Eigen::MatrixXf Fe = calculateIntNaNb<ShapeFunc>(elem);
+		Eigen::MatrixXf Ke = calculateIntdNadNb<ShapeFunc>(elem);
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
@@ -156,6 +175,11 @@ public:
 		} // for each node in element
 	}
 
+
+	/*
+	* @brief applies the contribution of the given element face to the global matrices
+	* @param face of type BoundaryFace
+	*/
 	template <typename ShapeFunc>
 	void applyBoundary(BoundaryFace face)
 	{
@@ -165,8 +189,8 @@ public:
 			long matrixCol = 0;
 			Element elem = mesh_->elements()[face.elemID];
 			int nodesPerElem = ShapeFunc::nNodes;
-			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
-			Eigen::MatrixXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
+			Eigen::VectorXf Feflux = calculateFaceIntNa<ShapeFunc>(elem, face.localFaceID, 1);
+			Eigen::MatrixXf FeConv = calculateFaceIntNaNb<ShapeFunc>(elem, face.localFaceID);
 			for (int A = 0; A < nodesPerElem; A++)
 			//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
@@ -200,7 +224,7 @@ public:
 		{
 			Element elem = mesh_->elements()[face.elemID];
 			long matrixRow = 0;
-			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);		
+			Eigen::VectorXf Feflux = calculateFaceIntNa<ShapeFunc>(elem, face.localFaceID, 1);		
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
 			//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
@@ -215,21 +239,24 @@ public:
 		}
 	}
 
+	/*
+	* @brief calculates the integral (N * N' |J| dV) for the given element
+	* @param elem current element
+	* 
+	* This function is used to calculate the Thermal Mass Matrix of a given element (Me) as well
+	* as the local function Fe used for nodal or elemental heat generation
+	*/
 	template <typename ShapeFunc>
-	Eigen::MatrixXf calculateMe(const Element& elem) 
+	Eigen::MatrixXf calculateIntNaNb(const Element& elem) 
 	{
 
 		Eigen::MatrixXf Me = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
 
-		/*const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();*/
 		const std::vector<std::array<float, 3>>& w = ShapeFunc::weights();
 
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
-			//std::array<float, 3> xi = gp[i];
-			//std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
-			//Eigen::VectorXf Nvals = Ngp_[i];
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxi_gp_[i];
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
 
 			// Jacobian and determinant (simplified)
 			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
@@ -238,31 +265,27 @@ public:
 
 
 			Me += NaNbCache_[i] * weight;
-			/*for (int a = 0; a < ShapeFunc::nNodes; a++)
-				for (int b = 0; b < ShapeFunc::nNodes; b++)
-					Me(a, b) += Nvals[a] * Nvals[b] * weight;*/
 		}
 
 		return Me;
 	}
 
+	/*
+	* @brief calculates the integral ( (Jinv * dN/dxi)^T * (Jinv * dN/dxi) |J| dV) for the given element
+	* @param elem current element
+	*
+	* This function is used to calculate the Conductivity matrix of an element (Ke)
+	*/
 	template <typename ShapeFunc>
-	Eigen::MatrixXf calculateKe(const Element& elem)
+	Eigen::MatrixXf calculateIntdNadNb(const Element& elem)
 	{
 		Eigen::MatrixXf Ke = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
 
-		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
 		const std::vector<std::array<float, 3>>& w = ShapeFunc::weights();
 
 		for (int i = 0; i < ShapeFunc::nGP; ++i)
 		{
-			const std::array<float, 3>& xi = gp[i];
-
-			// Shape function derivatives in reference coordinates
-			//std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxi_gp_[i];
-			//for (int a = 0; a < ShapeFunc::nNodes; ++a)
-				//dNdxi[a] = ShapeFunc::dNdxi(xi, a);
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
 
 			// Compute Jacobian and inverse
 			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
@@ -275,50 +298,35 @@ public:
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
 			// Ke contribution: (nNodes × 3)(3 × nNodes) = nNodes × nNodes
 			Ke += dNdx.transpose() * dNdx * weight;
-
-			// Derivatives in physical coordinates
-			/*std::array<Eigen::Vector3f, ShapeFunc::nNodes> dNdx;
-			for (int a = 0; a < ShapeFunc::nNodes; ++a)
-				dNdx[a] = Jinv * dNdxi[a];*/
-			// Weight for this Gauss point
-			//float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
-			// Assemble stiffness matrix
-			//for (int a = 0; a < ShapeFunc::nNodes; ++a)
-			//	for (int b = 0; b < ShapeFunc::nNodes; ++b)
-			//		Ke(a, b) += dNdx[a].dot(dNdx[b]) * weight;
 				
 		}
 
 		return Ke;
 	}
 
+	/*
+	* @brief calculates the integral (N * q J_s| dS) for the given face
+	* @param elem current element
+	* @param faceIndex face on the element
+	* @param q if we want to scale by a coefficient or input value (pretty much unused)
+	*
+	* This function is used to calculate the influence of Neumann boundary conditions
+	*/
 	template <typename ShapeFunc>
-	Eigen::MatrixXf calculateFeFlux(const Element& elem, int faceIndex, float q)
+	Eigen::MatrixXf calculateFaceIntNa(const Element& elem, int faceIndex, float q)
 	{
 		Eigen::Matrix<float, ShapeFunc::nNodes, 1> Fe = Eigen::Matrix<float, ShapeFunc::nNodes, 1>::Zero();
 
-		const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
+		//const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
 		const auto& w = ShapeFunc::faceWeights(faceIndex);
 
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
-			std::array<float, ShapeFunc::nFaceNodes> N_face;
-			std::array<Eigen::Vector2f, ShapeFunc::nFaceNodes> dN_dxi_eta;
-
-			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
-			{
-				N_face[a] = ShapeFunc::N_face(gp[i], a, faceIndex);
-				dN_dxi_eta[a] = ShapeFunc::dNdxi_face(gp[i], a, faceIndex);
-			}
+			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[faceIndex][i];
+			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
-			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
-			{
-				const Node& n = mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
-				Eigen::Vector3f nodePos(n.x, n.y, n.z);
-				JFace += dN_dxi_eta[a] * nodePos.transpose();
-			}
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem,faceIndex,dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
@@ -332,44 +340,34 @@ public:
 		return Fe;
 	}
 
+	/*
+	* @brief calculates the integral (N * N' |J_s| dS) for the given face
+	* @param elem current element
+	* @param faceIndex face on the element
+	*
+	* This function is used to calculate the influence of Neumann boundary conditions that are influenced
+	* by a value at each node. For example convection is influenced by temperature at each node so this would
+	* be used to calculate \int (N*h*T |J| dS) 
+	*/
 	template <typename ShapeFunc>
-	Eigen::MatrixXf calculateFeConv(const Element& elem, int faceIndex)
+	Eigen::MatrixXf calculateFaceIntNaNb(const Element& elem, int faceIndex)
 	{
 		constexpr int nNodes = ShapeFunc::nNodes;
 		constexpr int nFaceNodes = ShapeFunc::nFaceNodes;
 
 		Eigen::Matrix<float, nNodes, nNodes> Qe = Eigen::Matrix<float, nNodes, nNodes>::Zero();
 
-		const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
 		const auto& w = ShapeFunc::faceWeights(faceIndex);
 
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
-			std::array<float, nFaceNodes> N_face;
-			std::array<Eigen::Vector2f, nFaceNodes> dN_dxi_eta;
+			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[faceIndex][i];
+			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
-			for (int a = 0; a < nFaceNodes; ++a)
-			{
-				N_face[a] = ShapeFunc::N_face(gp[i], a, faceIndex);
-				dN_dxi_eta[a] = ShapeFunc::dNdxi_face(gp[i], a, faceIndex); // returns 2D derivatives in 
-			}
+			// Compute 2x3 surface Jacobian
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
 
-			// Get node positions for this face
-			std::vector<Node> faceNodes;
-			for (int a = 0; a < nFaceNodes; ++a)
-				faceNodes.push_back(mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]]);
-
-			// Compute surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
-			for (int a = 0; a < nFaceNodes; ++a)
-			{
-				Eigen::Vector3f nodePos(faceNodes[a].x, faceNodes[a].y, faceNodes[a].z);
-				//Eigen::MatrixXf var = dN_dxi_eta[a] * nodePos.transpose();
-				//std::cout << "J" << a << ":\n" << var << std::endl;
-				JFace += dN_dxi_eta[a] * nodePos.transpose();
-				//std::cout << "Jface:\n" << JFace << std::endl;;
-			}
-
+			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
 
 			float weight = w[i][0] * w[i][1] * detJ;
@@ -389,6 +387,11 @@ public:
 		return Qe;
 	}
 	
+	/*
+	* @brief precomputes the volume jacobian for an element
+	* @param elem is of type Element and is the current element we are working on
+	* @param dNdxi is the shape function derivative over the volume evaluated at the current gaussian integration point
+	*/
 	template <typename ShapeFunc>
 	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float,3,Eigen::Dynamic>& dNdxi)
 	{
@@ -402,13 +405,47 @@ public:
 		return J;
 	}
 
+	/*
+	* @brief precomputes the face jacobian for a face on an element
+	* @param elem is of type Element and is the current element we are working on
+	* @param faceIndex is the face number of the element
+	* @param dNdxi is the shape function derivative over the surface evaluated at the current gaussian integration point
+	*/
+	template <typename ShapeFunc>
+	Eigen::Matrix<float, 2, 3> calculateJFace(const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
+	{
+		Eigen::Matrix<float, ShapeFunc::nFaceNodes, 3> nodePoses;
+		for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
+		{
+			const Node& n = mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
+			nodePoses.row(a) << n.x, n.y, n.z;
+		}
+		Eigen::Matrix<float, 2, 3> JFace = dNdxi * nodePoses;
+		return JFace;
+	}
+
+	/*
+	* @brief precompute the shape functions at each gauss point, their derivatves, and outer products
+	* 
+	* Because we are assuming each element in the mesh will be the same element type (e.g. hex linear)
+	* we can compute the value of the shape functions at each gaussian integration point ahead of time. 
+	* The shape functions are defined in the parametric domain, meaning different element sizes or warps won't
+	* affect the shape functions. The differences in element lengths or sizes will be imparted with the Jacobian
+	* which isn't precomputed.
+	* 
+	* If we ever change to allow multiple element types within a mesh, we won't be able to precompute and 
+	* we will have to calculate them in the integration loops above.
+	*/
 	template <typename ShapeFunc>
 	void precomputeShapeFunctions()
 	{
 		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
-		Ngp_.clear();
+		NCache_.clear();
 		NaNbCache_.clear();
-		dNdxi_gp_.clear();
+		dNdxiCache_.clear();
+		NFaceCache_.clear();
+		dNdxiFaceCache_.clear();
+		// pre-compute volume shape functions
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
 			const auto& xi = gp[i];
@@ -420,11 +457,39 @@ public:
 				dNdxi.col(a) = ShapeFunc::dNdxi(xi, a);
 			}
 			NaNbCache_.push_back(Nvals * Nvals.transpose());
-			Ngp_.push_back(Nvals);
-			dNdxi_gp_.push_back(dNdxi);
+			NCache_.push_back(Nvals);
+			dNdxiCache_.push_back(dNdxi);
+		}
+
+		// pre-compute surface shape functions
+		for (int f = 0; f < ShapeFunc::nFaces; f++)
+		{
+			const auto& gpFace = ShapeFunc::faceGaussPoints(f);
+
+			std::vector<Eigen::VectorXf> temporaryNFace(ShapeFunc::nFaceGP);
+			//std::vector<Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes>> temporarydNdxi(ShapeFunc::nFaceGP);
+			std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> temporarydNdxi(ShapeFunc::nFaceGP);
+			std::vector<Eigen::Matrix<float, ShapeFunc::nFaceNodes, ShapeFunc::nFaceNodes>> temporaryNaNbFace(ShapeFunc::nFaceGP);
+			for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
+			{
+				Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face;
+				Eigen::Matrix<float,2,ShapeFunc::nFaceNodes> dN_dxi_eta;
+
+				for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
+				{
+					N_face(a) = ShapeFunc::N_face(gpFace[i], a, f);
+					dN_dxi_eta.col(a) = ShapeFunc::dNdxi_face(gpFace[i], a, f);
+				}
+				temporaryNFace[i] = N_face;
+				temporaryNaNbFace[i] = N_face * N_face.transpose();
+				temporarydNdxi[i] = dN_dxi_eta;
+			}
+			NFaceCache_.push_back(temporaryNFace);
+			dNdxiFaceCache_.push_back(temporarydNdxi);
 		}
 	}
 
+	// public getters
 	const std::vector<long>& nodeMap() const { return nodeMap_; }
 	const std::vector<long>& validNodes() const { return validNodes_; }
 	long nNonDirichlet() const { return nNonDirichlet_; }
@@ -447,12 +512,22 @@ private:
 	long nNonDirichlet_ = 0;
 	std::vector<long> validNodes_;
 
-	std::vector<Eigen::VectorXf> Ngp_; // Stores the shape functions for each node at each gauss point
+	/* Cached shape functions which are element independent */ 
+	// volume shape functions
+	std::vector<Eigen::VectorXf> NCache_; // Stores the shape functions for each node at each gauss point
 	std::vector<Eigen::MatrixXf> NaNbCache_; // Stores the multiplication of N*N' for element shape functions at each gauss point
-	std::vector<Eigen::Matrix<float, 3, Eigen::Dynamic>> dNdxi_gp_; // Stores the shape function derivaties for each node at each gauss point
+	std::vector<Eigen::Matrix<float, 3, Eigen::Dynamic>> dNdxiCache_; // Stores the shape function derivaties for each node at each gauss point
+	// surface shape functions
+	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Vector is face shape functions at gauss point on face
+	// size is nFace x nGP x nFaceNodes
+	std::vector<std::vector<Eigen::VectorXf>> NFaceCache_; 
+	// Stores multiplication of N*N' for each face shape function at each gauss point
+	std::vector<std::vector<Eigen::MatrixXf>> NaNbFaceCache_;
+	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Matrix is face derivative shape functions at gauss point on face
+	// size is nFace x nGp x (2 x nFaceNodes)
+	std::vector<std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>>> dNdxiFaceCache_;
 
-	//Eigen::Matrix3f J_; // Jacobian of our current element
-
+	/*Cache of global matrices used in assembly*/
 	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
@@ -475,6 +550,10 @@ private:
 	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
 	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
 
+
+	/*
+	* @brief templated version of buildMatrices() for specific element type
+	*/
 	template <typename ShapeFunc>
 	void buildMatricesT()
 	{
