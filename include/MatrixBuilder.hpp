@@ -410,18 +410,18 @@ public:
 		return J;
 	}
 
-	const std::vector<long>& nodeMap() { return nodeMap_; }
-	const std::vector<long>& validNodes() { return validNodes_; }
-	long nNonDirichlet() { return nNonDirichlet_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& M() { return M_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& K() { return K_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Q() { return Q_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fint() { return Fint_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& FintElem() { return FintElem_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fconv() { return Fconv_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fk() { return Fk_; }
-	const Eigen::VectorXf& Fflux() { return Fflux_; }
-	const Eigen::VectorXf& Fq() { return Fq_; }
+	const std::vector<long>& nodeMap() const { return nodeMap_; }
+	const std::vector<long>& validNodes() const { return validNodes_; }
+	long nNonDirichlet() const { return nNonDirichlet_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& M() const { return M_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& K() const { return K_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Q() const { return Q_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fint() const { return Fint_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& FintElem() const { return FintElem_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fconv() const { return Fconv_; }
+	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fk() const { return Fk_; }
+	const Eigen::VectorXf& Fflux() const { return Fflux_; }
+	const Eigen::VectorXf& Fq() const { return Fq_; }
 
 private:
 
