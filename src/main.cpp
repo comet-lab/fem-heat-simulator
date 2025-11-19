@@ -11,16 +11,18 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    std::array<float,3> tissueSize = { 5.0f,5.0f,1.0f };
+    std::array<float,3> tissueSize = { 5.0f,5.0f,5.0f };
     std::array<long, 3> nodesPerAxis = { 11,11,11 };
     long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
     long nElems = (nodesPerAxis[0] - 1) * (nodesPerAxis[1] - 1) * (nodesPerAxis[2] - 1);
-    std::array<BoundaryType,6> BC = { CONVECTION,HEATSINK,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };
+    //std::array<BoundaryType,6> BC = { CONVECTION,CONVECTION,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };
+    std::array<BoundaryType, 6> BC = { FLUX,FLUX,FLUX ,FLUX ,FLUX ,FLUX};
 
     std::cout << "Building Mesh" << std::endl;
     Mesh mesh = Mesh::buildCubeMesh(tissueSize, nodesPerAxis, BC);
 
-    Eigen::VectorXf Temp = Eigen::VectorXf::Constant(nNodes,20);
+    float initialTemp = 20.0f;
+    Eigen::VectorXf Temp = Eigen::VectorXf::Constant(nNodes, initialTemp);
     Eigen::VectorXf FluenceRate = Eigen::VectorXf::Constant(nNodes, 0);
     
     srand(1);
@@ -31,7 +33,7 @@ int main()
     float htc = 0.01;
     FEM_Simulator simulator(mua, vhc, tc, htc);
     std::cout << "Setting Mesh" << std::endl;
-    simulator.setMesh(mesh);
+    simulator.setMesh(std::make_shared<Mesh>(mesh));
     simulator.setTemp(Temp);
     std::cout << "Number of nodes: " << nNodes << std::endl;
     std::cout << "Number of elems: " << nElems << std::endl;
@@ -39,8 +41,8 @@ int main()
     float totalTime = 1.0f;
     simulator.setAlpha(0.5f);
     simulator.setDeltaT(0.05f);
-    simulator.setHeatFlux(0.0f);
-    simulator.setAmbientTemp(24);
+    simulator.setHeatFlux(-1.0);
+    simulator.setAmbientTemp(0.0f);
 
     simulator.silentMode = false;
 

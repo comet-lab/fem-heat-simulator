@@ -11,6 +11,29 @@
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
 
+struct GlobalMatrices
+{
+	std::vector<long> nodeMap_;
+	long nNonDirichlet_ = 0;
+	std::vector<long> validNodes_;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
+	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
+	// vector dictating the fluence experienced at each node. 
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_;
+	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
+	// by a vector dictating the fluence experienced by each element
+	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem_;
+	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
+	// by a vector specifying the fixed temperature at each element.
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv_;
+	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_;
+	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
+	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
+};
+
 class MatrixBuilder
 {
 public:

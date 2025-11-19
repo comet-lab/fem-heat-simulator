@@ -16,39 +16,49 @@ FEM_Simulator::FEM_Simulator(float MUA, float VHC, float TC, float HTC)
 	setHTC(HTC);
 }
 
-FEM_Simulator::FEM_Simulator(const FEM_Simulator& inputSim)
+FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 {
-	TC_ = inputSim.TC(); // Thermal Conductivity [W/cm C]
-	VHC_ = inputSim.VHC(); // Volumetric Heat Capacity [W/cm^3]
-	MUA_ = inputSim.MUA(); // Absorption Coefficient [cm^-1]
-	ambientTemp_ = inputSim.ambientTemp();  // Temperature surrounding the tissue for Convection [C]
-	Temp_ = inputSim.Temp(); // Our values for temperature at the nodes of the elements
-	fluenceRate_ = inputSim.fluenceRate(); // Our values for Heat addition
-	fluenceRateElem_ = inputSim.fluenceRateElem(); // Our values for Heat addition
-	alpha_ = inputSim.alpha(); // time step weight
-	deltaT_ = inputSim.deltaT(); // time step [s]
-	heatFlux_ = inputSim.heatFlux(); // heat escaping the Neumann Boundary
-	HTC_ = inputSim.HTC_; // convective heat transfer coefficient [W/cm^2]
-	sensorLocations_ = inputSim.sensorLocations();
-	sensorTemps_ = inputSim.sensorTemps();
+	// copy simple types
+	silentMode = other.silentMode;
+	TC_ = other.TC_;
+	VHC_ = other.VHC_;
+	MUA_ = other.MUA_;
+	HTC_ = other.HTC_;
+	ambientTemp_ = other.ambientTemp_;
+	alpha_ = other.alpha_;
+	deltaT_ = other.deltaT_;
+	heatFlux_ = other.heatFlux_;
+	parameterUpdate_ = other.parameterUpdate_;
+	fluenceUpdate_ = other.fluenceUpdate_;
 
-	parameterUpdate_ = inputSim.parameterUpdate_;
-	fluenceUpdate_ = inputSim.fluenceUpdate_;
-	
-	this->LHS_ = inputSim.LHS_; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
-	this->dVec_ = inputSim.dVec_; // This is our discrete temperature at non-dirichlet nodes from Time-stepping
-	this->vVec_ = inputSim.vVec_; // This is our discrete temperature velocity from Time-stepping
+	// copy STL containers
+	sensorLocations_ = other.sensorLocations_;
+	sensorTemps_ = other.sensorTemps_;
 
-	this->silentMode = inputSim.silentMode;
+	// copy Eigen vectors/matrices (Eigen copies deeply by default)
+	Temp_ = other.Temp_;
+	dVec_ = other.dVec_;
+	vVec_ = other.vVec_;
+	fluenceRate_ = other.fluenceRate_;
+	fluenceRateElem_ = other.fluenceRateElem_;
+
+	// copy sparse matrices and solver members
+	globK_ = other.globK_;
+	globM_ = other.globM_;
+	globF_ = other.globF_;
+	LHS_ = other.LHS_;
+//	cgSolver_ = other.cgSolver_; // this is safe; solver will copy settings but not references
+
+	// copy mesh (assuming Mesh has a safe copy constructor)
+	mesh_ = other.mesh_;
+
+	// IMPORTANT: shallow copy the MatrixBuilder pointer
+	mb_ = other.mb_;
+
 }
 
 FEM_Simulator::~FEM_Simulator(){
 	// std::cout << "FEM_Simulator Destructor" << std::endl;
-	if (mb_)
-	{
-		delete mb_;
-		mb_ = nullptr;
-	}
 }
 
 void FEM_Simulator::multiStep(float duration) {
@@ -131,7 +141,7 @@ void FEM_Simulator::singleStepCPU() {
 
 void FEM_Simulator::buildMatrices()
 {
-	mb_ = new MatrixBuilder(mesh_);
+	mb_ = std::make_shared<MatrixBuilder>(*mesh_);
 	mb_->buildMatrices();
 
 	setGlobalSparsityPattern();
@@ -148,14 +158,14 @@ void FEM_Simulator::applyParametersCPU()
 	// auto startTime = std::chrono::steady_clock::now();
 	
 	// Apply parameter specific multiplication for each global matrix.
+	// Conductivity matrix
 	globK_.setZero();
 	globK_ += mb_->K() * TC_;
 	globK_ += mb_->Q() * HTC_;
-
+	// Thermal mass matrix
 	globM_.setZero();
 	globM_ += mb_->M() * VHC_; // M Doesn't have any additions so we just multiply it by the constant
-	//globK_.makeCompressed();
-	//globM_.makeCompressed();
+	// Forcing Vector
 	globF_.setZero();
 	globF_ += (mb_->Fq() * ambientTemp_ + mb_->Fconv() * Temp_ ) * HTC_; // convection from ambient temp and dirichlet nodes
 	globF_ += (mb_->Fflux() * heatFlux_); // heat flux 
@@ -175,7 +185,7 @@ void FEM_Simulator::initializeTimeIntegrationCPU()
 	applyParametersCPU();
 	parameterUpdate_ = false;
 
-	int nNodes = mesh_.nodes().size();
+	int nNodes = mesh_->nodes().size();
 	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
 	// Initialize d, v, and dTilde vectors
 	dVec_.resize(mb_->nNonDirichlet());
@@ -276,9 +286,9 @@ void FEM_Simulator::updateTemperatureSensors(int timeIdx) {
 
 void FEM_Simulator::initializeContainers()
 {
-	Temp_ = Eigen::VectorXf::Zero(mesh_.nodes().size()); // Our values for temperature at the nodes of the elements
-	fluenceRate_ = Eigen::VectorXf::Zero(mesh_.nodes().size()); // Our values for Heat addition
-	fluenceRateElem_ = Eigen::VectorXf::Zero(mesh_.elements().size()); // Our values for Heat addition
+	Temp_ = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for temperature at the nodes of the elements
+	fluenceRate_ = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for Heat addition
+	fluenceRateElem_ = Eigen::VectorXf::Zero(mesh_->elements().size()); // Our values for Heat addition
 }
 
 void FEM_Simulator::setGlobalSparsityPattern()
@@ -311,7 +321,7 @@ void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
 void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 {	
 	//TODO make sure Temp is the correct size
-	if (mesh_.nodes().size() != Temp.size()) {
+	if (mesh_->nodes().size() != Temp.size()) {
 		throw std::runtime_error("Total number of elements in Temp does not match number of nodes in mesh.");
 	}
 	Temp_ = Temp;
@@ -340,10 +350,10 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& fluenceRate)
 	Main function to set the fluence rate of the laser. All other setFluenceRate() functions will call this one in the end. 
 	*/
 	// -- Checking size of vector to make sure it is appropriate
-	if (fluenceRate.size() == mesh_.nodes().size()){
+	if (fluenceRate.size() == mesh_->nodes().size()){
 		fluenceRate_ = fluenceRate;
 		fluenceRateElem_.setZero();
-	} else if (this->fluenceRate_.size() == mesh_.elements().size()){
+	} else if (this->fluenceRate_.size() == mesh_->elements().size()){
 		fluenceRateElem_ = fluenceRate;
 		fluenceRate_.setZero();
 	} else {
@@ -376,7 +386,7 @@ void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> 
 
 void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose, float laserPower, float beamWaist)
 {
-	Eigen::VectorXf FR = Eigen::VectorXf::Zero(mesh_.nodes().size());
+	Eigen::VectorXf FR = Eigen::VectorXf::Zero(mesh_->nodes().size());
 	
 	// Precompute constants
 	const float pi = 3.14159265358979323846f;
@@ -387,9 +397,9 @@ void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose, float laserPow
 
 	const float mua = this->MUA_;
 	
-	for (int i = 0; i < mesh_.nodes().size(); i++)
+	for (int i = 0; i < mesh_->nodes().size(); i++)
 	{
-		Node node = mesh_.nodes()[i];
+		Node node = mesh_->nodes()[i];
 		float xf = node.x - laserPose[0];
 		float yf = node.y - laserPose[1]; // distance between node and laser focal point in y
 		float zf = node.z - laserPose[2]; // distance between node and laser focal point in x
@@ -445,7 +455,7 @@ void FEM_Simulator::setHTC(float HTC) {
 
 void FEM_Simulator::setHeatFlux(float heatFlux)
 {
-	this->heatFlux_ = heatFlux;
+	heatFlux_ = heatFlux;
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
@@ -480,7 +490,7 @@ Eigen::VectorXf FEM_Simulator::getLatestSensorTemp() const
 	return sensorVector;
 }
 
-void FEM_Simulator::setMesh(Mesh mesh)
+void FEM_Simulator::setMesh(std::shared_ptr<const Mesh> mesh)
 {
 	mesh_ = mesh;
 	initializeContainers();

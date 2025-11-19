@@ -10,6 +10,21 @@
 #include <stdexcept>
 #include "Mesh.hpp"
 #include "MatrixBuilder.hpp"
+#include "TimeIntegrator.hpp"
+
+
+struct ThermalModel
+{
+	float TC_ = 0; // Thermal Conductivity [W/cm C]
+	float VHC_ = 0; // Volumetric Heat Capacity [W/cm^3]
+	float MUA_ = 0; // Absorption Coefficient [cm^-1]
+	float HTC_ = 0; // convective heat transfer coefficient [W/cm^2]
+	float ambientTemp_ = 0;  // Temperature surrounding the tissue for Convection [C]
+	Eigen::VectorXf Temp_; // Our values for temperature at the nodes of the elements
+	Eigen::VectorXf fluenceRate_; // Our values for Heat addition
+	Eigen::VectorXf fluenceRateElem_; // Our values for Heat addition
+	float heatFlux_ = 0; // heat escaping the Neumann Boundary
+};
 
 class FEM_Simulator
 {
@@ -71,7 +86,8 @@ public:
 	std::vector<std::vector<float>> sensorTemps() const { return sensorTemps_; }
 	Eigen::VectorXf getLatestSensorTemp() const;
 
-	void setMesh(Mesh mesh);
+	void setMesh(std::shared_ptr<const Mesh> mesh);
+	//std::shared_ptr<const Mesh> mesh() const { return mesh_; }
 	
 	void setTC(float TC);
 	float TC() const { return TC_; }
@@ -95,8 +111,10 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 private:
-	Mesh mesh_;
-	MatrixBuilder* mb_ = nullptr; 
+	std::shared_ptr<const Mesh> mesh_;
+	GlobalMatrices globlaMats;
+	ThermalModel thermalModel;
+	TimeIntegrator solver;
 	float TC_ = 0; // Thermal Conductivity [W/cm C]
 	float VHC_ = 0; // Volumetric Heat Capacity [W/cm^3]
 	float MUA_ = 0; // Absorption Coefficient [cm^-1]
@@ -113,7 +131,6 @@ private:
 	
 	bool parameterUpdate_ = true;
 	bool fluenceUpdate_ = true;
-	bool elemNFR_ = false; // whether the FluenceRate pertains to an element or a node
 	std::vector< std::array<float, 3 >> sensorLocations_; // locations of temperature sensors
 	std::vector<std::vector<float>> sensorTemps_; // stored temperature information for each sensor over time. 
 

@@ -10,6 +10,7 @@ protected:
 	std::vector<Node> nodes;
 	Element elem;
 	std::vector<BoundaryFace> boundaryFaces;
+	
 	Mesh mesh;
 	float mua = 1.0f;
 	float tc = 1.0f;
@@ -18,26 +19,7 @@ protected:
 
 	void SetUp() override {
 		// q0_ remains empty
-		nodes.resize(8);
-		for (int i = 0; i < 8; i++) {
-			nodes[i].x = 0 + i % 2;
-			nodes[i].y = 0 + (i / 2) % 2;
-			nodes[i].z = 0 + (i / 4);
-			elem.nodes.push_back(i);
-		}
-		mesh.setNodes(nodes);
-		mesh.setElements({ elem });
-
-		boundaryFaces.resize(6);
-		for (int i = 0; i < 6; i++) {
-			boundaryFaces[i].elemID = 0;
-			boundaryFaces[i].localFaceID = i;
-			boundaryFaces[i].nodes.assign(testHexLin.faceConnectivity[i].begin(), testHexLin.faceConnectivity[i].end());
-			boundaryFaces[i].type = FLUX;
-			boundaryFaces[i].value = 1;
-		}
-		boundaryFaces[0].type = HEATSINK;
-		mesh.setBoundaryFaces(boundaryFaces);
+		mesh = Mesh::buildCubeMesh({ 2,2,1 }, { 3,3,3 }, { FLUX,FLUX,FLUX,FLUX,FLUX,FLUX });
 
 		std::vector<std::vector<std::vector<float>>> Temp = { { {0,0,0}, {0,0,0}, {0,0,0} },
 													   { {0,0,0}, {0,0,0}, {0,0,0} },
@@ -45,7 +27,7 @@ protected:
 		float tissueSize[3] = { 1,1,1 };	
 
 		femSim = new FEM_Simulator(mua, vhc, tc, htc);
-		femSim->setMesh(mesh);
+		femSim->setMesh(std::make_shared<Mesh>(mesh));
 		femSim->setTemp(Temp);
 		femSim->buildMatrices();
 	}
@@ -135,7 +117,7 @@ TEST_F(BaseSim, testPositionToElement1) {
 
 TEST_F(BaseSim, testSetFluenceRate) {
 
-	float laserPose[6] = { 0,0,-20,0,0,0 };
+	std::array<float,6> laserPose = { 0,0,-20,0,0,0 };
 	float beamWaist = 0.0168;
 	float laserPower = 1; 
 	femSim->setFluenceRate(laserPose, laserPower, beamWaist);
@@ -144,10 +126,10 @@ TEST_F(BaseSim, testSetFluenceRate) {
 		0.007903577769, 0.1716547562, 0.007903577769, 0.1716547562, 3.728103424, 0.1716547562, 0.007903577769, 0.1716547562, 0.007903577769,
 		0.004799076444, 0.07942576033, 0.004799076444, 0.07942576033, 1.314513631, 0.07942576033, 0.004799076444, 0.07942576033, 0.004799076444;
 
-	int nNodes = femSimLin->nodesPerAxis[0] * femSimLin->nodesPerAxis[1] * femSimLin->nodesPerAxis[2];
+	int nNodes = 27;
 	for (int i = 0; i < nNodes; i++) {
 		//std::cout << "Simulator: " << femSimLin->FluenceRate(i) << " True Value: " << fluenceTrue(i) << std::endl;
-		ASSERT_TRUE(abs(femSimLin->fluenceRate_(i) - fluenceTrue(i)) < 0.000001);
+		ASSERT_TRUE(abs(femSim->fluenceRate()(i) - fluenceTrue(i)) < 0.000001);
 	}
 }
 
