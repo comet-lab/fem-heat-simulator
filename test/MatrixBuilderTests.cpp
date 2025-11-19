@@ -1,13 +1,11 @@
 #include <gtest/gtest.h>
 #include "MatrixBuilder.hpp"
-#include "ShapeFunctions/HexLinear.hpp"
-#include "ShapeFunctions/TetLinear.hpp"
 #include <iostream>
 #include <string>
 
 class HexBuilder : public testing::Test {
 protected:
-	MatrixBuilder* mb;
+	MatrixBuilder matrixBuilder;
 	Mesh mesh;
 	void SetUp() override {
 		std::vector<float> xPos = { -1,0,1 };
@@ -16,15 +14,12 @@ protected:
 		std::array<BoundaryType, 6> bc = { FLUX,HEATSINK,FLUX,CONVECTION,CONVECTION,CONVECTION };
 		mesh = Mesh::buildCubeMesh(xPos,yPos,zPos,bc);
 
-		mb = new MatrixBuilder(mesh);
+		matrixBuilder.setMesh(mesh);
 	};
 
 	void TearDown() override 
 	{
-		if (mb) {
-			delete mb;
-			mb = nullptr;
-		}
+
 	};
 };
 
@@ -32,7 +27,7 @@ class TetBuilder : public testing::Test {
 protected:
 	std::vector<Node> nodes;
 	std::vector<BoundaryFace> boundaryFaces;
-	MatrixBuilder* mb;
+	MatrixBuilder matrixBuilder;
 	ShapeFunctions::TetLinear testTetLin;
 	Mesh mesh;
 	Element elem;
@@ -59,15 +54,11 @@ protected:
 		boundaryFaces[0].type = HEATSINK;
 		mesh.setBoundaryFaces(boundaryFaces);
 
-		mb = new MatrixBuilder(mesh);
+		matrixBuilder.setMesh(mesh);
 	};
 
 	void TearDown() override
 	{
-		if (mb) {
-			delete mb;
-			mb = nullptr;
-		}
 	};
 };
 
@@ -83,7 +74,7 @@ TEST_F(HexBuilder, testCalculateJacobian)
 		dNdxi[a] = ShapeFunctions::HexLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
 	}
 	
-	Eigen::Matrix3f J = mb->calculateJ<ShapeFunctions::HexLinear>(mesh.elements()[0], dNdxi); // position (xi) doesn't matter in this test case
+	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::HexLinear>(mesh.elements()[0], dNdxi); // position (xi) doesn't matter in this test case
 
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++)
@@ -109,7 +100,7 @@ TEST_F(HexBuilder, testCalculateJacobian)
 TEST_F(HexBuilder, testCalculateHexLinMe)
 {
 
-	Eigen::Matrix<float, 8, 8> Me = mb->calculateMe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
+	Eigen::Matrix<float, 8, 8> Me = matrixBuilder.calculateMe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 2.0f, 2.0f, 4.0f, 2.0f, 4.0f, 4.0f, 8.0f };
@@ -128,7 +119,7 @@ TEST_F(HexBuilder, testCalculateHexLinMe)
 TEST_F(HexBuilder, testCalculateHexLinKe)
 {
 
-	Eigen::Matrix<float, 8, 8> Ke = mb->calculateKe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
+	Eigen::Matrix<float, 8, 8> Ke = matrixBuilder.calculateKe<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
 	float scale[8] = { 1.0f, 0.0f, 0.0f, -1/4.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
@@ -149,7 +140,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 {
 
 	//Face 0: Bottom Face
-	Eigen::Vector<float, 8> FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0],0,1);
+	Eigen::Vector<float, 8> FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0],0,1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 4) || (A == 5) || (A == 6) || (A == 7))
@@ -159,7 +150,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 1: Top Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 1, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 1, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
@@ -169,7 +160,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 2: Front Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 2, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 2, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
@@ -179,7 +170,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 3: Back Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 3, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 3, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
@@ -189,7 +180,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 4: Left Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 4, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 4, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
@@ -199,7 +190,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	}
 
 	//Face 5: Right Face
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 5, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::HexLinear>(mesh.elements()[0], 5, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
@@ -227,7 +218,7 @@ TEST_F(HexBuilder, testCalculateFeConv)
 	int B = 0;
 	for (int f = 0; f < 6; f++)
 	{
-		Eigen::MatrixXf FeConv = mb->calculateFeConv<ShapeFunctions::HexLinear>(mesh.elements()[0], f);
+		Eigen::MatrixXf FeConv = matrixBuilder.calculateFeConv<ShapeFunctions::HexLinear>(mesh.elements()[0], f);
 		// all of these nodes should be scaled relative to scale matrix
 		const int* nodes = faceNodes[f];
 		for (int i = 0; i < 4; i++)
@@ -260,24 +251,24 @@ TEST_F(HexBuilder, testCalculateFeConv)
 
 TEST_F(HexBuilder, testSetNodeMap)
 {
-	mb->setNodeMap();
+	matrixBuilder.setNodeMap();
 	// only bottom face is dirichlet
 	std::vector<long> trueMap = { -1 ,-1,-1,-1, 0, 1, 2, 3 };
 	std::vector<long> trueValid = { 4,5,6,7 };
 	for (int i = 0; i < 27; i++)
 	{
 		if (i > 17)
-			EXPECT_EQ(-1, mb->nodeMap()[i]);
+			EXPECT_EQ(-1, matrixBuilder.nodeMap()[i]);
 		else
-			EXPECT_EQ(i, mb->nodeMap()[i]);
+			EXPECT_EQ(i, matrixBuilder.nodeMap()[i]);
 	}
 	// 27 nodes total, 9 nodes are dirichlet
-	EXPECT_EQ(18, mb->nNonDirichlet());
+	EXPECT_EQ(18, matrixBuilder.nNonDirichlet());
 }
 
 TEST_F(HexBuilder, testBuildMatrices)
 {
-	mb->buildMatrices();
+	matrixBuilder.buildMatrices();
 	// This test really just makes sure the function runs, we should add checks on the matrix construction
 }
 
@@ -355,7 +346,7 @@ TEST_F(TetBuilder, testCalculateJ)
 		dNdxi[a] = ShapeFunctions::TetLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
 	}
 
-	Eigen::Matrix3f J = mb->calculateJ<ShapeFunctions::TetLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case
+	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case
 
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++)
@@ -380,7 +371,7 @@ TEST_F(TetBuilder, testCalculateJ)
 TEST_F(TetBuilder, testCalculateMe)
 {
 	const int Nne = testTetLin.nNodes;
-	Eigen::Matrix<float, Nne, Nne> Me = mb->calculateMe<ShapeFunctions::TetLinear>(elem);
+	Eigen::Matrix<float, Nne, Nne> Me = matrixBuilder.calculateMe<ShapeFunctions::TetLinear>(elem);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 2.0
 
@@ -399,7 +390,7 @@ TEST_F(TetBuilder, testCalculateMe)
 TEST_F(TetBuilder, testCalculateKe)
 {
 	const int Nne = testTetLin.nNodes;
-	Eigen::Matrix<float, Nne, Nne> Ke = mb->calculateKe<ShapeFunctions::TetLinear>(elem);
+	Eigen::Matrix<float, Nne, Nne> Ke = matrixBuilder.calculateKe<ShapeFunctions::TetLinear>(elem);
 
 	Eigen::Matrix<float, Nne, Nne> trueKe;
 	trueKe << 1.0, -1 / 3.0f, -1 / 3.0f, -1 / 3.0f,
@@ -424,7 +415,7 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 {
 	const int nNe = testTetLin.nNodes;
 	//Face 0: Bottom Face
-	Eigen::Vector<float, nNe> FeFlux = mb->calculateFeFlux<ShapeFunctions::TetLinear>(elem, 0, 1);
+	Eigen::Vector<float, nNe> FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::TetLinear>(elem, 0, 1);
 	for (int A = 0; A < nNe; A++)
 	{
 		if (A == 3)
@@ -434,7 +425,7 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 	}
 
 	//Face 1:
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::TetLinear>(elem, 1, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::TetLinear>(elem, 1, 1);
 	for (int A = 0; A < nNe; A++)
 	{
 		if (A == 2)
@@ -444,7 +435,7 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 	}
 
 	//Face 2: is slanted and has a larger area
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::TetLinear>(elem, 2, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::TetLinear>(elem, 2, 1);
 	for (int A = 0; A < nNe; A++)
 	{
 		if (A == 0)
@@ -454,7 +445,7 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 	}
 
 	//Face 3:
-	FeFlux = mb->calculateFeFlux<ShapeFunctions::TetLinear>(elem, 3, 1);
+	FeFlux = matrixBuilder.calculateFeFlux<ShapeFunctions::TetLinear>(elem, 3, 1);
 	for (int A = 0; A < nNe; A++)
 	{
 		if (A==1)
@@ -478,7 +469,7 @@ TEST_F(TetBuilder, testCalculateFeConv)
 	int B = 0;
 	for (int f = 0; f < 4; f++)
 	{
-		Eigen::MatrixXf FeConv = mb->calculateFeConv<ShapeFunctions::TetLinear>(elem, f);
+		Eigen::MatrixXf FeConv = matrixBuilder.calculateFeConv<ShapeFunctions::TetLinear>(elem, f);
 		// all of these nodes should be scaled relative to scale matrix
 		std::array<int, nFn> nodes = testTetLin.faceConnectivity[f];
 		for (int i = 0; i < nFn; i++)
@@ -506,6 +497,6 @@ TEST_F(TetBuilder, testCalculateFeConv)
 
 TEST_F(TetBuilder, testBuildMatrices)
 {
-	mb->buildMatrices();
+	matrixBuilder.buildMatrices();
 	// This test really just makes sure the function runs, we should add checks on the matrix construction
 }

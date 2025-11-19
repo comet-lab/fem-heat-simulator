@@ -15,28 +15,44 @@ class MatrixBuilder
 {
 public:
 
-	MatrixBuilder(const Mesh& mesh) : mesh_(mesh) {}
+	MatrixBuilder() {}
+	MatrixBuilder(const Mesh& mesh) { setMesh(mesh); }
+	~MatrixBuilder() {} // Destructor should not clear mesh because we don't allocate it in the class
+
+	void buildMatrices(const Mesh& mesh)
+	{
+		setMesh(mesh);
+		buildMatrices();
+	}
 
 	void buildMatrices()
 	{
-		if ((mesh_.order() == GeometricOrder::LINEAR) && (mesh_.elementShape() == Shape::HEXAHEDRAL))
+		if (!mesh_)
+			throw std::runtime_error("Mesh not set");
+
+		if ((mesh_->order() == GeometricOrder::LINEAR) && (mesh_->elementShape() == Shape::HEXAHEDRAL))
 		{
 			buildMatricesT<ShapeFunctions::HexLinear>();
 		}
-		else if ((mesh_.order() == GeometricOrder::LINEAR) && (mesh_.elementShape() == Shape::TETRAHEDRAL))
+		else if ((mesh_->order() == GeometricOrder::LINEAR) && (mesh_->elementShape() == Shape::TETRAHEDRAL))
 		{
 			buildMatricesT<ShapeFunctions::TetLinear>();
 		}
+	}
+
+	void setMesh(const Mesh& mesh)
+	{
+		mesh_ = &mesh;
 	}
 
 	void setNodeMap()
 	{
 		// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 		// A value of -1 at index i, indicates that global node i is a dirichlet node. 
-		nodeMap_.resize(mesh_.nodes().size());
+		nodeMap_.resize(mesh_->nodes().size());
 		std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
 		// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
-		for (BoundaryFace face : mesh_.boundaryFaces())
+		for (BoundaryFace face : mesh_->boundaryFaces())
 		{
 			if (face.type == HEATSINK)
 			{
@@ -49,7 +65,7 @@ public:
 		// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
 		// Also, store the index of the valid node. 
 		nNonDirichlet_ = 0;
-		for (int i = 0; i < mesh_.nodes().size(); i++)
+		for (int i = 0; i < mesh_->nodes().size(); i++)
 		{
 			if (nodeMap_[i] == 0)
 			{
@@ -67,10 +83,10 @@ public:
 		int nRelatedNodes = ShapeFunc::nNodes * ShapeFunc::nNodes * ShapeFunc::nNodes;
 		//  number of non-dirichlet nodes
 		// total number of nodes
-		int nNodes = mesh_.nodes().size();
+		int nNodes = mesh_->nodes().size();
 		int nodesPerElem = ShapeFunc::nNodes;
 		// Initialize matrices so that we don't have to resize them later
-		FintElem_ = Eigen::SparseMatrix<float>(nNonDirichlet_, mesh_.elements().size());
+		FintElem_ = Eigen::SparseMatrix<float>(nNonDirichlet_, mesh_->elements().size());
 		FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
 
 		Fint_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
@@ -108,7 +124,7 @@ public:
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
-			Node currNode = mesh_.nodes()[elem.nodes[A]];
+			Node currNode = mesh_->nodes()[elem.nodes[A]];
 			matrixRow = nodeMap_[elem.nodes[A]];
 			if (matrixRow >= 0)
 			{
@@ -118,7 +134,7 @@ public:
 				{
 					long neighborIdx = elem.nodes[B];
 					matrixCol = nodeMap_[neighborIdx];
-					Node neighbor = mesh_.nodes()[neighborIdx];
+					Node neighbor = mesh_->nodes()[neighborIdx];
 					// Add effect of nodal fluence rate 
 					Fint_.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
 					// Add effect of element fluence rate
@@ -147,7 +163,7 @@ public:
 		{
 			long matrixRow = 0;
 			long matrixCol = 0;
-			Element elem = mesh_.elements()[face.elemID];
+			Element elem = mesh_->elements()[face.elemID];
 			int nodesPerElem = ShapeFunc::nNodes;
 			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);
 			Eigen::MatrixXf FeConv = calculateFeConv<ShapeFunc>(elem, face.localFaceID);
@@ -164,7 +180,7 @@ public:
 					{
 						long neighborIdx = elem.nodes[B];
 						matrixCol = nodeMap_[neighborIdx];
-						Node neighbor = mesh_.nodes()[neighborIdx];
+						Node neighbor = mesh_->nodes()[neighborIdx];
 						if (matrixCol >= 0) // non dirichlet node
 						{
 							// add effect of node temperature on convection
@@ -182,7 +198,7 @@ public:
 		}
 		else if (face.type == FLUX)
 		{
-			Element elem = mesh_.elements()[face.elemID];
+			Element elem = mesh_->elements()[face.elemID];
 			long matrixRow = 0;
 			Eigen::VectorXf Feflux = calculateFeFlux<ShapeFunc>(elem, face.localFaceID, 1);		
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
@@ -295,7 +311,7 @@ public:
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
-				const Node& n = mesh_.nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
+				const Node& n = mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
 				Eigen::Vector3f nodePos(n.x, n.y, n.z);
 				JFace += dN_dxi_eta[a] * nodePos.transpose();
 			}
@@ -337,7 +353,7 @@ public:
 			// Get node positions for this face
 			std::vector<Node> faceNodes;
 			for (int a = 0; a < nFaceNodes; ++a)
-				faceNodes.push_back(mesh_.nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]]);
+				faceNodes.push_back(mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]]);
 
 			// Compute surface Jacobian
 			Eigen::Matrix<float, 2, 3> JFace = Eigen::Matrix<float, 2, 3>::Zero();
@@ -376,20 +392,20 @@ public:
 
 		for (int a = 0; a < ShapeFunc::nNodes; ++a)
 		{
-			const Node& n = mesh_.nodes()[elem.nodes[a]];
+			const Node& n = mesh_->nodes()[elem.nodes[a]];
 			Eigen::Vector3f nodePos(n.x, n.y, n.z);
 			J += dNdxi[a] * nodePos.transpose();
-			/*J(0, 0) += dN(0) * mesh_.nodes()[elem.nodes[a]].x;
-			J(0, 1) += dN(0) * mesh_.nodes()[elem.nodes[a]].y;
-			J(0, 2) += dN(0) * mesh_.nodes()[elem.nodes[a]].z;
+			/*J(0, 0) += dN(0) * mesh_->nodes()[elem.nodes[a]].x;
+			J(0, 1) += dN(0) * mesh_->nodes()[elem.nodes[a]].y;
+			J(0, 2) += dN(0) * mesh_->nodes()[elem.nodes[a]].z;
 
-			J(1, 0) += dN(1) * mesh_.nodes()[elem.nodes[a]].x;
-			J(1, 1) += dN(1) * mesh_.nodes()[elem.nodes[a]].y;
-			J(1, 2) += dN(1) * mesh_.nodes()[elem.nodes[a]].z;
+			J(1, 0) += dN(1) * mesh_->nodes()[elem.nodes[a]].x;
+			J(1, 1) += dN(1) * mesh_->nodes()[elem.nodes[a]].y;
+			J(1, 2) += dN(1) * mesh_->nodes()[elem.nodes[a]].z;
 
-			J(2, 0) += dN(2) * mesh_.nodes()[elem.nodes[a]].x;
-			J(2, 1) += dN(2) * mesh_.nodes()[elem.nodes[a]].y;
-			J(2, 2) += dN(2) * mesh_.nodes()[elem.nodes[a]].z;*/
+			J(2, 0) += dN(2) * mesh_->nodes()[elem.nodes[a]].x;
+			J(2, 1) += dN(2) * mesh_->nodes()[elem.nodes[a]].y;
+			J(2, 2) += dN(2) * mesh_->nodes()[elem.nodes[a]].z;*/
 		}
 		return J;
 	}
@@ -409,7 +425,7 @@ public:
 
 private:
 
-	const Mesh& mesh_;
+	const Mesh* mesh_ = nullptr;
 	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
 	std::vector<long> nodeMap_;
@@ -445,16 +461,16 @@ private:
 	{
 		setNodeMap();
 		resetMatrices<ShapeFunc>();
-		std::vector<Element> elements = mesh_.elements();
-		long nElem = mesh_.elements().size();
-		for (int elemIdx = 0; elemIdx < mesh_.elements().size(); elemIdx++)
+		std::vector<Element> elements = mesh_->elements();
+		long nElem = mesh_->elements().size();
+		for (int elemIdx = 0; elemIdx < mesh_->elements().size(); elemIdx++)
 		{
 			Element elem = elements[elemIdx];
 			applyElement<ShapeFunc>(elem, elemIdx);
 		}
-		for (int f = 0; f < mesh_.boundaryFaces().size(); f++)
+		for (int f = 0; f < mesh_->boundaryFaces().size(); f++)
 		{
-			applyBoundary<ShapeFunc>(mesh_.boundaryFaces()[f]);
+			applyBoundary<ShapeFunc>(mesh_->boundaryFaces()[f]);
 		}
 		// compress all sparse matrices
 		K_.makeCompressed();
