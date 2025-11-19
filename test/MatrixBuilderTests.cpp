@@ -15,6 +15,7 @@ protected:
 		mesh = Mesh::buildCubeMesh(xPos,yPos,zPos,bc);
 
 		matrixBuilder.setMesh(mesh);
+		matrixBuilder.precomputeShapeFunctions<ShapeFunctions::HexLinear>();
 	};
 
 	void TearDown() override 
@@ -55,6 +56,7 @@ protected:
 		mesh.setBoundaryFaces(boundaryFaces);
 
 		matrixBuilder.setMesh(mesh);
+		matrixBuilder.precomputeShapeFunctions<ShapeFunctions::TetLinear>();
 	};
 
 	void TearDown() override
@@ -68,10 +70,10 @@ protected:
 */
 TEST_F(HexBuilder, testCalculateJacobian)
 {
-	std::vector<Eigen::Vector3f> dNdxi(8);
+	Eigen::Matrix<float,3,8> dNdxi;
 	for (int a = 0; a < 8; a++)
 	{
-		dNdxi[a] = ShapeFunctions::HexLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
+		dNdxi.col(a) = ShapeFunctions::HexLinear::dNdxi({1.0f,-1.0f,0.0f}, a);
 	}
 	
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::HexLinear>(mesh.elements()[0], dNdxi); // position (xi) doesn't matter in this test case
@@ -340,10 +342,10 @@ TEST_F(TetBuilder, testCalculatedNdxi)
 TEST_F(TetBuilder, testCalculateJ)
 {
 	const int Nne = ShapeFunctions::TetLinear::nNodes;
-	std::vector<Eigen::Vector3f> dNdxi(Nne);
+	Eigen::Matrix<float,3,Nne> dNdxi;
 	for (int a = 0; a < Nne; a++)
 	{
-		dNdxi[a] = ShapeFunctions::TetLinear::dNdxi({ 1.0f,-1.0f,0.0f }, a);
+		dNdxi.col(a) = ShapeFunctions::TetLinear::dNdxi({1.0f,-1.0f,0.0f}, a);
 	}
 
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case

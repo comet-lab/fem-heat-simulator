@@ -221,28 +221,26 @@ public:
 
 		Eigen::MatrixXf Me = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
 
-		// simple 2-point Gauss integration in each axis (example)
-		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
+		/*const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();*/
 		const std::vector<std::array<float, 3>>& w = ShapeFunc::weights();
 
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
-			std::array<float, 3> xi = gp[i];
-			std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
-			std::array<float,ShapeFunc::nNodes> Nvals;
-			for (int a = 0; a < ShapeFunc::nNodes; a++)
-			{
-				Nvals[a] = ShapeFunc::N(xi, a);
-				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
-			}
+			//std::array<float, 3> xi = gp[i];
+			//std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
+			//Eigen::VectorXf Nvals = Ngp_[i];
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxi_gp_[i];
+
 			// Jacobian and determinant (simplified)
 			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			float detJ = J.determinant();
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
 
-			for (int a = 0; a < ShapeFunc::nNodes; a++)
+
+			Me += NaNbCache_[i] * weight;
+			/*for (int a = 0; a < ShapeFunc::nNodes; a++)
 				for (int b = 0; b < ShapeFunc::nNodes; b++)
-					Me(a, b) += Nvals[a] * Nvals[b] * weight;
+					Me(a, b) += Nvals[a] * Nvals[b] * weight;*/
 		}
 
 		return Me;
@@ -261,27 +259,33 @@ public:
 			const std::array<float, 3>& xi = gp[i];
 
 			// Shape function derivatives in reference coordinates
-			std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
-			for (int a = 0; a < ShapeFunc::nNodes; ++a)
-				dNdxi[a] = ShapeFunc::dNdxi(xi, a);
+			//std::vector<Eigen::Vector3f> dNdxi(ShapeFunc::nNodes);
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxi_gp_[i];
+			//for (int a = 0; a < ShapeFunc::nNodes; ++a)
+				//dNdxi[a] = ShapeFunc::dNdxi(xi, a);
 
 			// Compute Jacobian and inverse
 			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			Eigen::Matrix3f Jinv = J.inverse();
 			float detJ = J.determinant();
 
-			// Derivatives in physical coordinates
-			std::array<Eigen::Vector3f, ShapeFunc::nNodes> dNdx;
-			for (int a = 0; a < ShapeFunc::nNodes; ++a)
-				dNdx[a] = Jinv * dNdxi[a];
-
-			// Weight for this Gauss point
+			// Derivatives in physical coordinates: 3 × nNodes
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdx = Jinv * dNdxi;
+			// Weight
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
+			// Ke contribution: (nNodes × 3)(3 × nNodes) = nNodes × nNodes
+			Ke += dNdx.transpose() * dNdx * weight;
 
-			// Assemble stiffness matrix
+			// Derivatives in physical coordinates
+			/*std::array<Eigen::Vector3f, ShapeFunc::nNodes> dNdx;
 			for (int a = 0; a < ShapeFunc::nNodes; ++a)
-				for (int b = 0; b < ShapeFunc::nNodes; ++b)
-					Ke(a, b) += dNdx[a].dot(dNdx[b]) * weight;
+				dNdx[a] = Jinv * dNdxi[a];*/
+			// Weight for this Gauss point
+			//float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
+			// Assemble stiffness matrix
+			//for (int a = 0; a < ShapeFunc::nNodes; ++a)
+			//	for (int b = 0; b < ShapeFunc::nNodes; ++b)
+			//		Ke(a, b) += dNdx[a].dot(dNdx[b]) * weight;
 				
 		}
 
@@ -386,28 +390,39 @@ public:
 	}
 	
 	template <typename ShapeFunc>
-	Eigen::Matrix3f calculateJ(const Element& elem, const std::vector<Eigen::Vector3f> dNdxi)
+	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float,3,Eigen::Dynamic>& dNdxi)
 	{
-		Eigen::Matrix3f J = Eigen::Matrix3f::Zero();
-
+		Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePoses;
 		for (int a = 0; a < ShapeFunc::nNodes; ++a)
 		{
 			const Node& n = mesh_->nodes()[elem.nodes[a]];
-			Eigen::Vector3f nodePos(n.x, n.y, n.z);
-			J += dNdxi[a] * nodePos.transpose();
-			/*J(0, 0) += dN(0) * mesh_->nodes()[elem.nodes[a]].x;
-			J(0, 1) += dN(0) * mesh_->nodes()[elem.nodes[a]].y;
-			J(0, 2) += dN(0) * mesh_->nodes()[elem.nodes[a]].z;
-
-			J(1, 0) += dN(1) * mesh_->nodes()[elem.nodes[a]].x;
-			J(1, 1) += dN(1) * mesh_->nodes()[elem.nodes[a]].y;
-			J(1, 2) += dN(1) * mesh_->nodes()[elem.nodes[a]].z;
-
-			J(2, 0) += dN(2) * mesh_->nodes()[elem.nodes[a]].x;
-			J(2, 1) += dN(2) * mesh_->nodes()[elem.nodes[a]].y;
-			J(2, 2) += dN(2) * mesh_->nodes()[elem.nodes[a]].z;*/
+			nodePoses.row(a) << n.x, n.y, n.z;
 		}
+		Eigen::Matrix3f J = dNdxi * nodePoses;
 		return J;
+	}
+
+	template <typename ShapeFunc>
+	void precomputeShapeFunctions()
+	{
+		const std::vector<std::array<float, 3>>& gp = ShapeFunc::gaussPoints();
+		Ngp_.clear();
+		NaNbCache_.clear();
+		dNdxi_gp_.clear();
+		for (int i = 0; i < ShapeFunc::nGP; i++)
+		{
+			const auto& xi = gp[i];
+			Eigen::Matrix<float,3,ShapeFunc::nNodes> dNdxi;
+			Eigen::VectorXf Nvals(ShapeFunc::nNodes);
+			for (int a = 0; a < ShapeFunc::nNodes; a++)
+			{
+				Nvals(a) = ShapeFunc::N(xi, a);
+				dNdxi.col(a) = ShapeFunc::dNdxi(xi, a);
+			}
+			NaNbCache_.push_back(Nvals * Nvals.transpose());
+			Ngp_.push_back(Nvals);
+			dNdxi_gp_.push_back(dNdxi);
+		}
 	}
 
 	const std::vector<long>& nodeMap() const { return nodeMap_; }
@@ -431,6 +446,10 @@ private:
 	std::vector<long> nodeMap_;
 	long nNonDirichlet_ = 0;
 	std::vector<long> validNodes_;
+
+	std::vector<Eigen::VectorXf> Ngp_; // Stores the shape functions for each node at each gauss point
+	std::vector<Eigen::MatrixXf> NaNbCache_; // Stores the multiplication of N*N' for element shape functions at each gauss point
+	std::vector<Eigen::Matrix<float, 3, Eigen::Dynamic>> dNdxi_gp_; // Stores the shape function derivaties for each node at each gauss point
 
 	//Eigen::Matrix3f J_; // Jacobian of our current element
 
@@ -461,6 +480,7 @@ private:
 	{
 		setNodeMap();
 		resetMatrices<ShapeFunc>();
+		precomputeShapeFunctions<ShapeFunc>();
 		std::vector<Element> elements = mesh_->elements();
 		long nElem = mesh_->elements().size();
 		for (int elemIdx = 0; elemIdx < mesh_->elements().size(); elemIdx++)
