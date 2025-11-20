@@ -33,7 +33,7 @@ int main()
     float htc = 0.01;
     FEM_Simulator simulator(mua, vhc, tc, htc);
     std::cout << "Setting Mesh" << std::endl;
-    simulator.setMesh(std::make_shared<Mesh>(mesh));
+    simulator.setMesh(mesh);
     simulator.setTemp(Temp);
     std::cout << "Number of nodes: " << nNodes << std::endl;
     std::cout << "Number of elems: " << nElems << std::endl;

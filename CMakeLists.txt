@@ -62,13 +62,15 @@ endif()
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
     src/Mesh.cpp
+    src/TimeIntegrators/CPUTimeIntegrator.cpp
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
-    "include/MatrixBuilder.hpp"
+    include/MatrixBuilder.hpp
     include/ShapeFunctions/HexLinear.hpp
-
+    include/TimeIntegrator/TimeIntegrator.hpp
+    include/TimeIntegrator/CPUTimeIntegrator.hpp
 )
 
 # GPU sources (conditionally)

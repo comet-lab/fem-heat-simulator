@@ -71,7 +71,7 @@ public:
 	std::vector<std::vector<float>> sensorTemps() const { return sensorTemps_; }
 	Eigen::VectorXf getLatestSensorTemp() const;
 
-	void setMesh(std::shared_ptr<const Mesh> mesh);
+	void setMesh(const Mesh& mesh);
 	//std::shared_ptr<const Mesh> mesh() const { return mesh_; }
 	
 	void setTC(float TC);
@@ -96,10 +96,10 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 private:
-	Mesh* mesh_;
+	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;
 	ThermalModel thermalModel_;
-	TimeIntegrator* solver;
+	TimeIntegrator* solver = nullptr;
 	float alpha_ = 0.5; // time step weight
 	float dt_ = 0.01; // time step [s]
 	

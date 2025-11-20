@@ -47,20 +47,20 @@ void FEM_Simulator::multiStep(float duration) {
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
 	It repeatedly calls to singleStepCPU(). This function will also update the temperature sensors vector.  */ 
 	auto startTime = std::chrono::steady_clock::now();
-	int numSteps = round(duration / this->dt_);
-	this->initializeSensorTemps(numSteps);
-	this->updateTemperatureSensors(0);
-	if (!this->silentMode) {
+	int numSteps = round(duration / dt_);
+	initializeSensorTemps(numSteps);
+	updateTemperatureSensors(0);
+	if (!silentMode) {
 		std::cout << "Number of Steps: " << numSteps << std::endl;
 		std::cout << "MultiStep(): Number of threads " << Eigen::nbThreads() << std::endl;
 	}
 
 	for (int t = 1; t <= numSteps; t++) {
-		this->singleStep();
-		this->updateTemperatureSensors(t);
+		singleStep();
+		updateTemperatureSensors(t);
 	}
 
-	startTime = this->printDuration("Time Stepping Completed in ", startTime);
+	startTime = printDuration("Time Stepping Completed in ", startTime);
 }
 
 void FEM_Simulator::singleStep() {
@@ -69,6 +69,9 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. 
 	*/
+	if (!solver)
+		throw std::runtime_error("Solver not initialized. Call initializeModel() or initializeTimeIntegration before singleStep()");
+
 	if (fluenceUpdate_ || parameterUpdate_) {
 		// only happens if fluenceUpdate is true
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
@@ -89,6 +92,8 @@ void FEM_Simulator::singleStep() {
 void FEM_Simulator::buildMatrices()
 {
 	MatrixBuilder mb = MatrixBuilder();
+	if (!mesh_)
+		throw std::runtime_error("Mesh has not been set yet. Cannot build matrices");
 	globalMatrices_ = mb.buildMatrices(*mesh_);
 }
 
@@ -104,6 +109,7 @@ void FEM_Simulator::initializeTimeIntegration()
 	auto startTime = std::chrono::steady_clock::now();
 	parameterUpdate_ = false;
 	TimeIntegrator* solver = new CPUTimeIntegrator(thermalModel_, globalMatrices_, alpha_, dt_);
+	solver->initialize();
 	startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
 }
 
@@ -345,9 +351,9 @@ Eigen::VectorXf FEM_Simulator::getLatestSensorTemp() const
 	return sensorVector;
 }
 
-void FEM_Simulator::setMesh(std::shared_ptr<const Mesh> mesh)
+void FEM_Simulator::setMesh(const Mesh& mesh)
 {
-	mesh_ = mesh;
+	mesh_ = &mesh;
 	initializeContainers();
 }
 

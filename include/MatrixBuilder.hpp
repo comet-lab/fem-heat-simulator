@@ -532,7 +532,7 @@ public:
 	}
 
 private:
-	const Mesh* mesh_;
+	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;
 	/* Cached shape functions which are element independent */ 
 	// volume shape functions
