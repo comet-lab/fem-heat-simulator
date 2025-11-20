@@ -511,6 +511,9 @@ public:
 		}
 	}
 
+	// really just here for test cases, but I guess someone can use it if they want
+	const GlobalMatrices& globalMatrices() { return globalMatrices_; } 
+
 private:
 	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;

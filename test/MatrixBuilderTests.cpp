@@ -260,12 +260,12 @@ TEST_F(HexBuilder, testSetNodeMap)
 	for (int i = 0; i < 27; i++)
 	{
 		if (i > 17)
-			EXPECT_EQ(-1, matrixBuilder.nodeMap()[i]);
+			EXPECT_EQ(-1, matrixBuilder.globalMatrices().nodeMap[i]);
 		else
-			EXPECT_EQ(i, matrixBuilder.nodeMap()[i]);
+			EXPECT_EQ(i, matrixBuilder.globalMatrices().nodeMap[i]);
 	}
 	// 27 nodes total, 9 nodes are dirichlet
-	EXPECT_EQ(18, matrixBuilder.nNonDirichlet());
+	EXPECT_EQ(18, matrixBuilder.globalMatrices().nNonDirichlet);
 }
 
 TEST_F(HexBuilder, testBuildMatrices)
