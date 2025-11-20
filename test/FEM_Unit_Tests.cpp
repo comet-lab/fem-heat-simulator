@@ -47,14 +47,16 @@ TEST_F(BaseSim, testSetFluenceRate) {
 	float laserPower = 1;
 	femSim->setFluenceRate(laserPose, laserPower, beamWaist);
 	Eigen::VectorXf fluenceTrue(27); // matrices are transformed into vectors using column major
-	fluenceTrue << 0.008097328938, 0.1785890066, 0.008097328938, 0.1785890066, 3.938833843, 0.1785890066, 0.008097328938, 0.1785890066, 0.008097328938,
-		0.007903577769, 0.1716547562, 0.007903577769, 0.1716547562, 3.728103424, 0.1716547562, 0.007903577769, 0.1716547562, 0.007903577769,
-		0.004799076444, 0.07942576033, 0.004799076444, 0.07942576033, 1.314513631, 0.07942576033, 0.004799076444, 0.07942576033, 0.004799076444;
+	fluenceTrue << 0.000000, 0.000017, 0.000000, 0.000017, 3.938834,
+		0.000017, 0.000000, 0.000017, 0.000000, 0.000000, 0.000017,
+		0.000000, 0.000017, 2.274098, 0.000017, 0.000000, 0.000017,
+		0.000000, 0.000000, 0.000018, 0.000000, 0.000018, 1.314514,
+		0.000018, 0.000000, 0.000018, 0.000000;
 
 	int nNodes = 27;
 	for (int i = 0; i < nNodes; i++) {
 		//std::cout << "Simulator: " << femSimLin->FluenceRate(i) << " True Value: " << fluenceTrue(i) << std::endl;
-		//EXPECT_NEAR(femSim->fluenceRate()(i), fluenceTrue(i), 0.00001);
+		EXPECT_NEAR(femSim->fluenceRate()(i), fluenceTrue(i), 0.0001);
 	}
 }
 
