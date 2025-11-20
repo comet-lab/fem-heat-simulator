@@ -30,7 +30,7 @@ private:
     float layerHeight = 1;
     int elemsInLayer = 1;
     int Nn1d = 2;
-    std::chrono::steady_clock::time_point timeRef = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point timeRef_ = std::chrono::steady_clock::now();
 #ifdef USE_CUDA
     GPUTimeIntegrator* gpuHandle = nullptr;
 #endif
@@ -540,12 +540,12 @@ public:
     }
 
     void resetTimer(){
-        timeRef = std::chrono::steady_clock::now();
+        timeRef_ = std::chrono::steady_clock::now();
     }
 
     void printDuration(const std::string& message) {
         auto stopTime = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - timeRef);
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds> (stopTime - timeRef_);
         stream << message << duration.count() / 1000000.0 << " s" << std::endl;	
         displayOnMATLAB(stream);
     }

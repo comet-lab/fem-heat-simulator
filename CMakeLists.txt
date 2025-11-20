@@ -5,7 +5,7 @@ project(HeatSimulation VERSION 4.0 LANGUAGES CXX)
 # Options & global settings
 # ──────────────────────────────────────────────────────────────
 option(BUILD_TESTING  "Build unit‑test runner"            ON)
-option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" OFF)
+option(BUILD_FEM_MEX  "Build MATLAB MEX wrapper (Release)" ON)
 option(USE_CUDA       "Enable GPU solver using AmgX (requires CUDA)" OFF)
 set(AMGX_ROOT "/usr/local/amgx" CACHE STRING "Location where AMGX library files are")
 # Local install folder
@@ -229,7 +229,8 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     find_package(Matlab REQUIRED)
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
-            SRC src/MEX_Heat_Simulation.cpp
+            SRC src/MEX/MEX_Heat_Simulation.cpp
+            include/MEX_Utilities.hpp
         )
         target_link_libraries(MEX_Heat_Simulation HeatSimulation::Static)
 
@@ -246,22 +247,22 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
         endif()
 
 
-        matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
-            SRC src/MEX_Heat_Simulation_MultiStep.cpp
-        )
-        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::Static)
+#        matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
+#            SRC src/MEX_Heat_Simulation_MultiStep.cpp
+#        )
+#        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::Static)
 
-        set_target_properties(MEX_Heat_Simulation_MultiStep PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
-            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        )
+#        set_target_properties(MEX_Heat_Simulation_MultiStep PROPERTIES
+#            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+#            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+#        )
         # Manually add OpenMP compile flags (don't use helper function) because MEX requires plain linking
-        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE -fopenmp)
-            target_link_libraries(MEX_Heat_Simulation_MultiStep gomp)
-        elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE /openmp)
-        endif()
+#        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+#            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE -fopenmp)
+#            target_link_libraries(MEX_Heat_Simulation_MultiStep gomp)
+#        elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+#            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE /openmp)
+#        endif()
     else()
         set(BUILD_FEM_MEX OFF)
         message(STATUS "MATLAB not found - not building MATLAB Executable (MEX)")
