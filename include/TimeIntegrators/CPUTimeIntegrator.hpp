@@ -1,21 +1,27 @@
 #pragma once
 #include "TimeIntegrators/TimeIntegrator.hpp"
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
+#include <Eigen/IterativeLinearSolvers>
 
 class CPUTimeIntegrator : public TimeIntegrator {
 
 public:
-	virtual void applyParameters() override;
-	virtual void initialize() override;
-	virtual void initializeWithModel() override;
-	virtual Eigen::VectorXf singleStep(const Eigen::VectorXf& Temp, float alpha, float deltat) override;
-	virtual void singleStepWithUpdate() override;
+	CPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat) 
+		: TimeIntegrator(thermalModel, globalMatrices, alpha, deltat) {}
+	void applyParameters() override;
+	void initialize() override;
+	void singleStep() override;
+	void updateLHS() override;
+
+	void setMatrixSparsity(); // Sets the sparsity pattern so that applyParameters can run faster
 
 private:
-	FEM_Simulator* model_;
-	Eigen::VectorXf dVec;
-	Eigen::VectorXf vVec;
-
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globK_; // Global Conductivity Matrix
 	Eigen::SparseMatrix<float, Eigen::RowMajor> globM_; // Global Thermal Mass Matrix
 	Eigen::VectorXf globF_; // Global Heat Source Matrix 
+
+	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver_;
+	Eigen::SparseMatrix<float> LHS_; // this stores the left hand side of our matrix inversion, so the solver doesn't lose the reference.
 };

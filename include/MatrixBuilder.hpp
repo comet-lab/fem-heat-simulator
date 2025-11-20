@@ -13,25 +13,25 @@
 
 struct GlobalMatrices
 {
-	std::vector<long> nodeMap_;
-	long nNonDirichlet_ = 0;
-	std::vector<long> validNodes_;
-	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
+	std::vector<long> nodeMap;
+	long nNonDirichlet = 0;
+	std::vector<long> validNodes;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Thermal Mass Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Thermal Conductivity Matrix
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Q; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
 	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
 	// vector dictating the fluence experienced at each node. 
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint;
 	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
 	// by a vector dictating the fluence experienced by each element
-	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem_;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem;
 	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
 	// by a vector specifying the fixed temperature at each element.
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv_;
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv;
 	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_;
-	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
-	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
+	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk;
+	Eigen::VectorXf Fflux; // forcing function due to constant heatFlux boundary
+	Eigen::VectorXf Fq; // forcing function due to ambient temperature
 };
 
 class MatrixBuilder
@@ -47,20 +47,17 @@ public:
 	* @brief sets the mesh and then calls buildMatrices()
 	* @param mesh a constant reference to a mesh object
 	*/
-	void buildMatrices(const Mesh& mesh)
+	GlobalMatrices buildMatrices(const Mesh& mesh)
 	{
 		setMesh(mesh);
 		buildMatrices();
+		return globalMatrices_;
 	}
 
-
-	/*
-	* @brief selects the ShapeFunction to use to build the matrices based on the mesh
-	*/
 	void buildMatrices()
 	{
 		if (!mesh_)
-			throw std::runtime_error("Mesh not set");
+			throw std::runtime_error("Mesh cannot be nullptr when calling buildMatrices");
 
 		if ((mesh_->order() == GeometricOrder::LINEAR) && (mesh_->elementShape() == Shape::HEXAHEDRAL))
 		{
@@ -72,9 +69,18 @@ public:
 		}
 	}
 
+	/*
+	* @brief helper funciton that lets the user set the mesh
+	* @param Mesh
+	* 
+	* The purpose of this function is for when a user wants to to be able to construct element based matrices 
+	* without building the global matrices. Local element matrix construction requires a mesh for node positions
+	* within an element.
+	*/
 	void setMesh(const Mesh& mesh)
 	{
 		mesh_ = &mesh;
+		setNodeMap();
 	}
 
 	/*
@@ -84,8 +90,9 @@ public:
 	{
 		// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
 		// A value of -1 at index i, indicates that global node i is a dirichlet node. 
-		nodeMap_.resize(mesh_->nodes().size());
-		std::fill(nodeMap_.begin(), nodeMap_.end(), 0);
+		globalMatrices_.validNodes.clear();
+		globalMatrices_.nodeMap.resize(mesh_->nodes().size());
+		std::fill(globalMatrices_.nodeMap.begin(), globalMatrices_.nodeMap.end(), 0);
 		// First go through the boundary faces and set all nodes on a heatsink (dirichlet) face to -1
 		for (BoundaryFace face : mesh_->boundaryFaces())
 		{
@@ -93,20 +100,20 @@ public:
 			{
 				for (long n : face.nodes)
 				{
-					nodeMap_[n] = -1;
+					globalMatrices_.nodeMap[n] = -1;
 				}
 			}
 		}
 		// Then go through all the nodes that aren't -1 and set them to an increasing value from 0 to n-1;
 		// Also, store the index of the valid node. 
-		nNonDirichlet_ = 0;
+		globalMatrices_.nNonDirichlet = 0;
 		for (int i = 0; i < mesh_->nodes().size(); i++)
 		{
-			if (nodeMap_[i] == 0)
+			if (globalMatrices_.nodeMap[i] == 0)
 			{
-				nodeMap_[i] = nNonDirichlet_;
-				validNodes_.push_back(i);
-				nNonDirichlet_++;
+				globalMatrices_.nodeMap[i] = globalMatrices_.nNonDirichlet;
+				globalMatrices_.validNodes.push_back(i);
+				globalMatrices_.nNonDirichlet++;
 			}
 		}
 	}
@@ -123,30 +130,31 @@ public:
 		// total number of nodes
 		int nNodes = mesh_->nodes().size();
 		int nodesPerElem = ShapeFunc::nNodes;
+		long nNonDirichlet = globalMatrices_.nNonDirichlet;
 		// Initialize matrices so that we don't have to resize them later
-		FintElem_ = Eigen::SparseMatrix<float>(nNonDirichlet_, mesh_->elements().size());
-		FintElem_.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
+		globalMatrices_.FintElem = Eigen::SparseMatrix<float>(nNonDirichlet, mesh_->elements().size());
+		globalMatrices_.FintElem.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
 
-		Fint_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
-		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fint = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
+		globalMatrices_.Fint.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fconv_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
-		Fconv_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fconv = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
+		globalMatrices_.Fconv.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fk_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNodes);
-		Fint_.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fk = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
+		globalMatrices_.Fk.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
 
-		Fflux_ = Eigen::VectorXf::Zero(nNonDirichlet_);
-		Fq_ = Eigen::VectorXf::Zero(nNonDirichlet_);
+		globalMatrices_.Fflux = Eigen::VectorXf::Zero(nNonDirichlet);
+		globalMatrices_.Fq = Eigen::VectorXf::Zero(nNonDirichlet);
 
 		// M and K will be sparse matrices because nodes are shared by relatively few elements
-		M_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
-		M_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
-		K_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
-		K_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
+		globalMatrices_.M = Eigen::SparseMatrix<float>(nNonDirichlet, nNonDirichlet);
+		globalMatrices_.M.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes)); // at most 27 non-zero entries per column
+		globalMatrices_.K = Eigen::SparseMatrix<float>(nNonDirichlet, nNonDirichlet);
+		globalMatrices_.K.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes)); // at most 27 non-zero entries per column
 		// The Kconv matrix may also be able to be initialized differently since we know that it will only have values on the boundary ndoes.
-		Q_ = Eigen::SparseMatrix<float>(nNonDirichlet_, nNonDirichlet_);
-		Q_.reserve(Eigen::VectorXi::Constant(nNonDirichlet_, nRelatedNodes)); // at most 27 non-zero entries per column
+		globalMatrices_.Q = Eigen::SparseMatrix<float>(nNonDirichlet, nNonDirichlet);
+		globalMatrices_.Q.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes)); // at most 27 non-zero entries per column
 	}
 
 	/*
@@ -155,7 +163,7 @@ public:
 	* @param elemIdx the index of the element in the mesh element list
 	*/
 	template <typename ShapeFunc>
-	void applyElement(Element elem, long elemIdx)
+	void applyElement(const Element& elem, long elemIdx)
 	{
 		int nodesPerElem = ShapeFunc::nNodes;
 		long matrixRow = 0;
@@ -163,11 +171,12 @@ public:
 		Eigen::MatrixXf Me = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Fe = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Ke = calculateIntdNadNb<ShapeFunc>(elem);
+		precomputeElemJ(mesh_, elem);
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
 			Node currNode = mesh_->nodes()[elem.nodes[A]];
-			matrixRow = nodeMap_[elem.nodes[A]];
+			matrixRow = globalMatrices_.nodeMap[elem.nodes[A]];
 			if (matrixRow >= 0)
 			{
 				// handle node-neighbor interactions
@@ -175,23 +184,23 @@ public:
 				for (int B = 0; B < nodesPerElem; B++)
 				{
 					long neighborIdx = elem.nodes[B];
-					matrixCol = nodeMap_[neighborIdx];
+					matrixCol = globalMatrices_.nodeMap[neighborIdx];
 					Node neighbor = mesh_->nodes()[neighborIdx];
 					// Add effect of nodal fluence rate 
-					Fint_.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
+					globalMatrices_.Fint.coeffRef(matrixRow, neighborIdx) += Fe(A, B);
 					// Add effect of element fluence rate
-					FintElem_.coeffRef(matrixRow, elemIdx) += Fe(A, B);
+					globalMatrices_.FintElem.coeffRef(matrixRow, elemIdx) += Fe(A, B);
 					if (matrixCol >= 0) // non dirichlet node
 					{
 						// add effect of mass matrix
-						M_.coeffRef(matrixRow, matrixCol) += Me(A, B);
+						globalMatrices_.M.coeffRef(matrixRow, matrixCol) += Me(A, B);
 						// add effect of conductivity matrix
-						K_.coeffRef(matrixRow, matrixCol) += Ke(A, B);
+						globalMatrices_.K.coeffRef(matrixRow, matrixCol) += Ke(A, B);
 					}
 					else
 					{
 						// add conductivity as a forcing effect
-						Fk_.coeffRef(matrixRow, neighborIdx) -= Ke(A, B);
+						globalMatrices_.Fk.coeffRef(matrixRow, neighborIdx) -= Ke(A, B);
 					}
 				} // for each neighbor node
 			} // if node is not dirichlet
@@ -204,7 +213,7 @@ public:
 	* @param face of type BoundaryFace
 	*/
 	template <typename ShapeFunc>
-	void applyBoundary(BoundaryFace face)
+	void applyBoundary(const BoundaryFace& face)
 	{
 		if (face.type == CONVECTION)
 		{
@@ -215,49 +224,49 @@ public:
 			Eigen::VectorXf Feflux = calculateFaceIntNa<ShapeFunc>(elem, face.localFaceID, 1);
 			Eigen::MatrixXf FeConv = calculateFaceIntNaNb<ShapeFunc>(elem, face.localFaceID);
 			for (int A = 0; A < nodesPerElem; A++)
-			//TODO: Change this to only iterate over face nodes instead of all nodes
+				//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
-				long matrixRow = nodeMap_[elem.nodes[A]];
+				long matrixRow = globalMatrices_.nodeMap[elem.nodes[A]];
 				if (matrixRow >= 0)
 				{
 					// the portion of convection due to ambient temperature that acts like a constant flux boundary. 
 					// needs to be multiplied by htc and ambient temp to be the correct value.
-					Fq_(matrixRow) += Feflux(A);
+					globalMatrices_.Fq(matrixRow) += Feflux(A);
 					for (int B = 0; B < nodesPerElem; B++)
 					{
 						long neighborIdx = elem.nodes[B];
-						matrixCol = nodeMap_[neighborIdx];
+						matrixCol = globalMatrices_.nodeMap[neighborIdx];
 						Node neighbor = mesh_->nodes()[neighborIdx];
 						if (matrixCol >= 0) // non dirichlet node
 						{
 							// add effect of node temperature on convection
-							Q_.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
+							globalMatrices_.Q.coeffRef(matrixRow, matrixCol) += FeConv(A, B);
 						}
 						else
 						{
 							// Add effect of node temperature as forcing function
-							Fconv_.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
+							globalMatrices_.Fconv.coeffRef(matrixRow, neighborIdx) -= FeConv(A, B);
 						}
 					}
 				}
-				
+
 			}
 		}
 		else if (face.type == FLUX)
 		{
 			Element elem = mesh_->elements()[face.elemID];
 			long matrixRow = 0;
-			Eigen::VectorXf Feflux = calculateFaceIntNa<ShapeFunc>(elem, face.localFaceID, 1);		
+			Eigen::VectorXf Feflux = calculateFaceIntNa<ShapeFunc>(elem, face.localFaceID, 1);
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
-			//TODO: Change this to only iterate over face nodes instead of all nodes
+				//TODO: Change this to only iterate over face nodes instead of all nodes
 			{
-				matrixRow = nodeMap_[elem.nodes[A]];
+				matrixRow = globalMatrices_.nodeMap[elem.nodes[A]];
 				if (matrixRow >= 0)
 					/*by adding here, we are implicitly stating that a positve flux value will add heat to the system
 					* mathematically, we technically should be subtracting, but from a user perspective, it makes more sense
-					* that a positive heat flux will add heat at the boundary. 
-					*/ 
-					Fflux_(matrixRow) += Feflux(A);
+					* that a positive heat flux will add heat at the boundary.
+					*/
+					globalMatrices_.Fflux(matrixRow) += Feflux(A);
 			}
 		}
 	}
@@ -265,12 +274,12 @@ public:
 	/*
 	* @brief calculates the integral (N * N' |J| dV) for the given element
 	* @param elem current element
-	* 
+	*
 	* This function is used to calculate the Thermal Mass Matrix of a given element (Me) as well
 	* as the local function Fe used for nodal or elemental heat generation
 	*/
 	template <typename ShapeFunc>
-	Eigen::MatrixXf calculateIntNaNb(const Element& elem) 
+	Eigen::MatrixXf calculateIntNaNb(const Element& elem)
 	{
 
 		Eigen::MatrixXf Me = Eigen::MatrixXf::Zero(ShapeFunc::nNodes, ShapeFunc::nNodes);
@@ -279,13 +288,8 @@ public:
 
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
-
-			// Jacobian and determinant (simplified)
-			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
-			float detJ = J.determinant();
+			float detJ = detJCache_[i];
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
-
 
 			Me += NaNbCache_[i] * weight;
 		}
@@ -308,20 +312,13 @@ public:
 
 		for (int i = 0; i < ShapeFunc::nGP; ++i)
 		{
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
-
-			// Compute Jacobian and inverse
-			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
-			Eigen::Matrix3f Jinv = J.inverse();
-			float detJ = J.determinant();
-
+			float detJ = detJCache_[i];
 			// Derivatives in physical coordinates: 3 × nNodes
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdx = Jinv * dNdxi;
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdx = invJCache_[i] * dNdxi;
 			// Weight
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
 			// Ke contribution: (nNodes × 3)(3 × nNodes) = nNodes × nNodes
 			Ke += dNdx.transpose() * dNdx * weight;
-				
 		}
 
 		return Ke;
@@ -349,7 +346,7 @@ public:
 			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem,faceIndex,dN_dxi_eta);
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(mesh_, elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
@@ -370,7 +367,7 @@ public:
 	*
 	* This function is used to calculate the influence of Neumann boundary conditions that are influenced
 	* by a value at each node. For example convection is influenced by temperature at each node so this would
-	* be used to calculate \int (N*h*T |J| dS) 
+	* be used to calculate \int (N*h*T |J| dS)
 	*/
 	template <typename ShapeFunc>
 	Eigen::MatrixXf calculateFaceIntNaNb(const Element& elem, int faceIndex)
@@ -388,7 +385,7 @@ public:
 			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(mesh_, elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
@@ -409,14 +406,36 @@ public:
 
 		return Qe;
 	}
-	
+
+
 	/*
-	* @brief precomputes the volume jacobian for an element
+	* @brief precomutes the volume jacobian for an element at each gauss point. Assumes shape functions have been computed
+	* @params mesh_
+	* @params elem
+	*/
+	template <typename ShapeFunc>
+	void precomputeElemJ(const Mesh& mesh_, const Element& elem)
+	{
+		detJCache_.clear();
+		invJCache_.clear();
+		for (int i = 0; i < ShapeFunc::nGP; i++)
+		{
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
+			Eigen::Matrix3f J = calculateJ<ShapeFunc>(mesh_, elem, dNdxi);
+			Eigen::Matrix3f Jinv = J.inverse();
+			float detJ = J.determinant();
+			detJCache_.push_back(detJ);
+			invJCache_.push_back(Jinv);
+		}
+	}
+
+	/*
+	* @brief computes the volume jacobian for an element
 	* @param elem is of type Element and is the current element we are working on
 	* @param dNdxi is the shape function derivative over the volume evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float,3,Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix3f calculateJ(const Mesh& mesh_, const Element& elem, const Eigen::Matrix<float, 3, Eigen::Dynamic>& dNdxi)
 	{
 		Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePoses;
 		for (int a = 0; a < ShapeFunc::nNodes; ++a)
@@ -429,13 +448,13 @@ public:
 	}
 
 	/*
-	* @brief precomputes the face jacobian for a face on an element
+	* @brief computes the face jacobian for a face on an element
 	* @param elem is of type Element and is the current element we are working on
 	* @param faceIndex is the face number of the element
 	* @param dNdxi is the shape function derivative over the surface evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix<float, 2, 3> calculateJFace(const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix<float, 2, 3> calculateJFace(const Mesh& mesh_, const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
 	{
 		Eigen::Matrix<float, ShapeFunc::nFaceNodes, 3> nodePoses;
 		for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
@@ -449,14 +468,14 @@ public:
 
 	/*
 	* @brief precompute the shape functions at each gauss point, their derivatves, and outer products
-	* 
+	*
 	* Because we are assuming each element in the mesh will be the same element type (e.g. hex linear)
-	* we can compute the value of the shape functions at each gaussian integration point ahead of time. 
+	* we can compute the value of the shape functions at each gaussian integration point ahead of time.
 	* The shape functions are defined in the parametric domain, meaning different element sizes or warps won't
 	* affect the shape functions. The differences in element lengths or sizes will be imparted with the Jacobian
 	* which isn't precomputed.
-	* 
-	* If we ever change to allow multiple element types within a mesh, we won't be able to precompute and 
+	*
+	* If we ever change to allow multiple element types within a mesh, we won't be able to precompute and
 	* we will have to calculate them in the integration loops above.
 	*/
 	template <typename ShapeFunc>
@@ -472,7 +491,7 @@ public:
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
 			const auto& xi = gp[i];
-			Eigen::Matrix<float,3,ShapeFunc::nNodes> dNdxi;
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi;
 			Eigen::VectorXf Nvals(ShapeFunc::nNodes);
 			for (int a = 0; a < ShapeFunc::nNodes; a++)
 			{
@@ -496,7 +515,7 @@ public:
 			for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 			{
 				Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face;
-				Eigen::Matrix<float,2,ShapeFunc::nFaceNodes> dN_dxi_eta;
+				Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta;
 
 				for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 				{
@@ -512,29 +531,9 @@ public:
 		}
 	}
 
-	// public getters
-	const std::vector<long>& nodeMap() const { return nodeMap_; }
-	const std::vector<long>& validNodes() const { return validNodes_; }
-	long nNonDirichlet() const { return nNonDirichlet_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& M() const { return M_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& K() const { return K_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Q() const { return Q_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fint() const { return Fint_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& FintElem() const { return FintElem_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fconv() const { return Fconv_; }
-	const Eigen::SparseMatrix<float, Eigen::RowMajor>& Fk() const { return Fk_; }
-	const Eigen::VectorXf& Fflux() const { return Fflux_; }
-	const Eigen::VectorXf& Fq() const { return Fq_; }
-
 private:
-
-	const Mesh* mesh_ = nullptr;
-	// this vector contains a mapping between the global node number and its index location in the reduced matrix equations. 
-	// A value of -1 at index i, indicates that global node i is a dirichlet node. 
-	std::vector<long> nodeMap_;
-	long nNonDirichlet_ = 0;
-	std::vector<long> validNodes_;
-
+	const Mesh* mesh_;
+	GlobalMatrices globalMatrices_;
 	/* Cached shape functions which are element independent */ 
 	// volume shape functions
 	std::vector<Eigen::VectorXf> NCache_; // Stores the shape functions for each node at each gauss point
@@ -550,28 +549,10 @@ private:
 	// size is nFace x nGp x (2 x nFaceNodes)
 	std::vector<std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>>> dNdxiFaceCache_;
 
-	/*Cache of global matrices used in assembly*/
-	Eigen::SparseMatrix<float, Eigen::RowMajor> M_; // Thermal Mass Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> K_; // Thermal Conductivity Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Q_; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
-
-	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
-	// vector dictating the fluence experienced at each node. 
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint_; 
-
-	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
-	// by a vector dictating the fluence experienced by each element
-	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem_; 
-
-	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
-	// by a vector specifying the fixed temperature at each element.
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv_;
-
-	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk_; 
-
-	Eigen::VectorXf Fflux_; // forcing function due to constant heatFlux boundary
-	Eigen::VectorXf Fq_; // forcing function due to ambient temperature
+	/* Caching jacobians per element*/
+	std::vector<float> detJCache_; //Caching the determinant of the jacobian for each Gauss point
+	std::vector<Eigen::Matrix3f> invJCache_; // Cacheing the inverse of the jacobian for each Gauss point
+	std::vector<float> detJFaceCache_; //Caching the determinant of the jacobian for each Gauss point
 
 
 	/*
@@ -580,7 +561,6 @@ private:
 	template <typename ShapeFunc>
 	void buildMatricesT()
 	{
-		setNodeMap();
 		resetMatrices<ShapeFunc>();
 		precomputeShapeFunctions<ShapeFunc>();
 		std::vector<Element> elements = mesh_->elements();
@@ -595,13 +575,13 @@ private:
 			applyBoundary<ShapeFunc>(mesh_->boundaryFaces()[f]);
 		}
 		// compress all sparse matrices
-		K_.makeCompressed();
-		M_.makeCompressed();
-		Q_.makeCompressed();
-		Fint_.makeCompressed();
-		FintElem_.makeCompressed();
-		Fconv_.makeCompressed();
-		Fk_.makeCompressed();
+		globalMatrices_.K.makeCompressed();
+		globalMatrices_.M.makeCompressed();
+		globalMatrices_.Q.makeCompressed();
+		globalMatrices_.Fint.makeCompressed();
+		globalMatrices_.FintElem.makeCompressed();
+		globalMatrices_.Fconv.makeCompressed();
+		globalMatrices_.Fk.makeCompressed();
 	}
 
 };

@@ -101,16 +101,16 @@ int main()
     simulator.setTemp(Temp_);// reset temperature
     simulator.setFluenceRate(laserPose, 0, 0.0168); // set fluence rate
     simulator.buildMatrices(); // set fluence rate
-    GPUTimeIntegrator gpuHandle(simulator.alpha_, simulator.deltaT_);
+    GPUTimeIntegrator gpuHandle(simulator.alpha_, simulator.dt_);
     std::cout << "\nGPU Handle created " << std::endl;
     gpuHandle.setModel(&simulator);
     std::cout << "Model Assigned" << std::endl;
     gpuHandle.initializeWithModel();
-    simulator.initializeSensorTemps(round(totalTime/simulator.deltaT_));
+    simulator.initializeSensorTemps(round(totalTime/simulator.dt_));
     simulator.updateTemperatureSensors(0);
     start = std::chrono::high_resolution_clock::now();
     std::cout << "Model initialized" << std::endl;
-    for (int i = 1; i <= round(totalTime/simulator.deltaT_); i++) {
+    for (int i = 1; i <= round(totalTime/simulator.dt_); i++) {
         simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
         simulator.setMUA(i*5 + 20);
         gpuHandle.singleStepWithUpdate();

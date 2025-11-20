@@ -20,12 +20,12 @@ protected:
         femSim->silentMode = true;
 
         float laserPose[6] = { 0, 0, -25, 0, 0, 0 };
-        femSim->deltaT_ = 0.05f;
+        femSim->dt_ = 0.05f;
         femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
 
         femSim->buildMatrices();
         
-        gpu = new GPUTimeIntegrator(femSim->alpha_, femSim->deltaT_);
+        gpu = new GPUTimeIntegrator(femSim->alpha_, femSim->dt_);
 
         gpu->setModel(femSim);
     }

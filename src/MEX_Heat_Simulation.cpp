@@ -479,14 +479,14 @@ public:
         }
         simulator.buildMatrices();
         gpuHandle->setAlpha(simulator.alpha_);
-        gpuHandle->setDeltaT(simulator.deltaT_);
+        gpuHandle->setDeltaT(simulator.dt_);
         gpuHandle->setModel(&simulator);
         gpuHandle->initializeWithModel();
     }
 
     void multiStepGPU(float totalTime){
         auto startTime = std::chrono::steady_clock::now();
-        int numSteps = round(totalTime / simulator.deltaT_);
+        int numSteps = round(totalTime / simulator.dt_);
         simulator.initializeSensorTemps(numSteps);
         simulator.updateTemperatureSensors(0);
         for (int i = 1; i <= numSteps; i++) {
