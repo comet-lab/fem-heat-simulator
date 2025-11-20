@@ -1,7 +1,4 @@
-#include "CPUTimeIntegrator.hpp"
-#include "CPUTimeIntegrator.hpp"
-#include "TimeIntegrator.hpp"
-#include "CPUTimeIntegrator.hpp"
+#include "TimeIntegrators/CPUTimeIntegrator.hpp"
 
 void CPUTimeIntegrator::applyParameters()
 {
@@ -16,23 +13,23 @@ void CPUTimeIntegrator::applyParameters()
 	// Apply parameter specific multiplication for each global matrix.
 	// Conductivity matrix
 	globK_.setZero();
-	globK_ += globalMatrices_.->K * thermalModel_.TC;
-	globK_ += globalMatrices_.->Q * thermalModel_.HTC;
+	globK_ += globalMatrices_.K * thermalModel_.TC;
+	globK_ += globalMatrices_.Q * thermalModel_.HTC;
 	// Thermal mass matrix
 	globM_.setZero();
 	globM_ += globalMatrices_.M * thermalModel_.VHC; // M Doesn't have any additions so we just multiply it by the constant
 	// Forcing Vector
 	globF_.setZero();
-	globF_ += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv() * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
+	globF_ += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
 	globF_ += (globalMatrices_.Fflux * thermalModel_.heatFlux); // heat flux 
 	globF_ += (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC); // conduction on dirichlet nodes
-	globF_ += MUA_ * (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem); // forcing function
+	globF_ += (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
 	// startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
 }
 
 void CPUTimeIntegrator::setMatrixSparsity()
 {
-	globK_ = globalMatrices_.K + mb_.Q;
+	globK_ = globalMatrices_.K + globalMatrices_.Q;
 	globK_.makeCompressed();
 	globM_ = globalMatrices_.M;
 	globM_.makeCompressed();
@@ -56,7 +53,7 @@ void CPUTimeIntegrator::initialize()
 	vVec_ = Eigen::VectorXf::Zero(globalMatrices_.nNonDirichlet);
 
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
-	dVec_ = thermaModel_.Temp(globalMatrices_.validNodes);
+	dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
 
 	if (alpha_ < 1) {
 		// Perform the conjugate gradiant to compute the initial vVec value
@@ -69,12 +66,12 @@ void CPUTimeIntegrator::initialize()
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
-	startTime = printDuration("Time Stepping Initialized in ", startTime);
+	//startTime = printDuration("Time Stepping Initialized in ", startTime);
 
 	// Prepare solver for future iterations
-	LHS_ = globM_ + alpha_ * deltaT_ * globK_;
+	LHS_ = globM_ + alpha_ * dt_ * globK_;
 	LHS_.makeCompressed();
-	startTime = printDuration("LHS created: ", startTime);
+	//startTime = printDuration("LHS created: ", startTime);
 
 	// These two steps form the cgSolver_.compute() function. By calling them separately, we 
 	// only ever need to call factorize when the tissue properties change.
@@ -88,7 +85,7 @@ void CPUTimeIntegrator::initialize()
 
 void CPUTimeIntegrator::updateLHS()
 {
-	LHS_ = globM_ + alpha_ * deltaT_ * globK_; // Create new left hand side 
+	LHS_ = globM_ + alpha_ * dt_ * globK_; // Create new left hand side 
 	LHS_.makeCompressed();
 	cgSolver_.factorize(LHS_); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	if (cgSolver_.info() != Eigen::Success) {
@@ -104,7 +101,7 @@ void CPUTimeIntegrator::singleStep()
 	//this->cgSolver_.factorize(this->LHS_); // Perform factoriziation based on analysis which should have been called with initializeModel();
 	// Explicit Forward Step (only if alpha < 1)
 	if (alpha_ < 1) {
-		dVec_ = dVec_ + (1 - alpha_) * deltaT_ * vVec_; // normally the output of this equation is assigned to dTilde for clarity...
+		dVec_ = dVec_ + (1 - alpha_) * dt_ * vVec_; // normally the output of this equation is assigned to dTilde for clarity...
 	}
 	// Create Right-hand side of v(M + alpha*deltaT*K) = (F - K*dTilde);
 	Eigen::VectorXf RHS = globF_ - globK_ * dVec_; // ... and dTilde would be used here
@@ -119,5 +116,5 @@ void CPUTimeIntegrator::singleStep()
 		std::cout << "Iterations: " << this->cgSolver_.iterations() << std::endl;
 	}*/
 	// Implicit Backward Step (only if alpha > 0) 
-	dVec_ = dVec_ + alpha_ * deltaT_ * vVec_; // ... dTilde would also be on the righ-hand side here. 
+	dVec_ = dVec_ + alpha_ * dt_ * vVec_; // ... dTilde would also be on the righ-hand side here. 
 }

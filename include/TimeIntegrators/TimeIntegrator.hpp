@@ -1,13 +1,9 @@
 #pragma once
-#include <vector> 
-#include <algorithm>
-#include <functional>
 #include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <chrono>
-#include <stdexcept>
 #include "FEM_Simulator.h"
-
+#include "ThermalModel.hpp"
+#include "GlobalMatrices.hpp"
+#include <iostream>
 
 class TimeIntegrator {
 public:

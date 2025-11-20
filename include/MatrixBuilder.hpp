@@ -10,29 +10,7 @@
 #include "Mesh.hpp"
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
-
-struct GlobalMatrices
-{
-	std::vector<long> nodeMap;
-	long nNonDirichlet = 0;
-	std::vector<long> validNodes;
-	Eigen::SparseMatrix<float, Eigen::RowMajor> M; // Thermal Mass Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> K; // Thermal Conductivity Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Q; // Convection Matrix -- should have the same structure as Me just gets scaled by htc instead of vhc
-	// Internal nodal heat generation (aka laser). Its size is nNodes x nNodes. Becomes a vector once post multiplied by a 
-	// vector dictating the fluence experienced at each node. 
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fint;
-	// forcing function due to irradiance when using elemental fluence rate. Its size is nNodes x nElems. Becomes vector once post multiplied
-	// by a vector dictating the fluence experienced by each element
-	Eigen::SparseMatrix<float, Eigen::RowMajor> FintElem;
-	// forcing function due to convection on dirichlet node. Size is nNodes x nNodes. Becomes a vector once post multiplied
-	// by a vector specifying the fixed temperature at each element.
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fconv;
-	// Forcing Function due to conductivity matrix on dirichlet nodes. Stored as a matrix but becomes vector once multiplied by nodal temperatures
-	Eigen::SparseMatrix<float, Eigen::RowMajor> Fk;
-	Eigen::VectorXf Fflux; // forcing function due to constant heatFlux boundary
-	Eigen::VectorXf Fq; // forcing function due to ambient temperature
-};
+#include "GlobalMatrices.hpp"
 
 class MatrixBuilder
 {
@@ -171,7 +149,7 @@ public:
 		Eigen::MatrixXf Me = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Fe = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Ke = calculateIntdNadNb<ShapeFunc>(elem);
-		precomputeElemJ(mesh_, elem);
+		precomputeElemJ<ShapeFunc>(elem);
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
@@ -312,6 +290,7 @@ public:
 
 		for (int i = 0; i < ShapeFunc::nGP; ++i)
 		{
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
 			float detJ = detJCache_[i];
 			// Derivatives in physical coordinates: 3 × nNodes
 			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdx = invJCache_[i] * dNdxi;
@@ -346,7 +325,7 @@ public:
 			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(mesh_, elem, faceIndex, dN_dxi_eta);
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
@@ -385,7 +364,7 @@ public:
 			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(mesh_, elem, faceIndex, dN_dxi_eta);
+			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
 			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
@@ -414,14 +393,14 @@ public:
 	* @params elem
 	*/
 	template <typename ShapeFunc>
-	void precomputeElemJ(const Mesh& mesh_, const Element& elem)
+	void precomputeElemJ(const Element& elem)
 	{
 		detJCache_.clear();
 		invJCache_.clear();
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
 			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
-			Eigen::Matrix3f J = calculateJ<ShapeFunc>(mesh_, elem, dNdxi);
+			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			Eigen::Matrix3f Jinv = J.inverse();
 			float detJ = J.determinant();
 			detJCache_.push_back(detJ);
@@ -435,7 +414,7 @@ public:
 	* @param dNdxi is the shape function derivative over the volume evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix3f calculateJ(const Mesh& mesh_, const Element& elem, const Eigen::Matrix<float, 3, Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float, 3, Eigen::Dynamic>& dNdxi)
 	{
 		Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePoses;
 		for (int a = 0; a < ShapeFunc::nNodes; ++a)
@@ -454,7 +433,7 @@ public:
 	* @param dNdxi is the shape function derivative over the surface evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix<float, 2, 3> calculateJFace(const Mesh& mesh_, const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix<float, 2, 3> calculateJFace(const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
 	{
 		Eigen::Matrix<float, ShapeFunc::nFaceNodes, 3> nodePoses;
 		for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)

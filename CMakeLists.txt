@@ -69,8 +69,10 @@ set(HEATSIM_HEADERS
     include/FEM_Simulator.h
     include/MatrixBuilder.hpp
     include/ShapeFunctions/HexLinear.hpp
-    include/TimeIntegrator/TimeIntegrator.hpp
-    include/TimeIntegrator/CPUTimeIntegrator.hpp
+    include/TimeIntegrators/TimeIntegrator.hpp
+    include/TimeIntegrators/CPUTimeIntegrator.hpp
+    include/ThermalModel.hpp
+    include/GlobalMatrices.hpp
 )
 
 # GPU sources (conditionally)
