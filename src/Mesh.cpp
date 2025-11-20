@@ -10,6 +10,7 @@ Mesh::Mesh(std::vector<Node> nodes, std::vector<Element> elements, std::vector<B
 	setNodes(nodes);
 	setElements(elements);
 	setBoundaryFaces(boundaryFaces);
+    computeBoundingBoxes();
 }
 
 void Mesh::setNodes(std::vector<Node> nodes)
@@ -62,6 +63,79 @@ void Mesh::setOrderAndShape()
 	}
 }
 
+long Mesh::findPosInMesh(const std::array<float,3>& p, std::array<float,3>& xi)
+{
+    for (int e = 0; e < elements_.size(); e++)
+    {
+        auto elem = elements_[e];
+        auto& box = elementBoxes_[e];
+
+        if (p[0] < box.xmin || p[0] > box.xmax ||
+            p[1] < box.ymin || p[1] > box.ymax ||
+            p[2] < box.zmin || p[2] > box.zmax)
+            continue;
+        // Now do parametric inversion
+        Eigen::Vector3f pVec;
+        pVec << p[0], p[1], p[2];
+        xi = computeXiCoordinates(pVec, elem.nodes);
+
+        if (insideReferenceElement(xi))
+            return e;
+    }
+
+    return -1; // not found
+}
+
+bool Mesh::insideReferenceElement(std::array<float, 3> xi)
+{
+    const float tol = 1e-6f;
+    if (elementShape_ == TETRAHEDRAL) {
+        // xi barycentric coords for tet: 
+        if (xi[0] < -tol || xi[1] < -tol || xi[2] < -tol) return false;
+        if (xi[0] + xi[1] + xi[2] > 1.0f + tol) return false;
+        return true;
+    }
+    else {
+        // Hex:
+        if (xi[0] < -1.0f - tol || xi[0] > 1.0f + tol) return false;
+        if (xi[1] < -1.0f - tol || xi[1] > 1.0f + tol) return false;
+        if (xi[2] < -1.0f - tol || xi[2] > 1.0f + tol) return false;
+        return true;
+    }
+}
+
+void Mesh::computeBoundingBoxes() {
+    elementBoxes_.resize(elements_.size());
+    for (int e = 0; e < elements_.size(); e++) {
+        auto elemNodes = elements_[e].nodes;
+        auto& box = elementBoxes_[e];
+
+        box.xmin = box.ymin = box.zmin = std::numeric_limits<float>::max();
+        box.xmax = box.ymax = box.zmax = std::numeric_limits<float>::lowest();
+
+        for (auto n : elemNodes) {
+            auto node = nodes_[n];
+            box.xmin = std::min(box.xmin, node.x);
+            box.xmax = std::max(box.xmax, node.x);
+            box.ymin = std::min(box.ymin, node.y);
+            box.ymax = std::max(box.ymax, node.y);
+            box.zmin = std::min(box.zmin, node.z);
+            box.zmax = std::max(box.zmax, node.z);
+        }
+    }
+}
+
+std::array<float,3> Mesh::computeXiCoordinates(const Eigen::Vector3f& p,const std::vector<long>& nodeList)
+{
+    if ((order_ == LINEAR) && (elementShape_ == TETRAHEDRAL))
+        return computeXiCoordinatesT<ShapeFunctions::TetLinear>(p, nodeList);
+    else if ((order_ == LINEAR) && (elementShape_ == HEXAHEDRAL))
+        return  computeXiCoordinatesT<ShapeFunctions::HexLinear>(p, nodeList);
+    else
+        throw std::runtime_error("cannot compute xi coordinates for unknown shape-order combination");
+
+}
+
 Mesh Mesh::buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> nodesPerAxis, std::array<BoundaryType, 6> bc)
 {
     std::vector<float> xPos(nodesPerAxis[0]); 
@@ -89,7 +163,7 @@ Mesh Mesh::buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> no
 }
 
 
-Mesh Mesh::buildCubeMesh(std::vector<float> xPos, std::vector<float> yPos, std::vector<float> zPos, std::array<BoundaryType, 6> bc)
+Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float>& yPos,const std::vector<float>& zPos, std::array<BoundaryType, 6> bc)
 {
     const long Nx = xPos.size();
     const long Ny = yPos.size();
