@@ -46,8 +46,7 @@ int main()
 
     simulator.silentMode = false;
 
-    
-
+ 
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.05f}, {0,0,0.5f}, {0,0,0.95f},{0,0,1} };
     simulator.setSensorLocations(tempSensorLocations);
     // FEM_Simulator simCopy = FEM_Simulator(simulator);

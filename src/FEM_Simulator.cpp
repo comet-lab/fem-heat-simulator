@@ -32,10 +32,10 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 
 FEM_Simulator::~FEM_Simulator(){
 	
-	if (!solver)
+	if (!solver_)
 	{
-		delete solver;
-		solver = nullptr;
+		delete solver_;
+		solver_ = nullptr;
 	}
 }
 
@@ -67,21 +67,21 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. 
 	*/
-	if (!solver)
+	if (!solver_)
 		throw std::runtime_error("Solver not initialized. Call initializeModel() or initializeTimeIntegration before singleStep()");
 
 	if (fluenceUpdate_ || parameterUpdate_) {
 		// only happens if fluenceUpdate is true
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
-		solver->applyParameters();
+		solver_->applyParameters();
 		fluenceUpdate_ = false;
 
 		if (parameterUpdate_) { // Happens only if parameters were updated
-			solver->updateLHS();
+			solver_->updateLHS();
 			parameterUpdate_ = false;
 		}
 	}
-	Eigen::VectorXf dVec = solver->singleStepWithUpdate();
+	Eigen::VectorXf dVec = solver_->singleStepWithUpdate();
 
 	// Adjust our Temp with new d vector
 	thermalModel_.Temp(globalMatrices_.validNodes) = dVec;
@@ -106,8 +106,8 @@ void FEM_Simulator::initializeTimeIntegration()
 {
 	auto startTime = std::chrono::steady_clock::now();
 	parameterUpdate_ = false;
-	TimeIntegrator* solver = new CPUTimeIntegrator(thermalModel_, globalMatrices_, alpha_, dt_);
-	solver->initialize();
+	solver_ = new CPUTimeIntegrator(thermalModel_, globalMatrices_, alpha_, dt_);
+	solver_->initialize();
 	startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
 }
 

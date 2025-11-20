@@ -88,7 +88,7 @@ private:
 	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;
 	ThermalModel thermalModel_;
-	TimeIntegrator* solver = nullptr;
+	TimeIntegrator* solver_ = nullptr;
 	float alpha_ = 0.5; // time step weight
 	float dt_ = 0.01; // time step [s]
 	

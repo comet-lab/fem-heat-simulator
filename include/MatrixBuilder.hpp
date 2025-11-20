@@ -146,10 +146,11 @@ public:
 		int nodesPerElem = ShapeFunc::nNodes;
 		long matrixRow = 0;
 		long matrixCol = 0;
+		precomputeElemJ<ShapeFunc>(elem);
 		Eigen::MatrixXf Me = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Fe = calculateIntNaNb<ShapeFunc>(elem);
 		Eigen::MatrixXf Ke = calculateIntdNadNb<ShapeFunc>(elem);
-		precomputeElemJ<ShapeFunc>(elem);
+		
 
 		for (int A = 0; A < nodesPerElem; A++)
 		{
