@@ -324,19 +324,18 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 
 void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
 {
-	sensorLocations_ = tempSensorLocations;
 	bool errorFlag = false;
-	/* TODO - need to find a way to check if sensors are in tissue with arbitrary mesh setup */
-	//for (int s = 0; s < sensorLocations_.size(); s++) {
-	//	if ((sensorLocations_[s][0] < -this->tissueSize[0] / 2.0f) || (sensorLocations_[s][0] > this->tissueSize[0] / 2.0f) ||
-	//		(sensorLocations_[s][1] < -this->tissueSize[1] / 2.0f) || (sensorLocations_[s][1] > this->tissueSize[1] / 2.0f) ||
-	//		(sensorLocations_[s][2] < 0) || (sensorLocations_[s][2] > this->tissueSize[2])) {
-	//		errorFlag = true;
-	//		break;
-	//	}	
-	//}
-	if (errorFlag) {
-		throw std::invalid_argument("All sensor locations must be within the tissue block");
+	for (int s = 0; s < tempSensorLocations.size(); s++)
+	{	
+		SensorLocation currSens; 
+		std::array<float, 3> xi;
+		long e = mesh_->findPosInMesh(tempSensorLocations[s],xi);
+		if (e < 0)
+			throw std::invalid_argument("All sensor locations must be within the mesh");
+		currSens.elemIdx = e;
+		currSens.pos = tempSensorLocations[s];
+		currSens.xi = xi;
+		sensorLocations_.push_back(currSens);
 	}
 }
 

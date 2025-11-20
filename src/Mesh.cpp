@@ -63,7 +63,7 @@ void Mesh::setOrderAndShape()
 	}
 }
 
-long Mesh::findPosInMesh(const std::array<float,3>& p, std::array<float,3>& xi)
+long Mesh::findPosInMesh(const std::array<float,3>& p, std::array<float,3>& xi) const
 {
     for (int e = 0; e < elements_.size(); e++)
     {
@@ -86,7 +86,7 @@ long Mesh::findPosInMesh(const std::array<float,3>& p, std::array<float,3>& xi)
     return -1; // not found
 }
 
-bool Mesh::insideReferenceElement(std::array<float, 3> xi)
+bool Mesh::insideReferenceElement(std::array<float, 3> xi) const
 {
     const float tol = 1e-6f;
     if (elementShape_ == TETRAHEDRAL) {
@@ -125,7 +125,7 @@ void Mesh::computeBoundingBoxes() {
     }
 }
 
-std::array<float,3> Mesh::computeXiCoordinates(const Eigen::Vector3f& p,const std::vector<long>& nodeList)
+std::array<float,3> Mesh::computeXiCoordinates(const Eigen::Vector3f& p,const std::vector<long>& nodeList) const
 {
     if ((order_ == LINEAR) && (elementShape_ == TETRAHEDRAL))
         return computeXiCoordinatesT<ShapeFunctions::TetLinear>(p, nodeList);

@@ -85,6 +85,14 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 private:
+	struct SensorLocation
+	{
+		std::array<float, 3> pos;
+		long elemIdx;
+		std::array<float, 3> xi;
+	};
+
+
 	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;
 	ThermalModel thermalModel_;
@@ -94,7 +102,7 @@ private:
 	
 	bool parameterUpdate_ = true;
 	bool fluenceUpdate_ = true;
-	std::vector< std::array<float, 3 >> sensorLocations_; // locations of temperature sensors
+	std::vector<SensorLocation> sensorLocations_; // locations of temperature sensors
 	std::vector<std::vector<float>> sensorTemps_; // stored temperature information for each sensor over time. 
 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);

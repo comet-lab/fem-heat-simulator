@@ -63,12 +63,12 @@ public:
 	const std::vector<BoundaryFace>& boundaryFaces() const { return boundaryFaces_; }
 	const GeometricOrder order() const { return order_; }
 	const Shape elementShape() const { return elementShape_; }
-	long findPosInMesh(const std::array<float, 3>& p, std::array<float,3>& xi);
-	bool insideReferenceElement(std::array<float, 3> xi);
+	long findPosInMesh(const std::array<float, 3>& p, std::array<float,3>& xi) const;
+	bool insideReferenceElement(std::array<float, 3> xi) const;
 	void computeBoundingBoxes();
-	std::array<float,3> computeXiCoordinates(const Eigen::Vector3f& p, const std::vector<long>& nodeList);
+	std::array<float,3> computeXiCoordinates(const Eigen::Vector3f& p, const std::vector<long>& nodeList) const;
 	template <typename ShapeFunc>
-	std::array<float,3> computeXiCoordinatesT(const Eigen::Vector3f& p, const std::vector<long>& nodeList);
+	std::array<float,3> computeXiCoordinatesT(const Eigen::Vector3f& p, const std::vector<long>& nodeList) const;
 
 	static Mesh buildCubeMesh(std::array<float, 3> tissueSize, std::array<long, 3> nodesPerAxis, std::array<BoundaryType,6> bc);
 	static Mesh buildCubeMesh(const std::vector<float>& xPos, const std::vector<float>& yPos, const std::vector<float>& zPos, std::array<BoundaryType, 6> bc);
@@ -93,7 +93,7 @@ private:
 };
 
 	template<typename ShapeFunc>
-	inline std::array<float,3> Mesh::computeXiCoordinatesT(const Eigen::Vector3f& p, const std::vector<long>& nodeList)
+	inline std::array<float,3> Mesh::computeXiCoordinatesT(const Eigen::Vector3f& p, const std::vector<long>& nodeList) const
 	{
 		std::array<float, 3> xi = { 0.0f, 0.0f, 0.0f }; // initial guess
 		for (int iter = 0; iter < 20; iter++) {
