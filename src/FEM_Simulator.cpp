@@ -257,6 +257,8 @@ void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float lase
 
 void FEM_Simulator::setDeltaT(float dt)
 {
+	if (dt < 0)
+		throw std::runtime_error("Time step must be greater than 0");
 	dt_ = dt;
 	parameterUpdate_ = true;
 }
