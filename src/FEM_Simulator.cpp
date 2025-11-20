@@ -95,7 +95,7 @@ void FEM_Simulator::buildMatrices()
 
 void FEM_Simulator::initializeTimeIntegration(float alpha, float dt)
 {
-	setDeltaT(dt);
+	setDt(dt);
 	setAlpha(alpha);
 	initializeTimeIntegration();
 }
@@ -255,7 +255,7 @@ void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float lase
 	setFluenceRate(laserPoseVec, laserPower, beamWaist);
 }
 
-void FEM_Simulator::setDeltaT(float dt)
+void FEM_Simulator::setDt(float dt)
 {
 	if (dt < 0)
 		throw std::runtime_error("Time step must be greater than 0");

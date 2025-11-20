@@ -40,7 +40,7 @@ int main()
     std::cout << "Object Created " << std::endl;
     float totalTime = 1.0f;
     simulator.setAlpha(0.5f);
-    simulator.setDeltaT(0.05f);
+    simulator.setDt(0.05f);
     simulator.setHeatFlux(-1.0);
     simulator.setAmbientTemp(0.0f);
 

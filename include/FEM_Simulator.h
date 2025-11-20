@@ -47,8 +47,8 @@ public:
 	Eigen::VectorXf fluenceRate() const  { return thermalModel_.fluenceRate; }
 	Eigen::VectorXf fluenceRateElem() const { return thermalModel_.fluenceRateElem; }
 
-	void setDeltaT(float deltaT);
-	float deltaT() const { return dt_; }
+	void setDt(float deltaT);
+	float dt() const { return dt_; }
 
 	void setHeatFlux(float heatFlux);
 	//float heatFlux() const { return heatFlux_; }

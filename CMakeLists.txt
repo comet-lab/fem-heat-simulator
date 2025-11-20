@@ -230,7 +230,9 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
             SRC src/MEX/MEX_Heat_Simulation.cpp
-            include/MEX_Utilities.hpp
+        )
+        target_include_directories(MEX_Heat_Simulation
+            PRIVATE ${CMAKE_SOURCE_DIR}/include
         )
         target_link_libraries(MEX_Heat_Simulation HeatSimulation::Static)
 
@@ -245,8 +247,6 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
         elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(MEX_Heat_Simulation PRIVATE /openmp)
         endif()
-
-
 #        matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
 #            SRC src/MEX_Heat_Simulation_MultiStep.cpp
 #        )

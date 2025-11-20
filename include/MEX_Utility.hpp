@@ -62,19 +62,23 @@ inline matlab::data::TypedArray<float> convertVectorToMatlabArray(const std::vec
     return matlabArray;
 }
 
-/* Helper function to convert a matlab array to a std::vector<float>*/
-inline std::vector<float> convertMatlabArrayToFloatVector(const matlab::data::Array& matlabArray) {
-    // Get dimensions of the Matlab array
-    size_t numElems = matlabArray.getNumberOfElements();
-    // Create result vector to match the dimensions of the Matlab array
-    std::vector<float> result(numElems);
-    // Iterate through the Matlab array and fill the result vector
-    for (size_t i = 0; i < numElems; ++i) {
-        result[i] = static_cast<float>(matlabArray[i]);
+inline matlab::data::TypedArray<float> convertEigenVectorToMatlabArray(const Eigen::VectorXf& vec) {
+    // Get dimensions of the input vector
+    size_t dim1 = vec.size();
+
+    matlab::data::ArrayFactory factory;
+    // Create MATLAB array with appropriate dimensions
+    matlab::data::TypedArray<float> matlabArray = factory.createArray<float>({ dim1 });
+
+    // Fill MATLAB array with vector data
+    for (size_t i = 0; i < dim1; ++i) {
+        matlabArray[i] = vec(i);
     }
-    return result;
+
+    return matlabArray;
 }
 
+/* Helper function to convert a matlab array to a std::vector<float>*/
 inline std::vector<float> convertMatlabArrayToFloatVector(const matlab::data::Array& matlabArray) {
     // Get dimensions of the Matlab array
     size_t numElems = matlabArray.getNumberOfElements();
@@ -133,17 +137,6 @@ bool strEquals(const std::string& a, const std::string& b)
     );
 }
 
-bool checkFieldNames(const std::vector<std::string>& requiredNames, const std::vector<std::string>& givenNames)
-{
-    bool allMatching = true;
-    for (int i = 0; i < requiredNames.size(); i++) /* Check the field names*/
-    {
-        bool match hasField(givenNames, requiredNames[0]);
-        allMatching |= match;
-    }
-    return allMatching;
-}
-
 bool hasField(const std::vector<std::string>& fieldNames, const std::string& target)
 {
     for (const auto& fn : fieldNames) {
@@ -153,6 +146,19 @@ bool hasField(const std::vector<std::string>& fieldNames, const std::string& tar
     }
     return false;
 }
+
+bool checkFieldNames(const std::vector<std::string>& requiredNames, const std::vector<std::string>& givenNames)
+{
+    bool allMatching = true;
+    for (int i = 0; i < requiredNames.size(); i++) /* Check the field names*/
+    {
+        bool match = hasField(givenNames, requiredNames[0]);
+        allMatching |= match;
+    }
+    return allMatching;
+}
+
+
 //inline void display3DVector(const std::vector<std::vector<std::vector<float>>>& vec, std::string title) {
 //    // Get dimensions of the input vector
 //    size_t dim1 = vec.size();
