@@ -27,7 +27,7 @@ protected:
 		float tissueSize[3] = { 1,1,1 };	
 
 		femSim = new FEM_Simulator(mua, vhc, tc, htc);
-		femSim->setMesh(std::make_shared<Mesh>(mesh));
+		femSim->setMesh(mesh);
 		femSim->setTemp(Temp);
 		femSim->buildMatrices();
 	}

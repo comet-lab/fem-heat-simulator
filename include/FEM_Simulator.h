@@ -116,8 +116,8 @@ inline void FEM_Simulator::calculateSensorTemp(Sensor& sensor)
 	Element elem = mesh_->elements()[sensor.elemIdx];
 	for (int A = 0; A < ShapeFunc::nNodes; A++)
 	{
-		long nodeIdx = thermalModel_.Temp(elem.nodes[A]);
-		float nodeTemp = ;
+		long nodeIdx = elem.nodes[A];
+		float nodeTemp = thermalModel_.Temp(nodeIdx);
 		sTemp += ShapeFunc::N(sensor.xi, A) * nodeTemp;
 	}
 	sensor.temp = sTemp;

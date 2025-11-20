@@ -109,12 +109,12 @@ private:
 			// Compute residual r = X(xi) - p
 			Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePos;
 			for (int A = 0; A < ShapeFunc::nNodes; A++) {
-				nodePos.row(A) << nodes_[nodeList[A]].x << nodes_[nodeList[A]].y << nodes_[nodeList[A]].z;
+				nodePos.row(A) << nodes_[nodeList[A]].x, nodes_[nodeList[A]].y, nodes_[nodeList[A]].z;
 			}
 			Eigen::Vector3f r = (nodePos.transpose() * N) - p;
 
 			// Build Jacobian matrix J
-			Matrix3f J = dNdxi * nodePos;
+			Eigen::Matrix3f J = dNdxi * nodePos;
 
 			// Solve J * delta = -r
 			Eigen::Vector3f delta = J.colPivHouseholderQr().solve(-r);
