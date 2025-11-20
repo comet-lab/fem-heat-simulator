@@ -32,8 +32,7 @@ public:
 	void initializeTimeIntegration(float alpha, float dt); // initializes solver for time integration
 	void initializeTimeIntegration(); // initializes solver for time integration
 	void initializeModel();
-	void initializeSensorTemps(int numSteps); // initialize sensor temps vec with 0s
-	void updateTemperatureSensors(int timeIdx); // update sensor temp vec
+	void updateTemperatureSensors(); // update sensor temp vec and sensors variable
 	void initializeContainers();
 
 	// -- Setters and Getters -- 
@@ -55,10 +54,9 @@ public:
 	//float heatFlux() const { return heatFlux_; }
 	
 	void setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations);
-	std::vector<std::array<float, 3>> sensorLocations() const { return sensorLocations_; }
+	std::vector<std::array<float, 3>> sensorLocations() const;
 
-	std::vector<std::vector<float>> sensorTemps() const { return sensorTemps_; }
-	Eigen::VectorXf getLatestSensorTemp() const;
+	std::vector<float> sensorTemps() const { return sensorTemps_; }
 
 	void setMesh(const Mesh& mesh);
 	//std::shared_ptr<const Mesh> mesh() const { return mesh_; }
@@ -85,13 +83,16 @@ public:
 	/**********************************************************************************************************************/
 	/***************	 These were all private but I made them public so I could unit test them **************************/
 private:
-	struct SensorLocation
+	struct Sensor
 	{
 		std::array<float, 3> pos;
 		long elemIdx;
 		std::array<float, 3> xi;
+		float temp = 0;
 	};
 
+	template <typename ShapeFunc>
+	void calculateSensorTemp(Sensor& sensor);
 
 	const Mesh* mesh_ = nullptr;
 	GlobalMatrices globalMatrices_;
@@ -102,10 +103,22 @@ private:
 	
 	bool parameterUpdate_ = true;
 	bool fluenceUpdate_ = true;
-	std::vector<SensorLocation> sensorLocations_; // locations of temperature sensors
-	std::vector<std::vector<float>> sensorTemps_; // stored temperature information for each sensor over time. 
+	std::vector<Sensor> sensors_; // locations of temperature sensors
+	std::vector<float> sensorTemps_; // stored temperature information for each sensor
 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
 };
 
-
+template<typename ShapeFunc>
+inline void FEM_Simulator::calculateSensorTemp(Sensor& sensor)
+{
+	float sTemp = 0;
+	Element elem = mesh_->elements()[sensor.elemIdx];
+	for (int A = 0; A < ShapeFunc::nNodes; A++)
+	{
+		long nodeIdx = thermalModel_.Temp(elem.nodes[A]);
+		float nodeTemp = ;
+		sTemp += ShapeFunc::N(sensor.xi, A) * nodeTemp;
+	}
+	sensor.temp = sTemp;
+}

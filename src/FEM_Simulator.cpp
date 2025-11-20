@@ -1,4 +1,5 @@
 #include "FEM_Simulator.h"
+#include "FEM_Simulator.h"
 #include <iostream>
 
 FEM_Simulator::FEM_Simulator() {
@@ -21,7 +22,7 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 	parameterUpdate_ = other.parameterUpdate_;
 	fluenceUpdate_ = other.fluenceUpdate_;
 
-	sensorLocations_ = other.sensorLocations_;
+	sensors_ = other.sensors_;
 	sensorTemps_ = other.sensorTemps_;
 	alpha_ = other.alpha_;
 	dt_ = other.dt_;
@@ -43,11 +44,9 @@ void FEM_Simulator::multiStep(float duration) {
 	/* This function simulates multiple steps of the heat equation. A single step duration is given by deltaT. If the total
 	duration is not easily divisible by deltaT, we will round (up or down) and potentially perform an extra step or one step 
 	fewer. This asumes that initializeModel() has already been run to create the the global matrices. 
-	It repeatedly calls to singleStepCPU(). This function will also update the temperature sensors vector.  */ 
+	It repeatedly calls to singleStep(). This function will also update the temperature sensors vector.  */ 
 	auto startTime = std::chrono::steady_clock::now();
 	int numSteps = round(duration / dt_);
-	initializeSensorTemps(numSteps);
-	updateTemperatureSensors(0);
 	if (!silentMode) {
 		std::cout << "Number of Steps: " << numSteps << std::endl;
 		std::cout << "MultiStep(): Number of threads " << Eigen::nbThreads() << std::endl;
@@ -55,9 +54,8 @@ void FEM_Simulator::multiStep(float duration) {
 
 	for (int t = 1; t <= numSteps; t++) {
 		singleStep();
-		updateTemperatureSensors(t);
 	}
-
+	updateTemperatureSensors();
 	startTime = printDuration("Time Stepping Completed in ", startTime);
 }
 
@@ -127,47 +125,19 @@ void FEM_Simulator::initializeModel()
 	// We are now ready to call single step
 }
 
-void FEM_Simulator::initializeSensorTemps(int numSteps) {
-	// Create sensorTemperature Vectors and reserve sizes
-	int nSensors = sensorLocations_.size();
-	if (nSensors == 0) { // if there weren't any sensors added, put one at 0,0,0
-		nSensors = 1;
-		sensorLocations_.push_back({ 0,0,0 });
-	}
-	sensorTemps_.resize(nSensors);
+void FEM_Simulator::updateTemperatureSensors() {
+	
+	int nSensors = sensors_.size();
+	// Input time = 0 information into temperature sensors
 	for (int s = 0; s < nSensors; s++) {
-		sensorTemps_[s].resize(numSteps + 1);
+		if ((mesh_->order() == LINEAR) && (mesh_->elementShape() == HEXAHEDRAL))
+			calculateSensorTemp<ShapeFunctions::HexLinear>(sensors_[s]);
+		else if ((mesh_->order() == LINEAR) && (mesh_->elementShape() == TETRAHEDRAL))
+			calculateSensorTemp<ShapeFunctions::TetLinear>(sensors_[s]);
+		else
+			throw std::runtime_error("Can't calculate sensor temperature for element type");
+		sensorTemps_[s] = (sensors_[s].temp);
 	}
-}
-
-void FEM_Simulator::updateTemperatureSensors(int timeIdx) {
-	/*TODO THIS DOES NOT WORK IF WE AREN'T USING LINEAR BASIS FUNCTIONS */
-	//int nSensors = this->sensorLocations_.size();
-	//int Nne = pow(this->Nn1d, 3);
-	//// Input time = 0 information into temperature sensors
-	////spacingLayer contains the distance between nodes in eacy layer.
-	//for (int s = 0; s < nSensors; s++) {
-	//	std::array<float,3> sensorLocation = this->sensorLocations_[s];
-	//	// Determine the element (which for 1D linear elements is equivalent to the starting global node)
-	//	// as well as the location in the bi-unit domain of that element, xi
-	//	float xi[3];
-	//	std::array<int, 3> elementLocation = positionToElement(sensorLocation,xi);
-	//	std::array<int, 3> globalNodeStart;
-	//	// For linear elements, there will be no change between globalNodeStart and elementLocation
-	//	for (int i = 0; i < 3; i++) {
-	//		globalNodeStart[i] = elementLocation[i] * (this->Nn1d - 1);
-	//	}
-	//	float tempValue = 0;	
-	//	for (int Ai = 0; Ai < Nne; Ai++) { // iterate through each node in the element
-	//		// adjust the global starting node based on the current node we should be visiting
-	//		int globalNodeSub[3] = { globalNodeStart[0] + (Ai&1),globalNodeStart[1]+((Ai & 2) >> 1), globalNodeStart[2]+ ((Ai & 4) >> 2) };
-	//		// convert subscript to index
-	//		int globalNode = globalNodeSub[0] + globalNodeSub[1] * this->nodesPerAxis[0] + globalNodeSub[2] * this->nodesPerAxis[0] * this->nodesPerAxis[1];
-	//		// add temperature contribution of node
-	//		tempValue += this->calculateNA(xi, Ai) * this->Temp_(globalNode);			
-	//	}
-	//	this->sensorTemps_[s][timeIdx] = tempValue;
-	//}
 
 }
 
@@ -324,10 +294,11 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 
 void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
 {
-	bool errorFlag = false;
-	for (int s = 0; s < tempSensorLocations.size(); s++)
+	int nSensors = tempSensorLocations.size();
+	sensorTemps_.resize(nSensors);
+	for (int s = 0; s < nSensors; s++)
 	{	
-		SensorLocation currSens; 
+		Sensor currSens; 
 		std::array<float, 3> xi;
 		long e = mesh_->findPosInMesh(tempSensorLocations[s],xi);
 		if (e < 0)
@@ -335,17 +306,21 @@ void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSe
 		currSens.elemIdx = e;
 		currSens.pos = tempSensorLocations[s];
 		currSens.xi = xi;
-		sensorLocations_.push_back(currSens);
+		currSens.temp = 0;
+		sensors_.push_back(currSens);
+		sensorTemps_[s] = 0;
 	}
 }
 
-Eigen::VectorXf FEM_Simulator::getLatestSensorTemp() const
+std::vector<std::array<float, 3>> FEM_Simulator::sensorLocations() const
 {
-	Eigen::VectorXf sensorVector(sensorTemps_.size());
-	for (int s = 0; s < sensorTemps_.size(); s++) {
-		sensorVector(s) = this->sensorTemps_[s][sensorTemps_[s].size()-1];
+	std::vector<std::array<float, 3>> sensorLocations(sensors_.size());
+	for (int s = 0; s < sensors_.size(); s++)
+	{
+		sensorLocations[s] = sensors_[s].pos;
 	}
-	return sensorVector;
+
+	return sensorLocations;
 }
 
 void FEM_Simulator::setMesh(const Mesh& mesh)
