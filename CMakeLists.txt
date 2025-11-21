@@ -155,7 +155,7 @@ set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STAN
 # Executable: main
 # ──────────────────────────────────────────────────────────────
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE HeatSimulation::Shared)
+target_link_libraries(main PRIVATE HeatSimulation::Static)
 
 # ──────────────────────────────────────────────────────────────
 # Unit tests (GoogleTest via FetchContent)
