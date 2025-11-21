@@ -117,9 +117,6 @@ void CPUTimeIntegrator::singleStep()
 	if (cgSolver_.info() != Eigen::Success) {
 		std::cout << "Issue With Solver" << std::endl;
 	}
-	/*if (!this->silentMode) {
-		std::cout << "Iterations: " << this->cgSolver_.iterations() << std::endl;
-	}*/
 	// Implicit Backward Step (only if alpha > 0) 
 	dVec_ = dVec_ + alpha_ * dt_ * vVec_; // ... dTilde would also be on the righ-hand side here. 
 }

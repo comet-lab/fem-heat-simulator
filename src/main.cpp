@@ -12,7 +12,7 @@ int main()
 {
     std::cout << "Starting Program" << std::endl;
     std::array<float,3> tissueSize = { 2.0f,2.0f,1.0f };
-    std::array<long, 3> nodesPerAxis = { 21,21,21 };
+    std::array<long, 3> nodesPerAxis = { 81,81,51 };
     long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
     long nElems = (nodesPerAxis[0] - 1) * (nodesPerAxis[1] - 1) * (nodesPerAxis[2] - 1);
     //std::array<BoundaryType,6> BC = { CONVECTION,CONVECTION,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };
@@ -47,7 +47,7 @@ int main()
     simulator.silentMode = false;
 
  
-    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.05f}, {0,0,0.5f}, {0,0,0.95f},{0,0,1} };
+    std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.05f}, {0,0,0.5f}, {0,0,0.95f},{0,0,0.5} };
     simulator.setSensorLocations(tempSensorLocations);
     // FEM_Simulator simCopy = FEM_Simulator(simulator);
     std::cout << "Running FEA" << std::endl;

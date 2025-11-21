@@ -132,7 +132,7 @@ public:
         if (useAllCPUs) { //useAllCPUs is true
             stream << "MEX: Using all CPUs" << std::endl;
             displayOnMATLAB(matlabPtr, stream, silentMode);
-            Eigen::setNbThreads(1);
+            Eigen::setNbThreads(omp_get_num_procs()/2);
         }
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;

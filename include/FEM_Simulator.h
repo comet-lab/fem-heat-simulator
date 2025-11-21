@@ -14,7 +14,9 @@
 #include "TimeIntegrators/CPUTimeIntegrator.hpp"
 #include "ThermalModel.hpp"
 
-class TimeIntegrator;
+/* These are needed here so that compiler is aware and MATLAB mex doesn't crash */
+class TimeIntegrator; // specifically for compiling and circular references
+class CPUTimeIntegrator; // seems to prevent mex from crashing
 
 class FEM_Simulator
 {
