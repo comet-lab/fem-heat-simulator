@@ -111,16 +111,16 @@ public:
 		long nNonDirichlet = globalMatrices_.nNonDirichlet;
 		// Initialize matrices so that we don't have to resize them later
 		globalMatrices_.FintElem = Eigen::SparseMatrix<float>(nNonDirichlet, mesh_->elements().size());
-		globalMatrices_.FintElem.reserve(Eigen::VectorXi::Constant(nNodes, nodesPerElem));
+		globalMatrices_.FintElem.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nodesPerElem));
 
 		globalMatrices_.Fint = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
-		globalMatrices_.Fint.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fint.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes));
 
 		globalMatrices_.Fconv = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
-		globalMatrices_.Fconv.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fconv.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes));
 
 		globalMatrices_.Fk = Eigen::SparseMatrix<float>(nNonDirichlet, nNodes);
-		globalMatrices_.Fk.reserve(Eigen::VectorXi::Constant(nNodes, nRelatedNodes));
+		globalMatrices_.Fk.reserve(Eigen::VectorXi::Constant(nNonDirichlet, nRelatedNodes));
 
 		globalMatrices_.Fflux = Eigen::VectorXf::Zero(nNonDirichlet);
 		globalMatrices_.Fq = Eigen::VectorXf::Zero(nNonDirichlet);

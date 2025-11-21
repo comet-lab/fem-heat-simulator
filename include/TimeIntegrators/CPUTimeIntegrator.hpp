@@ -17,8 +17,8 @@ public:
 	void setMatrixSparsity(); // Sets the sparsity pattern so that applyParameters can run faster
 
 private:
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globK_; // Global Conductivity Matrix
-	Eigen::SparseMatrix<float, Eigen::RowMajor> globM_; // Global Thermal Mass Matrix
+	Eigen::SparseMatrix<float> globK_; // Global Conductivity Matrix
+	Eigen::SparseMatrix<float> globM_; // Global Thermal Mass Matrix
 	Eigen::VectorXf globF_; // Global Heat Source Matrix 
 
 	Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> cgSolver_;
