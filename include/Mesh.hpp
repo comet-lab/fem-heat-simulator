@@ -12,10 +12,9 @@
 #include "ShapeFunctions/TetLinear.hpp"
 
 enum BoundaryType {
-	NONE,
-	HEATSINK,
 	FLUX,
-	CONVECTION
+	CONVECTION,
+	HEATSINK
 };
 
 struct Node {
