@@ -1,11 +1,4 @@
-/* ========================================================================
-* It compiles in MATLAB, but not in Visual Studio... idk.
- *=======================================================================*/
-
 #include "MEX_Utility.hpp"
-
- //using namespace matlab::mex;
- //using namespace matlab::data;
 
 class MexFunction : public matlab::mex::Function {
 
