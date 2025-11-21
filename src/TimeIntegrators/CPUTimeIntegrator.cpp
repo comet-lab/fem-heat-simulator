@@ -54,7 +54,6 @@ void CPUTimeIntegrator::initialize()
 	// Initialize d, v, and dTilde vectors
 	dVec_.resize(globalMatrices_.nNonDirichlet);
 	vVec_ = Eigen::VectorXf::Zero(globalMatrices_.nNonDirichlet);
-	//std::cout << "alpha: " << alpha_ << std::endl;
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
 	if (alpha_ < 1) {
@@ -63,25 +62,30 @@ void CPUTimeIntegrator::initialize()
 		// And can mess up the first few timesteps
 		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 		initSolver.compute(globM_);
-		Eigen::VectorXf RHSinit = (globF_ - (globK_ * dVec_));
-		std::cout << "Right before v solve" << std::endl;
+		if (initSolver.info() != Eigen::Success) {
+			std::cout << "Factorization failed!" << std::endl;
+			return;
+		}
+		Eigen::VectorXf RHSinit = (globF_) - globK_ * dVec_;
+		//Eigen::VectorXf RHSinit = Eigen::VectorXf::Constant(globM_.rows(), 1);
+		//std::cout << "Right before v solve" << std::endl;
 		vVec_ = initSolver.solve(RHSinit);
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
 	// Prepare solver for future iterations
-	//LHS_ = globM_ + alpha_ * dt_ * globK_;
-	//LHS_.makeCompressed();
+	LHS_ = globM_ + alpha_ * dt_ * globK_;
+	LHS_.makeCompressed();
 	//std::cout << "LHS setup" << std::endl;
-	//// These two steps form the cgSolver_.compute() function. By calling them separately, we 
-	//// only ever need to call factorize when the tissue properties change.
-	//cgSolver_.analyzePattern(LHS_);
+	// These two steps form the cgSolver_.compute() function. By calling them separately, we 
+	// only ever need to call factorize when the tissue properties change.
+	cgSolver_.analyzePattern(LHS_);
 	//std::cout << "LHS analyzed" << std::endl;
-	//cgSolver_.factorize(LHS_);
+	cgSolver_.factorize(LHS_);
 	//std::cout << "LHS factorized" << std::endl;
-	//if (cgSolver_.info() != Eigen::Success) {
-	//	std::cout << "Decomposition Failed" << std::endl;
-	//}
+	if (cgSolver_.info() != Eigen::Success) {
+		std::cout << "Decomposition Failed" << std::endl;
+	}
 }
 
 void CPUTimeIntegrator::updateLHS()

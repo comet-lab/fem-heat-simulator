@@ -15,7 +15,7 @@
 class MatrixBuilder
 {
 public:
-
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	MatrixBuilder() {}
 	MatrixBuilder(const Mesh& mesh) { setMesh(mesh); }
 	~MatrixBuilder() {} // Destructor should not clear mesh because we don't allocate it in the class

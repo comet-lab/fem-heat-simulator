@@ -3,7 +3,7 @@ clear; close all; clc
 simulator = HeatSimulator();
 simulator.dt = 0.05;
 simulator.alpha = 0.5;
-simulator.useAllCPUs = true;
+simulator.useAllCPUs = false;
 simulator.useGPU = false;
 simulator.silentMode = false;
 simulator.xpos = -1:0.1:1;

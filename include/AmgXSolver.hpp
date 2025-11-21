@@ -6,6 +6,7 @@
 
 class AmgXSolver {
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     // Delete copy constructor and assignment operator
     AmgXSolver(const AmgXSolver&) = delete;
     AmgXSolver& operator=(const AmgXSolver&) = delete;

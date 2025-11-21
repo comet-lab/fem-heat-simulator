@@ -1,5 +1,6 @@
 #pragma once
 #include "TimeIntegrators/TimeIntegrator.hpp"
+#include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>
@@ -7,6 +8,8 @@
 class CPUTimeIntegrator : public TimeIntegrator {
 
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 	CPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat) 
 		: TimeIntegrator(thermalModel, globalMatrices, alpha, deltat) {}
 	void applyParameters() override;

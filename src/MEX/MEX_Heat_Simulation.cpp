@@ -132,7 +132,7 @@ public:
         if (useAllCPUs) { //useAllCPUs is true
             stream << "MEX: Using all CPUs" << std::endl;
             displayOnMATLAB(matlabPtr, stream, silentMode);
-            Eigen::setNbThreads(omp_get_num_procs() / 2);
+            Eigen::setNbThreads(1);
         }
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
@@ -167,9 +167,11 @@ public:
             }
             printDuration("MEX: Matrices Built -- ");
         }
-        return;
+
         // Perform time stepping
         int numSteps = round(simDuration / simulator.dt()) + 1;
+        stream << "Time Stepping for " << numSteps-1 << " steps (" << simDuration << " seconds)" << std::endl;
+        displayOnMATLAB(matlabPtr, stream, silentMode);
         std::vector<std::vector<float>> sensorTemps(numSteps);
         try 
         { //

@@ -7,6 +7,7 @@
 namespace ShapeFunctions {
 
     struct TetLinear {
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         /* Reference for shape functions and numerical integration Schemes: The finite element method: its basis and fundamentals (7th edition)
         * by O.C. Zienkiewicz, R.L. Taylor, J.Z. Zhu. Note that the weights in their tables are presumed to be multiplied by the volume of the 
         * element. In our case our element volume is 1/6 so we multiply the weights in the table by 1/6. The same is true for area where the area

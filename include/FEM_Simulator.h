@@ -19,6 +19,7 @@ class TimeIntegrator;
 class FEM_Simulator
 {
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	bool silentMode = false; // controls print statements
 
 	// -- Main Function calls for use -- 

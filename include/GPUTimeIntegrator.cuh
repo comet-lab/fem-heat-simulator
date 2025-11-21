@@ -27,6 +27,8 @@ struct DeviceVec {
 class GPUTimeIntegrator {
 
 public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
     GPUTimeIntegrator();
     GPUTimeIntegrator(float alpha, float deltaT);
     ~GPUTimeIntegrator();

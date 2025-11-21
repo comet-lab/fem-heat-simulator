@@ -7,6 +7,7 @@
 namespace ShapeFunctions {
 
     struct HexLinear {
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         static constexpr int nNodes = 8;
         static constexpr int nGP = 8;
         static constexpr int nFaceGP = 4;

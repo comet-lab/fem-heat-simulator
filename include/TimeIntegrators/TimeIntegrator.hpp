@@ -7,13 +7,15 @@
 
 class TimeIntegrator {
 public:
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 	TimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float dt)
 		: thermalModel_(thermalModel), globalMatrices_(globalMatrices), alpha_(alpha), dt_(dt) 
 	{
 		setAlpha(alpha);
 		setDt(dt);
 		dVec_.setZero(globalMatrices_.nNonDirichlet);
-		vVec_.resize(globalMatrices_.nNonDirichlet);
+		vVec_.setZero(globalMatrices_.nNonDirichlet);
 	}
 	virtual ~TimeIntegrator() = default;
 	virtual void applyParameters() = 0;
