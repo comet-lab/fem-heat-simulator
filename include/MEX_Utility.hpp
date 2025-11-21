@@ -1,9 +1,5 @@
 #include "mex.hpp"
 #include "mexAdapter.hpp"
-#include <string>
-#include <memory>
-#include <iostream>
-#include <algorithm>
 #include "FEM_Simulator.h"
 
 #ifdef USE_CUDA

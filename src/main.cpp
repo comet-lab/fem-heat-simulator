@@ -1,7 +1,6 @@
 // HeatSimulation.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include <iostream>
 #include "FEM_Simulator.h"
 
 #ifdef USE_CUDA
@@ -42,7 +41,6 @@ int main()
     float vhc = 4.3;
     float htc = 0.01;
     FEM_Simulator simulator(mua, vhc, tc, htc);
-    simulator.setEigenThreads(Eigen::nbThreads());
     std::cout << "Setting Mesh" << std::endl;
     simulator.setMesh(mesh);
     simulator.setTemp(Temp);
@@ -71,9 +69,6 @@ int main()
     std::cout << "Time to calculate Fluence Rate: " << duration.count()/1000000.0 << std::endl;
 
     // RUN Solver on CPU
-
-
- 
     simulator.initializeModel();   
     duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
     std::cout << "Initialization Duration: " << duration.count()/1000000.0 << std::endl;
@@ -88,7 +83,6 @@ int main()
     duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
     std::cout << "Time-Stepping Duration: " << duration.count()/1000000.0 << std::endl;
     start = std::chrono::high_resolution_clock::now();
-    
     Eigen::VectorXf outputTemp = simulator.Temp();
 
     std::cout << "Top Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0]) << std::endl;

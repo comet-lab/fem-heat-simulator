@@ -1,13 +1,9 @@
 #pragma once
-#include <vector> 
-#include <array>
 #include <algorithm>
 #include <numeric>
-#include <functional>
 #include <chrono>
 #include <math.h>
 #include <stdexcept>
-#include <Eigen/Dense>
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
 

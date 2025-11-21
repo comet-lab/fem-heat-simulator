@@ -1,6 +1,5 @@
 #include "FEM_Simulator.h"
-#include "FEM_Simulator.h"
-#include <iostream>
+
 
 FEM_Simulator::FEM_Simulator() {
 	thermalModel_ = std::make_unique<ThermalModel>();

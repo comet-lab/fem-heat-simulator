@@ -1,12 +1,5 @@
 #pragma once
-#include <vector> 
-#include <array>
 #include <algorithm>
-#include <functional>
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <chrono>
-#include <stdexcept>
 #include "Mesh.hpp"
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"

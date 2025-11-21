@@ -1,6 +1,5 @@
 #pragma once
 #include <Eigen/Dense>
-#include "FEM_Simulator.h"
 #include "ThermalModel.hpp"
 #include "GlobalMatrices.hpp"
 #include <iostream>

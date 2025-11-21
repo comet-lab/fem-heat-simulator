@@ -1,14 +1,10 @@
 #pragma once
 #include <vector> 
+#include <iostream>
 #include <algorithm>
 #include <functional>
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
-#include <Eigen/SparseCholesky>
-#include <Eigen/IterativeLinearSolvers>
 #include <chrono>
 #include <stdexcept>
-#include "Mesh.hpp"
 #include "MatrixBuilder.hpp"
 #include "TimeIntegrators/TimeIntegrator.hpp"
 #include "TimeIntegrators/CPUTimeIntegrator.hpp"
@@ -37,8 +33,6 @@ public:
 	void initializeModel();
 	void updateTemperatureSensors(); // update sensor temp vec and sensors variable
 	void initializeContainers();
-
-	void setEigenThreads(int nThreads) { Eigen::setNbThreads(nThreads); }
 
 	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);

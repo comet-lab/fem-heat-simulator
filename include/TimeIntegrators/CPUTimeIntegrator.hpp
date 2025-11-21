@@ -1,6 +1,5 @@
 #pragma once
 #include "TimeIntegrators/TimeIntegrator.hpp"
-#include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 #include <Eigen/IterativeLinearSolvers>

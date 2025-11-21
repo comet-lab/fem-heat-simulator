@@ -46,7 +46,6 @@ void CPUTimeIntegrator::initialize()
 	linear system M*v = (F-K*d). Then the Eigen conjugate gradient solver is initialized with the
 	left-hand-side of the system (M + alpha*dt*K)*v = (F - K*d).
 	*/
-	auto startTime = std::chrono::steady_clock::now();
 	setMatrixSparsity();
 	applyParameters();
 

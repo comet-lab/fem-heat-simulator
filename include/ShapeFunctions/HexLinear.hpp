@@ -2,7 +2,6 @@
 #include <array>
 #include <vector>
 #include <Eigen/Dense>
-//#include "../Mesh.hpp"  // your mesh/nodes definition
 
 namespace ShapeFunctions {
 
