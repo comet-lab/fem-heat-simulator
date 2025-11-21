@@ -11,8 +11,8 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
-    std::array<float,3> tissueSize = { 5.0f,5.0f,5.0f };
-    std::array<long, 3> nodesPerAxis = { 11,11,11 };
+    std::array<float,3> tissueSize = { 2.0f,2.0f,1.0f };
+    std::array<long, 3> nodesPerAxis = { 21,21,21 };
     long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
     long nElems = (nodesPerAxis[0] - 1) * (nodesPerAxis[1] - 1) * (nodesPerAxis[2] - 1);
     //std::array<BoundaryType,6> BC = { CONVECTION,CONVECTION,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };
@@ -41,8 +41,8 @@ int main()
     float totalTime = 1.0f;
     simulator.setAlpha(0.5f);
     simulator.setDt(0.05f);
-    simulator.setHeatFlux(-1.0);
-    simulator.setAmbientTemp(0.0f);
+    simulator.setHeatFlux(0.0);
+    simulator.setAmbientTemp(24.0f);
 
     simulator.silentMode = false;
 

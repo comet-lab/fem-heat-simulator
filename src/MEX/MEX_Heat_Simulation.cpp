@@ -67,17 +67,17 @@ public:
             matlab::data::StructArray thermalInfo = inputs[VarPlacement::THERMAL_INFO];
             Eigen::VectorXf Temp = convertMatlabArrayToEigenVector(thermalInfo[0]["temperature"]);
             Eigen::VectorXf fluenceRate = convertMatlabArrayToEigenVector(thermalInfo[0]["fluenceRate"]);
-            matlab::data::Array muaArr = thermalInfo[0]["MUA"];
+            matlab::data::TypedArray<double> muaArr = thermalInfo[0]["MUA"];
             float MUA = static_cast<float>(muaArr[0]);
-            matlab::data::Array tcArr = thermalInfo[0]["TC"];
+            matlab::data::TypedArray<double> tcArr = thermalInfo[0]["TC"];
             float TC = static_cast<float>(tcArr[0]);
-            matlab::data::Array vhcArr = thermalInfo[0]["VHC"];
+            matlab::data::TypedArray<double> vhcArr = thermalInfo[0]["VHC"];
             float VHC = static_cast<float>(vhcArr[0]);
-            matlab::data::Array htcArr = thermalInfo[0]["HTC"];
+            matlab::data::TypedArray<double> htcArr = thermalInfo[0]["HTC"];
             float HTC = static_cast<float>(htcArr[0]);
-            matlab::data::Array fluxArr = thermalInfo[0]["Flux"];
+            matlab::data::TypedArray<double> fluxArr = thermalInfo[0]["flux"];
             float flux = static_cast<float>(fluxArr[0]);
-            matlab::data::Array ambArr = thermalInfo[0]["ambientTemp"];
+            matlab::data::TypedArray<double> ambArr = thermalInfo[0]["ambientTemp"];
             float ambientTemp = static_cast<float>(ambArr[0]);
 
             simulator.setTemp(Temp);
@@ -93,24 +93,28 @@ public:
 
             // Get time step and final time
             matlab::data::StructArray settings = inputs[VarPlacement::SETTINGS];
-            matlab::data::Array durArr = settings[0]["finalTime"];
+            matlab::data::TypedArray<double> durArr = settings[0]["finalTime"];
             simDuration = static_cast<float>(durArr[0]);
-            matlab::data::Array dtArr = settings[0]["dt"];
+            matlab::data::TypedArray<double> dtArr = settings[0]["dt"];
             float dt = static_cast<float>(dtArr[0]);
-            matlab::data::Array alphaArr = settings[0]["alpha"];
+            matlab::data::TypedArray<double> alphaArr = settings[0]["alpha"];
             float alpha = static_cast<float>(alphaArr[0]);
 
             simulator.setDt(dt);
             simulator.setAlpha(alpha);
+            printDuration("MEX: Set time stepping rate ");
             
             // Set sensor locations
             matlab::data::StructArray meshInfo = inputs[VarPlacement::MESH_INFO];
-            matlab::data::Array sensorLocations = meshInfo[0]["sensorLocations"];
+            matlab::data::TypedArray<double> sensorLocations = meshInfo[0]["sensorLocations"];
             std::vector<std::array<float, 3>> sLocations;
             for (int s = 0; s < sensorLocations.getDimensions()[0]; s++) {
-                sLocations.push_back({ sensorLocations[s][0],sensorLocations[s][1] ,sensorLocations[s][2] });
+                sLocations.push_back({ static_cast<float>(sensorLocations[s][0]), 
+                    static_cast<float>(sensorLocations[s][1]),
+                    static_cast<float>(sensorLocations[s][2]) });
             }
-            this->simulator.setSensorLocations(sLocations);
+            simulator.setSensorLocations(sLocations);
+            printDuration("MEX: Set sensor locations ");
         }
         catch (const std::exception& e) {
             stream << "MEX: Error in Setup: " << std::endl;
@@ -119,7 +123,7 @@ public:
             return;
         }
         printDuration("MEX: Set all simulation parameters -- ");
-
+        
         // Set parallelization
         Eigen::setNbThreads(1);
 #ifdef _OPENMP
@@ -133,6 +137,7 @@ public:
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(matlabPtr, stream, silentMode);
+        
         // Create global K M and F 
         if (createAllMatrices) { // only need to create the KMF matrices the first time
             createAllMatrices = false;
@@ -162,7 +167,7 @@ public:
             }
             printDuration("MEX: Matrices Built -- ");
         }
-
+        return;
         // Perform time stepping
         int numSteps = round(simDuration / simulator.dt()) + 1;
         std::vector<std::vector<float>> sensorTemps(numSteps);
@@ -295,7 +300,6 @@ public:
                 boundaryConditions[i] = static_cast<BoundaryType>(static_cast<int>(val));
             }
             mesh = Mesh::buildCubeMesh(xpos,ypos,zpos,boundaryConditions);
-            return;
         }
         else
         {
@@ -325,31 +329,39 @@ public:
             displayError(matlabPtr, oss.str());
         }
         // Temperature -- thermalFields[0]
-        if ((thermalInfo[0]["temperature"].getDimensions()[0] != 1) // checking for column vector
-            || (thermalInfo[0]["temperature"][0].getDimensions()[0] != mesh.nodes().size())) // same length as mesh 
-            displayError(matlabPtr,"Temperature vector should have length equal to the number of nodes in the mesh");
+        if ((thermalInfo[0]["temperature"].getDimensions()[0] == 1) // checking for column vector
+            || (thermalInfo[0]["temperature"].getDimensions()[0] != mesh.nodes().size())) // same length as mesh 
+        {
+            long length = static_cast<long>(thermalInfo[0]["temperature"].getDimensions()[0]);
+            long width = static_cast<long>(thermalInfo[0]["temperature"].getDimensions()[1]);
+            std::ostringstream oss;
+            oss << "Temperature vector has incorrect length -- should be (" << mesh.nodes().size() << ", 1)";
+            oss << " but is (" << length << ", " << width << ")";
+            displayError(matlabPtr, oss.str());
+        }
+            
         // FLUENCE Rate -- thermalFields[2]
-        if ((thermalInfo[0]["fluenceRate"].getDimensions()[0] != 1) // checking for column vector
-            || ((thermalInfo[0]["fluenceRate"][0].getDimensions()[0] != mesh.nodes().size()) // length != num nodes
-                && (thermalInfo[0]["fluenceRate"][0].getDimensions()[0] != mesh.elements().size()))) // length != num elements
+        if ((thermalInfo[0]["fluenceRate"].getDimensions()[0] == 1) // checking for column vector
+            || ((thermalInfo[0]["fluenceRate"].getDimensions()[0] != mesh.nodes().size()) // length != num nodes
+                && (thermalInfo[0]["fluenceRate"].getDimensions()[0] != mesh.elements().size()))) // length != num elements
             displayError(matlabPtr, "FluenceRate vector should be a column vector with length equal to number of elements or number of nodes in mesh");
         // MUA -- thermalFields[3]
-        if ((thermalInfo[0]["MUA"].getDimensions()[0] != 1) || (thermalInfo[0]["MUA"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["MUA"].getDimensions()[0] != 1) || (thermalInfo[0]["MUA"].getDimensions()[1] != 1))
             displayError(matlabPtr, "MUA should be a scalar");
         // VHC -- thermalFields[4]
-        if ((thermalInfo[0]["VHC"].getDimensions()[0] != 1) || (thermalInfo[0]["VHC"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["VHC"].getDimensions()[0] != 1) || (thermalInfo[0]["VHC"].getDimensions()[1] != 1))
             displayError(matlabPtr, "VHC should be a scalar");
         // TC -- thermalFields[5]
-        if ((thermalInfo[0]["TC"].getDimensions()[0] != 1) || (thermalInfo[0]["TC"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["TC"].getDimensions()[0] != 1) || (thermalInfo[0]["TC"].getDimensions()[1] != 1))
             displayError(matlabPtr, "TC should be a scalar");
         // HTC -- thermalFields[6]
-        if ((thermalInfo[0]["HTC"].getDimensions()[0] != 1) || (thermalInfo[0]["HTC"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["HTC"].getDimensions()[0] != 1) || (thermalInfo[0]["HTC"].getDimensions()[1] != 1))
             displayError(matlabPtr, "HTC should be a scalar");
         // FLUX -- thermalFields[7]
-        if ((thermalInfo[0]["flux"].getDimensions()[0] != 1) || (thermalInfo[0]["flux"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["flux"].getDimensions()[0] != 1) || (thermalInfo[0]["flux"].getDimensions()[1] != 1))
             displayError(matlabPtr, "flux should be a scalar");
         // AMBIENTTEMP -- thermalFields[8]
-        if ((thermalInfo[0]["ambientTemp"].getDimensions()[0] != 1) || (thermalInfo[0]["ambientTemp"][0].getDimensions()[0] != 1))
+        if ((thermalInfo[0]["ambientTemp"].getDimensions()[0] != 1) || (thermalInfo[0]["ambientTemp"].getDimensions()[1] != 1))
             displayError(matlabPtr, "ambientTemp should be a scalar");
     }
 
@@ -372,17 +384,17 @@ public:
             displayError(matlabPtr, oss.str());
         }
         // dt
-        if ((settings[0]["dt"].getDimensions()[0] != 1) || (settings[0]["dt"][0].getDimensions()[0] != 1))
+        if ((settings[0]["dt"].getDimensions()[0] != 1) || (settings[0]["dt"].getDimensions()[1] != 1))
             displayError(matlabPtr, "dt should be a scalar");
         //if (settings[0]["dt"][0] < 0)
         //    displayError(matlabPtr, "dt should be greater than 0");
         //alpha
-        if ((settings[0]["alpha"].getDimensions()[0] != 1) || (settings[0]["alpha"][0].getDimensions()[0] != 1))
+        if ((settings[0]["alpha"].getDimensions()[0] != 1) || (settings[0]["alpha"].getDimensions()[1] != 1))
             displayError(matlabPtr, "alpha should be a scalar");
         //if ((settings[0]["alpha"][0] >= 0) || (settings[0]["alpha"][0] <= 1))
         //    displayError(matlabPtr, "alpha should be between 0 and 1");
         // finaltime
-        if ((settings[0]["finalTime"].getDimensions()[0] != 1) || (settings[0]["finalTime"][0].getDimensions()[0] != 1))
+        if ((settings[0]["finalTime"].getDimensions()[0] != 1) || (settings[0]["finalTime"].getDimensions()[1] != 1))
             displayError(matlabPtr, "finalTime should be a scalar");
         /*if (settings[0]["finalTime"][0] < settings[0]["dt"])
             displayError(matlabPtr, "finalTime should be greater than the timestep");*/

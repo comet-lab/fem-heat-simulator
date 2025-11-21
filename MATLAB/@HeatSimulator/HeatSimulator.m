@@ -1,0 +1,54 @@
+classdef HeatSimulator < handle
+    %HEATSIMULATOR Summary of this class goes here
+    %   Detailed explanation goes here
+
+    properties
+        % mesh Mesh
+        thermalInfo ThermalModel
+        dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
+        alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
+        sensorLocations (:,3) double
+        silentMode (1,1) logical = false
+        useAllCPUs (1,1) logical = false
+        useGPU (1,1) logical = false
+        buildMatrices (1,1) logical = true
+        xpos
+        ypos
+        zpos
+        boundaryConditions (6,1)
+    end
+
+    methods
+        function obj = HeatSimulator()
+            %HEATSIMULATOR Construct an instance of this class
+            %   Detailed explanation goes here
+        end
+
+        function [T,sensors] = solve(obj, finalTime, dt, alpha)
+            arguments
+                obj (1,1) HeatSimulator
+                finalTime (1,1) {mustBeGreaterThan(finalTime,0)}
+                dt double {mustBeGreaterThan(dt,0)} = []
+                alpha double {mustBeInRange(alpha,0,1)} = []
+            end
+            if isempty(alpha)
+                alpha = obj.alpha;
+            end
+            if isempty(dt)
+                dt = obj.dt;
+            end
+            obj.dt = dt;
+            obj.alpha = alpha;
+            if (finalTime < obj.dt)
+                error('Final time must be greater than the time step.');
+            end
+
+            meshInfo = struct('xpos',obj.xpos, 'ypos', obj.ypos, 'zpos',obj.zpos,...
+                'boundaryConditions',obj.boundaryConditions,'sensorLocations',obj.sensorLocations);
+            thermalInfoStruct = obj.thermalInfo.toStruct();
+            settings = struct('finalTime',finalTime,'dt', obj.dt, 'alpha', obj.alpha,...
+                'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU);
+            [T,sensors] = MEX_Heat_Simulation(meshInfo,thermalInfoStruct,settings);
+        end
+    end
+end

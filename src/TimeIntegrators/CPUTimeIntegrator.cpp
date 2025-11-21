@@ -12,19 +12,22 @@ void CPUTimeIntegrator::applyParameters()
 
 	// Apply parameter specific multiplication for each global matrix.
 	// Conductivity matrix
-	globK_.setZero();
-	globK_ += globalMatrices_.K * thermalModel_.TC;
-	globK_ += globalMatrices_.Q * thermalModel_.HTC;
+	globK_ = globalMatrices_.K * thermalModel_.TC + globalMatrices_.Q * thermalModel_.HTC;
+	globK_.makeCompressed();
 	// Thermal mass matrix
-	globM_.setZero();
-	globM_ += globalMatrices_.M * thermalModel_.VHC; // M Doesn't have any additions so we just multiply it by the constant
+	//globM_.setZero();
+	globM_ = globalMatrices_.M * thermalModel_.VHC; // M Doesn't have any additions so we just multiply it by the constant
+	globM_.makeCompressed();
 	// Forcing Vector
-	globF_.setZero();
-	globF_ += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
-	globF_ += (globalMatrices_.Fflux * thermalModel_.heatFlux); // heat flux 
-	globF_ += (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC); // conduction on dirichlet nodes
-	globF_ += (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
-	// startTime = this->printDuration("Parameter Multiplication Performed: ", startTime);
+	//globF_.setZero();
+	globF_ = (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC // convection from ambient temp and dirichlet nodes
+		+ (globalMatrices_.Fflux * thermalModel_.heatFlux) // heat flux 
+		+ (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC) // conduction on dirichlet nodes
+		+ (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
+	//globF_.noalias() += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
+	//globF_.noalias() += (globalMatrices_.Fflux * thermalModel_.heatFlux); // heat flux 
+	//globF_.noalias() += (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC); // conduction on dirichlet nodes
+	//globF_.noalias() += (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
 }
 
 void CPUTimeIntegrator::setMatrixSparsity()
@@ -51,36 +54,34 @@ void CPUTimeIntegrator::initialize()
 	// Initialize d, v, and dTilde vectors
 	dVec_.resize(globalMatrices_.nNonDirichlet);
 	vVec_ = Eigen::VectorXf::Zero(globalMatrices_.nNonDirichlet);
-
+	//std::cout << "alpha: " << alpha_ << std::endl;
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
-
 	if (alpha_ < 1) {
 		// Perform the conjugate gradiant to compute the initial vVec value
 		// This is a bit odd because if the user hasn't specified the initial fluence rate it will be 0 initially. 
 		// And can mess up the first few timesteps
 		Eigen::ConjugateGradient<Eigen::SparseMatrix<float>, Eigen::Lower | Eigen::Upper> initSolver;
 		initSolver.compute(globM_);
-		Eigen::VectorXf RHSinit = globF_ - globK_ * dVec_;
+		Eigen::VectorXf RHSinit = (globF_ - (globK_ * dVec_));
+		std::cout << "Right before v solve" << std::endl;
 		vVec_ = initSolver.solve(RHSinit);
 	} // if we are using backwards Euler we can skip this initial computation of vVec. It is only
 	// needed for explicit steps. 
 
-	//startTime = printDuration("Time Stepping Initialized in ", startTime);
-
 	// Prepare solver for future iterations
-	LHS_ = globM_ + alpha_ * dt_ * globK_;
-	LHS_.makeCompressed();
-	//startTime = printDuration("LHS created: ", startTime);
-
-	// These two steps form the cgSolver_.compute() function. By calling them separately, we 
-	// only ever need to call factorize when the tissue properties change.
-	cgSolver_.analyzePattern(LHS_);
-	cgSolver_.factorize(LHS_);
-	if (cgSolver_.info() != Eigen::Success) {
-		std::cout << "Decomposition Failed" << std::endl;
-	}
-	//startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
+	//LHS_ = globM_ + alpha_ * dt_ * globK_;
+	//LHS_.makeCompressed();
+	//std::cout << "LHS setup" << std::endl;
+	//// These two steps form the cgSolver_.compute() function. By calling them separately, we 
+	//// only ever need to call factorize when the tissue properties change.
+	//cgSolver_.analyzePattern(LHS_);
+	//std::cout << "LHS analyzed" << std::endl;
+	//cgSolver_.factorize(LHS_);
+	//std::cout << "LHS factorized" << std::endl;
+	//if (cgSolver_.info() != Eigen::Success) {
+	//	std::cout << "Decomposition Failed" << std::endl;
+	//}
 }
 
 void CPUTimeIntegrator::updateLHS()
