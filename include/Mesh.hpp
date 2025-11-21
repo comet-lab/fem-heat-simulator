@@ -48,7 +48,7 @@ enum Shape {
 class Mesh {
 
 public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	//EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	Mesh();
 	Mesh(std::vector<Node> nodes, std::vector<Element> elements, std::vector<BoundaryFace> boundaryFaces);

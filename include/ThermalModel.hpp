@@ -3,7 +3,7 @@
 
 struct ThermalModel
 {
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	//EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	float TC = 0; // Thermal Conductivity [W/cm C]
 	float VHC = 0; // Volumetric Heat Capacity [W/cm^3]

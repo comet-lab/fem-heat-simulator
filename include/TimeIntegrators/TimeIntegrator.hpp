@@ -7,7 +7,7 @@
 
 class TimeIntegrator {
 public:
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	//EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	TimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float dt)
 		: thermalModel_(thermalModel), globalMatrices_(globalMatrices), alpha_(alpha), dt_(dt) 

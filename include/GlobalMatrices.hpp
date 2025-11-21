@@ -5,7 +5,7 @@
 
 struct GlobalMatrices
 {
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	//EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	std::vector<long> nodeMap;
 	long nNonDirichlet = 0;
