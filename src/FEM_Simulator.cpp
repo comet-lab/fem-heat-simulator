@@ -3,21 +3,23 @@
 #include <iostream>
 
 FEM_Simulator::FEM_Simulator() {
+	thermalModel_ = std::make_unique<ThermalModel>();
 }
 
 FEM_Simulator::FEM_Simulator(float MUA, float VHC, float TC, float HTC)
 {
+	thermalModel_ = std::make_unique<ThermalModel>();
 	setMUA(MUA);
 	setVHC(VHC);
 	setTC(TC);
 	setHTC(HTC);
+
 }
 
 FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 {
 	// copy simple types
 	silentMode = other.silentMode;
-	thermalModel_ = other.thermalModel_;
 	globalMatrices_ = other.globalMatrices_;
 	parameterUpdate_ = other.parameterUpdate_;
 	fluenceUpdate_ = other.fluenceUpdate_;
@@ -26,6 +28,11 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 	sensorTemps_ = other.sensorTemps_;
 	alpha_ = other.alpha_;
 	dt_ = other.dt_;
+
+	if(other.thermalModel_)
+		thermalModel_ = std::make_unique<ThermalModel>(*other.thermalModel_);
+	else
+		thermalModel_ = nullptr;
 
 	// copy mesh (assuming Mesh has a safe copy constructor)
 	mesh_ = other.mesh_;
@@ -82,7 +89,7 @@ void FEM_Simulator::singleStep() {
 	Eigen::VectorXf dVec = solver_->singleStepWithUpdate();
 
 	// Adjust our Temp with new d vector
-	thermalModel_.Temp(globalMatrices_.validNodes) = dVec;
+	thermalModel_->Temp(globalMatrices_->validNodes) = dVec;
 }
 
 void FEM_Simulator::buildMatrices()
@@ -90,7 +97,7 @@ void FEM_Simulator::buildMatrices()
 	MatrixBuilder mb = MatrixBuilder();
 	if (!mesh_)
 		throw std::runtime_error("Mesh has not been set yet. Cannot build matrices");
-	globalMatrices_ = mb.buildMatrices(*mesh_);
+	globalMatrices_ = std::make_shared<GlobalMatrices>(mb.buildMatrices(*mesh_));
 }
 
 void FEM_Simulator::initializeTimeIntegration(float alpha, float dt)
@@ -104,7 +111,7 @@ void FEM_Simulator::initializeTimeIntegration()
 {
 	auto startTime = std::chrono::steady_clock::now();
 	parameterUpdate_ = false;
-	solver_ = new CPUTimeIntegrator(thermalModel_, globalMatrices_, alpha_, dt_);
+	solver_ = new CPUTimeIntegrator(*thermalModel_, *globalMatrices_, alpha_, dt_);
 	solver_->initialize();
 	startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
 }
@@ -143,9 +150,9 @@ void FEM_Simulator::updateTemperatureSensors() {
 
 void FEM_Simulator::initializeContainers()
 {
-	thermalModel_.Temp = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for temperature at the nodes of the elements
-	thermalModel_.fluenceRate = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for Heat addition
-	thermalModel_.fluenceRateElem = Eigen::VectorXf::Zero(mesh_->elements().size()); // Our values for Heat addition
+	thermalModel_->Temp = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for temperature at the nodes of the elements
+	thermalModel_->fluenceRate = Eigen::VectorXf::Zero(mesh_->nodes().size()); // Our values for Heat addition
+	thermalModel_->fluenceRateElem = Eigen::VectorXf::Zero(mesh_->elements().size()); // Our values for Heat addition
 }
 
 void FEM_Simulator::setTemp(std::vector<std::vector<std::vector<float>>> Temp) {
@@ -171,7 +178,7 @@ void FEM_Simulator::setTemp(Eigen::VectorXf &Temp)
 	if (mesh_->nodes().size() != Temp.size()) {
 		throw std::runtime_error("Total number of elements in Temp does not match number of nodes in mesh.");
 	}
-	thermalModel_.Temp = Temp;
+	thermalModel_->Temp = Temp;
 }
 
 void FEM_Simulator::setFluenceRate(Eigen::VectorXf& fluenceRate)
@@ -180,11 +187,11 @@ void FEM_Simulator::setFluenceRate(Eigen::VectorXf& fluenceRate)
 	*/
 	// -- Checking size of vector to make sure it is appropriate
 	if (fluenceRate.size() == mesh_->nodes().size()){
-		thermalModel_.fluenceRate = fluenceRate;
-		thermalModel_.fluenceRateElem.setZero();
+		thermalModel_->fluenceRate = fluenceRate;
+		thermalModel_->fluenceRateElem.setZero();
 	} else if (fluenceRate.size() == mesh_->elements().size()){
-		thermalModel_.fluenceRateElem = fluenceRate;
-		thermalModel_.fluenceRate.setZero();
+		thermalModel_->fluenceRateElem = fluenceRate;
+		thermalModel_->fluenceRate.setZero();
 	} else {
 		std::cout << "NFR must have the same number of entries as the node space or element space" << std::endl;
 		throw std::invalid_argument("NFR must have the same number of entries as the node space or element space");
@@ -224,7 +231,7 @@ void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose, float laserPow
 	//TODO: account for orientation shift on the laser
 	// I(x,y,z) = 2*P/(pi*w^2) * exp(-2*(x^2 + y^2)/w^2 - mua*z)
 
-	const float mua = thermalModel_.MUA;
+	const float mua = thermalModel_->MUA;
 	
 	for (int i = 0; i < mesh_->nodes().size(); i++)
 	{
@@ -265,32 +272,32 @@ void FEM_Simulator::setDt(float dt)
 
 
 void FEM_Simulator::setTC(float TC) {
-	thermalModel_.TC = TC;
+	thermalModel_->TC = TC;
 	parameterUpdate_ = true;
 }
 
 void FEM_Simulator::setVHC(float VHC) {
-	thermalModel_.VHC = VHC;
+	thermalModel_->VHC = VHC;
 	parameterUpdate_ = true;
 }
 
 void FEM_Simulator::setMUA(float MUA) {
-	thermalModel_.MUA = MUA;
+	thermalModel_->MUA = MUA;
 	parameterUpdate_ = true;
 }
 
 void FEM_Simulator::setHTC(float HTC) {
-	thermalModel_.HTC = HTC;
+	thermalModel_->HTC = HTC;
 	parameterUpdate_ = true;
 }
 
 void FEM_Simulator::setHeatFlux(float heatFlux)
 {
-	thermalModel_.heatFlux = heatFlux;
+	thermalModel_->heatFlux = heatFlux;
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
-	thermalModel_.ambientTemp = ambientTemp;
+	thermalModel_->ambientTemp = ambientTemp;
 }
 
 

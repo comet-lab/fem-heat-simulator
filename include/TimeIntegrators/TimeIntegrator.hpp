@@ -14,8 +14,8 @@ public:
 	{
 		setAlpha(alpha);
 		setDt(dt);
-		dVec_.setZero(globalMatrices_.nNonDirichlet);
-		vVec_.setZero(globalMatrices_.nNonDirichlet);
+		/*dVec_.setZero(globalMatrices_.nNonDirichlet);
+		vVec_.setZero(globalMatrices_.nNonDirichlet);*/
 	}
 	virtual ~TimeIntegrator() = default;
 	virtual void applyParameters() = 0;

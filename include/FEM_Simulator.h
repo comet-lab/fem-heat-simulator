@@ -38,17 +38,19 @@ public:
 	void updateTemperatureSensors(); // update sensor temp vec and sensors variable
 	void initializeContainers();
 
+	void setEigenThreads(int nThreads) { Eigen::setNbThreads(nThreads); }
+
 	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
-	Eigen::VectorXf Temp() const { return thermalModel_.Temp; }
+	Eigen::VectorXf Temp() const { return thermalModel_->Temp; }
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
 	void setFluenceRate(Eigen::VectorXf& fluenceRate);
 	void setFluenceRate(std::array<float,6> laserPose, float laserPower, float beamWaist);
 	void setFluenceRate(Eigen::Vector<float,6> laserPose, float laserPower, float beamWaist);
-	Eigen::VectorXf fluenceRate() const  { return thermalModel_.fluenceRate; }
-	Eigen::VectorXf fluenceRateElem() const { return thermalModel_.fluenceRateElem; }
+	Eigen::VectorXf fluenceRate() const  { return thermalModel_->fluenceRate; }
+	Eigen::VectorXf fluenceRateElem() const { return thermalModel_->fluenceRateElem; }
 
 	void setDt(float deltaT);
 	float dt() const { return dt_; }
@@ -98,8 +100,8 @@ private:
 	void calculateSensorTemp(Sensor& sensor);
 
 	const Mesh* mesh_ = nullptr;
-	GlobalMatrices globalMatrices_;
-	ThermalModel thermalModel_;
+	std::shared_ptr<GlobalMatrices> globalMatrices_ = nullptr;
+	std::unique_ptr<ThermalModel> thermalModel_ = nullptr;
 	TimeIntegrator* solver_ = nullptr;
 	float alpha_ = 0.5; // time step weight
 	float dt_ = 0.01; // time step [s]
@@ -120,7 +122,7 @@ inline void FEM_Simulator::calculateSensorTemp(Sensor& sensor)
 	for (int A = 0; A < ShapeFunc::nNodes; A++)
 	{
 		long nodeIdx = elem.nodes[A];
-		float nodeTemp = thermalModel_.Temp(nodeIdx);
+		float nodeTemp = thermalModel_->Temp(nodeIdx);
 		sTemp += ShapeFunc::N(sensor.xi, A) * nodeTemp;
 	}
 	sensor.temp = sTemp;

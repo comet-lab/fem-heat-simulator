@@ -148,16 +148,13 @@ enable_openmp(HeatSimulationShared)
 
 # CUDA standard
 
-
 set_target_properties(HeatSimulationShared PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
 set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
-
-
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main
 # ──────────────────────────────────────────────────────────────
-add_executable(main src/main.cpp "src/Mesh.cpp")
+add_executable(main src/main.cpp)
 target_link_libraries(main PRIVATE HeatSimulation::Shared)
 
 # ──────────────────────────────────────────────────────────────

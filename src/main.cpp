@@ -11,6 +11,16 @@
 int main()
 {
     std::cout << "Starting Program" << std::endl;
+#ifdef _OPENMP
+    std::cout << "OpenMP enabled" << std::endl;
+    //Eigen::setNbThreads(omp_get_num_procs() / 2);
+    Eigen::setNbThreads(1);
+#else
+    std::cout << "OpenMP disabled" << std::endl;
+
+#endif
+    std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
+
     std::array<float,3> tissueSize = { 2.0f,2.0f,1.0f };
     std::array<long, 3> nodesPerAxis = { 81,81,51 };
     long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
@@ -32,6 +42,7 @@ int main()
     float vhc = 4.3;
     float htc = 0.01;
     FEM_Simulator simulator(mua, vhc, tc, htc);
+    simulator.setEigenThreads(Eigen::nbThreads());
     std::cout << "Setting Mesh" << std::endl;
     simulator.setMesh(mesh);
     simulator.setTemp(Temp);
@@ -60,14 +71,7 @@ int main()
     std::cout << "Time to calculate Fluence Rate: " << duration.count()/1000000.0 << std::endl;
 
     // RUN Solver on CPU
-#ifdef _OPENMP
-    std::cout << "OpenMP enabled" << std::endl;
-    Eigen::setNbThreads(omp_get_num_procs()/2);
-#else
-    std::cout << "OpenMP disabled" << std::endl;
-    Eigen::setNbThreads(1);
-#endif
-    std::cout << "Number of threads: " << Eigen::nbThreads() << std::endl;
+
 
  
     simulator.initializeModel();   
