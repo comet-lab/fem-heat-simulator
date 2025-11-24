@@ -12,22 +12,23 @@ void CPUTimeIntegrator::applyParameters()
 
 	// Apply parameter specific multiplication for each global matrix.
 	// Conductivity matrix
-	globK_ = globalMatrices_.K * thermalModel_.TC + globalMatrices_.Q * thermalModel_.HTC;
-	globK_.makeCompressed();
+	globK_.setZero();
+	globK_ += globalMatrices_.K * thermalModel_.TC + globalMatrices_.Q * thermalModel_.HTC;
+	//globK_.makeCompressed();
 	// Thermal mass matrix
-	//globM_.setZero();
-	globM_ = globalMatrices_.M * thermalModel_.VHC; // M Doesn't have any additions so we just multiply it by the constant
-	globM_.makeCompressed();
+	globM_.setZero();
+	globM_ += globalMatrices_.M * thermalModel_.VHC; // M Doesn't have any additions so we just multiply it by the constant
+	//globM_.makeCompressed();
 	// Forcing Vector
-	//globF_.setZero();
-	globF_ = (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC // convection from ambient temp and dirichlet nodes
-		+ (globalMatrices_.Fflux * thermalModel_.heatFlux) // heat flux 
-		+ (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC) // conduction on dirichlet nodes
-		+ (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
-	//globF_.noalias() += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
-	//globF_.noalias() += (globalMatrices_.Fflux * thermalModel_.heatFlux); // heat flux 
-	//globF_.noalias() += (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC); // conduction on dirichlet nodes
-	//globF_.noalias() += (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
+	//globF_ = (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC // convection from ambient temp and dirichlet nodes
+		//+ (globalMatrices_.Fflux * thermalModel_.heatFlux) // heat flux 
+		//+ (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC) // conduction on dirichlet nodes
+		//+ (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
+	globF_.setZero();
+	globF_.noalias() += (globalMatrices_.Fq * thermalModel_.ambientTemp + globalMatrices_.Fconv * thermalModel_.Temp) * thermalModel_.HTC; // convection from ambient temp and dirichlet nodes
+	globF_.noalias() += (globalMatrices_.Fflux * thermalModel_.heatFlux); // heat flux 
+	globF_.noalias() += (globalMatrices_.Fk * thermalModel_.Temp * thermalModel_.TC); // conduction on dirichlet nodes
+	globF_.noalias() += (globalMatrices_.Fint * thermalModel_.fluenceRate + globalMatrices_.FintElem * thermalModel_.fluenceRateElem) * thermalModel_.MUA; // forcing function
 }
 
 void CPUTimeIntegrator::setMatrixSparsity()
