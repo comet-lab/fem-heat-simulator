@@ -62,19 +62,8 @@ end
 toc
 clear mex
 %% Plot Sensor Temps over time
-figure(1);
-clf;
-hold on;
-for ss = 1:size(sensorPositions,1)
-    plot(0:deltaT:simDuration,sensorTemps(:,ss),'LineWidth',2,'DisplayName',...
-        sprintf("(%g,%g,%g)",sensorPositions(ss,:)));
-end
-hold off
-grid on;
-xlabel("Time (s)");
-ylabel("Temperature (deg C)");
-title("Sensor temperature over time");
-legend()
+simulator.plotSensorTemps(0:deltaT:simDuration,sensorTemps);
+
 %% plot depth irradiance at final time step
 figure(2);
 clf;
