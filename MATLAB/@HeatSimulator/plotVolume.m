@@ -1,8 +1,9 @@
-function plotVolume(obj)
+function plotVolume(obj,figNum)
 %PLOTVOLUME Plots volumetric temperature data
 %TODO: This function needs to be updated to plot arbitrary meshes. 
 arguments (Input)
     obj
+    figNum (1,1) double = 2
 end
 
 
@@ -14,7 +15,7 @@ if obj.mesh.useXYZ
 end
 data = reshape(obj.thermalInfo.temperature,[Nx,Ny,Nz]);
 
-figure(2)
+figure(figNum)
 clf;
 hold on
 % surf(X(:,:,1),Y(:,:,1),Z(:,:,1),data(:,:,1),...
