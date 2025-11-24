@@ -6,7 +6,7 @@ classdef HeatSimulator < handle
         mesh Mesh
         thermalInfo ThermalModel
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
-        time (:,1) double 
+        time (:,1) double
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
         sensorLocations (:,3) double
         silentMode (1,1) logical = false
@@ -66,5 +66,6 @@ classdef HeatSimulator < handle
             legend()
             ax = gca;
         end
+
     end
 end

@@ -62,7 +62,7 @@ end
 toc
 clear mex
 %% Plot Sensor Temps over time
-simulator.plotSensorTemps(0:deltaT:simDuration,sensorTemps);
+simulator.plotSensorTemps(sensorTemps);
 
 %% plot depth irradiance at final time step
 figure(2);
