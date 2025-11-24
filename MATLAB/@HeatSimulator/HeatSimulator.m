@@ -3,7 +3,7 @@ classdef HeatSimulator < handle
     %   Detailed explanation goes here
 
     properties
-        % mesh Mesh
+        mesh Mesh
         thermalInfo ThermalModel
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
@@ -12,10 +12,6 @@ classdef HeatSimulator < handle
         useAllCPUs (1,1) logical = false
         useGPU (1,1) logical = false
         buildMatrices (1,1) logical = true
-        xpos
-        ypos
-        zpos
-        boundaryConditions (6,1)
     end
 
     methods
@@ -43,12 +39,15 @@ classdef HeatSimulator < handle
                 error('Final time must be greater than the time step.');
             end
 
-            meshInfo = struct('xpos',obj.xpos, 'ypos', obj.ypos, 'zpos',obj.zpos,...
-                'boundaryConditions',obj.boundaryConditions,'sensorLocations',obj.sensorLocations);
+            meshInfo = obj.mesh.toStruct();
+            meshInfo.sensorLocations = obj.sensorLocations;
             thermalInfoStruct = obj.thermalInfo.toStruct();
             settings = struct('finalTime',finalTime,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU);
             [T,sensors] = MEX_Heat_Simulation(meshInfo,thermalInfoStruct,settings);
+            obj.thermalInfo.temperature = T;
         end
+
+        
     end
 end

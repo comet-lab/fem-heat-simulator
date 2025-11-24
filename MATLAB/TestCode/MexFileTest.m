@@ -5,7 +5,9 @@ z = 0:0.02:1;
 y = -1:0.025:1;
 x = -1:0.025:1;
 nodesPerAxis = [length(x),length(y),length(z)];
+boundaryConditions = [0,0,0,0,0,0]';
 
+mesh = Mesh(x,y,z,boundaryConditions);
 % Initialization of parameters
 simulator = HeatSimulator();
 simulator.dt = 0.05;
@@ -13,10 +15,7 @@ simulator.alpha = 0.5;
 simulator.useAllCPUs = true;
 simulator.useGPU = false;
 simulator.silentMode = false;
-simulator.xpos = x;
-simulator.ypos = y;
-simulator.zpos = z;
-simulator.boundaryConditions = [0,0,0,0,0,0]';
+simulator.mesh = mesh;
 simulator.sensorLocations = sensorPositions;
 
 
@@ -34,7 +33,7 @@ focalPoint = 35; % distance from waist to target [cm]
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
 
-[X,Y,Z] = meshgrid(simulator.xpos,simulator.ypos,simulator.zpos);
+[X,Y,Z] = meshgrid(x,y,z);
 X = X(:); Y = Y(:); Z = Z(:);
 fluenceRate = single(I(X,Y,Z,thermalInfo.MUA));
 thermalInfo.fluenceRate = fluenceRate;

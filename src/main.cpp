@@ -13,7 +13,7 @@ int main()
 #ifdef _OPENMP
     std::cout << "OpenMP enabled" << std::endl;
     //Eigen::setNbThreads(omp_get_num_procs() / 2);
-    Eigen::setNbThreads(1);
+    Eigen::setNbThreads(11);
 #else
     std::cout << "OpenMP disabled" << std::endl;
 
