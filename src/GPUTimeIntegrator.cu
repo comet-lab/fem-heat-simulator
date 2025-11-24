@@ -3,17 +3,10 @@
 // =====================
 // Constructor / Destructor
 // =====================
-GPUTimeIntegrator::GPUTimeIntegrator() 
-: amgxSolver_(AmgXSolver::getInstance())
+GPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat)
+    : TimeIntegrator(thermalModel, globalMatrices, alpha, deltat), amgxSolver_(AmgXSolver::getInstance())
 {
     CHECK_CUSPARSE(cusparseCreate(&handle_));
-}
-
-GPUTimeIntegrator::GPUTimeIntegrator(float alpha, float deltaT)
-: GPUTimeIntegrator()
-{
-    setAlpha(alpha);
-    setDeltaT(deltaT);
 }
 
 GPUTimeIntegrator::~GPUTimeIntegrator() {
@@ -29,101 +22,85 @@ GPUTimeIntegrator::~GPUTimeIntegrator() {
 // =====================
 // Apply Parameters
 // =====================
-void GPUTimeIntegrator::applyParameters(
-    const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
-    const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
-    const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
-    const Eigen::SparseMatrix<float, Eigen::RowMajor>& FirrMat,
-    float TC, float HTC, float VHC, float MUA,
-    const Eigen::VectorXf& FluenceRate,
-    const Eigen::VectorXf& Fq,
-    const Eigen::VectorXf& Fconv,
-    const Eigen::VectorXf& Fk,
-    const Eigen::VectorXf& FirrElem,
-    bool elemNFR
-) {
-    // ---------------- Step 0: Upload data ----------------
-    uploadAllMatrices(Kint, Kconv, M, FirrMat,
-                                       FluenceRate, Fq, Fconv, Fk, FirrElem);
+void GPUTimeIntegrator::applyParameters()
+{
+    // upload the fluence rate vector to GPU from thermalModel before applying parameters
+    // because of current setup, applyParameters doesn't know if fluence rate or just coefficients were changed
+    // so we update both. 
+    uploadFluenceRate() 
+    // These variables get set in here so we want to make sure they are free
+    freeCSR(globK_d_);
+    freeCSR(globM_d_);
+    if (globF_d_)
+    {
+        CHECK_CUDA(cudaFree(globF_d_));
+        globF_d_ = nullptr; // <--- IMPORTANT
+    }
+
+    // ---------------- Step 1: Compute globK ----------------
+    // This will perform Kint*TC + Kconv*HTC = globK
+    // std::cout << "Apply Parameters Step 1" << std::endl;
+    addSparse(K_d_, thermalModel_.TC, Q_d_, thermalModel_.HTC, globK_d_);
+    // addSparse naturally will define globK_d_ properly as a DeviceCSR
+
+    // ---------------- Step 2: Set globM ----------------
+    // this will perform M*VHC + M*0 = globM
+    // std::cout << "Apply Parameters Step 2" << std::endl;
+    addSparse(M_d_, thermalModel_.VHC, M_d_, 0, globM_d_); // Already scaled
+    // addSparse naturally will define globM_d properly as a DeviceCSR
+
+    // ---------------- Step 3: Compute Firr ----------------
+    // std::cout << "Apply Parameters Step 3" << std::endl;
+    float *Firr_d = nullptr;
+    float* Firr_elem_d = nullptr;
+
+    // nodal fluence rate vector
+    CHECK_CUDA(cudaMalloc((void **)&Firr_d, FirrMat_d_.rows * sizeof(float)));
+    multiplySparseVector(FirrMat_d_, FluenceRate_d_, Firr_d);
+
+    //elemental fluence rate vector
+    CHECK_CUDA(cudaMalloc((void**)&Firr_elem_d, FirrElemMat_d_.rows * sizeof(float)));
+    multiplySparseVector(FirrElemMat_d_, FluenceRateElem_d_, Firr_elem_d);
     
-    applyParameters(TC, HTC, VHC, MUA, elemNFR);
-    }
+    // ---------------- Step 4: Compute globF ----------------
+    // std::cout << "Apply Parameters Step 4" << std::endl;
+    // Firr = Firr*MUA;
+    scaleVector(Firr_d, thermalMode_.MUA, FirrMat_d_.rows);
+    if (!globF_d_)
+        CHECK_CUDA(cudaMalloc((void **)&globF_d_, FirrMat_d_.rows * sizeof(float)));
 
-    void GPUTimeIntegrator::applyParameters()
-    {
-        applyParameters(femModel_->TC, femModel_->HTC, femModel_->VHC, femModel_->MUA, femModel_->elemNFR);
-    }
+    // globF = Firr*MUA
+    CHECK_CUDA(cudaMemcpy(globF_d_, Firr_d, FirrMat_d_.rows * sizeof(float),
+                            cudaMemcpyDeviceToDevice));
+    // globF = Firr*MUA + FirrElem*MUA
+    addVectors(globF_d_, Firr_elem_d, globF_d_, FirrElemMat_d_.rows, thermalMode_.MUA);
+    // globF = Firr*MUA + FirrElem*MUA + Fq*HTC*Tinf --> added convection due to ambient temp
+    addVectors(globF_d_, Fq_d_.data, globF_d_, FirrMat_d_.rows, thermalModel_.HTC * thermalModel_.ambientTemp);
+    // globF = Firr*MUA + FirrElem*MUA + Fq*HTC*Tinf + Fflux*qn --> added flux at the boundary
+    addVectors(globF_d_, Fflux_d_.data, globF_d_, FirrMat_d_.rows, thermalModel_.heatFlux);
 
-    void GPUTimeIntegrator::applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR)
-    {
+    // globF = Firr*MUA + FirrElem*MUA + Fk*HTC + F_q + Fconv*TC*Temp --> Forcing vector due to dirichlet 
+    float* Fconv_d_temp = nullptr; // temporary device storage for FConv*Temp
+    CHECK_CUDA(cudaMalloc((void**)&Fconv_d, globF_d_.rows * sizeof(float))); // allocate rows
+    multiplySparseVector(Fconv_d_, Temp_d_, Fconv_d_temp); // perform multiplication
+    addVectors(globF_d_, Fconv_d_temp, globF_d_, FirrMat_d_.rows, TC); // adds to F
 
-        // These variables get set in here so we want to make sure they are free
-        freeCSR(globK_d_);
-        freeCSR(globM_d_);
-        if (globF_d_)
-        {
-            CHECK_CUDA(cudaFree(globF_d_));
-            globF_d_ = nullptr; // <--- IMPORTANT
-        }
+    // ---------------- Step 5: Free temporary GPU vectors ----------------
+    // std::cout << "Apply Parameters Step 5" << std::endl;
+    CHECK_CUDA(cudaFree(Firr_d));
+    Firr_d = nullptr;
+}
 
-        // ---------------- Step 1: Compute globK ----------------
-        // This will perform Kint*TC + Kconv*HTC = globK
-        // std::cout << "Apply Parameters Step 1" << std::endl;
-        addSparse(Kint_d_, TC, Kconv_d_, HTC, globK_d_);
-        // addSparse naturally will define globK_d_ properly as a DeviceCSR
-
-        // ---------------- Step 2: Set globM ----------------
-        // this will perform M*VHC + M*0 = globM
-        // std::cout << "Apply Parameters Step 2" << std::endl;
-        addSparse(M_d_, VHC, M_d_, 0, globM_d_); // Already scaled
-        // addSparse naturally will define globM_d properly as a DeviceCSR
-
-        // ---------------- Step 3: Compute Firr ----------------
-        // std::cout << "Apply Parameters Step 3" << std::endl;
-        float *Firr_d = nullptr;
-        if (elemNFR)
-        {
-            Firr_d = FirrElem_d_.data;
-        }
-        else
-        {
-            CHECK_CUDA(cudaMalloc((void **)&Firr_d, FirrMat_d_.rows * sizeof(float)));
-            multiplySparseVector(FirrMat_d_, FluenceRate_d_, Firr_d);
-        }
-
-        // ---------------- Step 4: Compute globF ----------------
-        // std::cout << "Apply Parameters Step 4" << std::endl;
-        // Firr = Firr*MUA;
-        scaleVector(Firr_d, MUA, FirrMat_d_.rows);
-
-        if (!globF_d_)
-            CHECK_CUDA(cudaMalloc((void **)&globF_d_, FirrMat_d_.rows * sizeof(float)));
-
-        // globF = Firr*MUA
-        CHECK_CUDA(cudaMemcpy(globF_d_, Firr_d, FirrMat_d_.rows * sizeof(float),
-                              cudaMemcpyDeviceToDevice));
-
-        // globF = Firr*MUA + Fconv*HTC
-        addVectors(globF_d_, Fconv_d_.data, globF_d_, FirrMat_d_.rows, HTC);
-        // globF = Firr*MUA + Fconv*HTC + F_q
-        addVectors(globF_d_, Fq_d_.data, globF_d_, FirrMat_d_.rows, 1);
-        // globF = Firr*MUA + Fconv*HTC + F_q + Fk*TC
-        addVectors(globF_d_, Fk_d_.data, globF_d_, FirrMat_d_.rows, TC);
-
-        // ---------------- Step 5: Free temporary GPU vectors ----------------
-        // std::cout << "Apply Parameters Step 5" << std::endl;
-        CHECK_CUDA(cudaFree(Firr_d));
-        Firr_d = nullptr;
-    }
-
-void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec){
+void GPUTimeIntegrator::initialize(){
     /*
     This function will initialize the d and v vectors used for Euler integration. The d vector is
     simply passed in, and the v vector is assigned through the equation M*v = (F - K*d).
     */
     // -- Step 0: Upload dVec to GPU and save as attribute -- 
-    int nRows = dVec.size();
-    uploadVector(dVec,dVec_d_);
+    dVec_.resize(globalMatrices_.nNonDirichlet);
+    dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
+    int nRows = dVec_.size();
+    uploadVector(dVec_,dVec_d_);
     // -- Step1: Construct Right Hand Side of Ax = b
     // In this case b = (F - K*d);
     // std::cout << "Initialize Step 1" << std::endl;
@@ -133,7 +110,10 @@ void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf
     // -- Step 2: construct Left Hand Side of Ax = b
     // In this case it is just A = M so we run setup with alpha = 0 and dt = 0;
     // std::cout << "Initialize Step 2" << std::endl;
-    setup(0); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
+    float holdAlpha = alpha_;
+    alpha_ = 0;
+    updateLHS(); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
+    alpha_ = holdAlpha;
 
     // -- Step 3: Solve using AMGX so we can have a linear solver
     // std::cout << "Initialize Step 3" << std::endl;
@@ -144,7 +124,7 @@ void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf
 
     // -- Step 4: Assign attribute to solution and return to eigen
     // std::cout << "InitializeDV Step 4" << std::endl;
-    CHECK_CUDA( cudaMemcpy(vVec.data(), x_d, nRows*sizeof(float),cudaMemcpyDeviceToHost) );
+    CHECK_CUDA( cudaMemcpy(vVec_.data(), x_d, nRows*sizeof(float),cudaMemcpyDeviceToHost) );
     // We aren't using upload vector here because upload vector assumes host-to-device copy
     // we don't want to free this data after either because it is a class attribute
     CHECK_CUDA(cudaMalloc((void**)&(vVec_d_), nRows*sizeof(float)));
@@ -157,37 +137,20 @@ void GPUTimeIntegrator::initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf
     x_d = nullptr;
 }
 
-void GPUTimeIntegrator::initializeWithModel()
-{
-    int nNodes = femModel_->nodesPerAxis[0] * femModel_->nodesPerAxis[1] * femModel_->nodesPerAxis[2];
-	/* PERFORMING TIME INTEGRATION USING EULER FAMILY */
-	// Initialize d, v, and dTilde vectors
-	femModel_->dVec.resize(nNodes - femModel_->dirichletNodes.size());
-	femModel_->vVec = Eigen::VectorXf::Zero(nNodes - femModel_->dirichletNodes.size());
-
-	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
-	femModel_->dVec = femModel_->Temp(femModel_->validNodes);
-    initialize(femModel_->dVec,femModel_->vVec);
-
-    setup(alpha_);
-	femModel_->fluenceUpdate = false;
-	femModel_->parameterUpdate = false;
-}
-
-void GPUTimeIntegrator::setup(float alpha){
+void GPUTimeIntegrator::updateLHS(){
     /*
     This function initializes the A matrix in AMGX in order to solve the sparse linear system
                 Ax = b
     In this case, A is built from the finite element matrices M and F, based on the equation
-                (M + alpha*dt*F)v = (F - K*d)
+                (M + alpha_*dt*F)v = (F - K*d)
     --- This function needs to be called before solve. Once setup has been called, solve
     --- can be called repeatedly without need to call setup again. However, if applyParameters()
     --- is called, then setup needs to be called before solve again. 
     */
     // -- Step 1: Construct A for Ax = b
     DeviceCSR A;
-    // Perform the addition of A = (M + alpha*deltaT*F)
-    addSparse(globM_d_, 1, globK_d_, alpha*deltaT_, A);
+    // Perform the addition of A = (M + alpha_*deltaT*K)
+    addSparse(globM_d_, 1, globK_d_, alpha_*dt_, A);
     // Upload A to the amgxSolver_
     amgxSolver_.uploadMatrix(A.rows, A.cols, A.nnz,
         A.data_d, A.rowPtr_d, A.colIdx_d);
@@ -202,23 +165,23 @@ void GPUTimeIntegrator::singleStep(){
     /* This function performs a single step of Euler Integration. For each step, we perform 
     an Explicit Step and Implicit Step
     --- Explicit Step:
-        This is given by d = d + (1-alpha)*dt*v.
+        This is given by d = d + (1-alpha_)*dt*v.
         We assume that an initial value for v and d have already been created (either by initializeDV 
         or by a previous call to singleStep())
     --- Implicit Step:
         In the implicit step we first solve the linear equation Ax = b where A was initialized in the
         function setup(), and b is set to (F-K*d). The solution vector, x, is our new value for v. 
-        Then we simply update d with d = d + alpha*dt*v
+        Then we simply update d with d = d + alpha_*dt*v
     */
 
     // --- Function Assumes GPUTimeIntegrator::setup() has already been called ----
 	// d vector gets initialized to what is stored in our Temp vector, ignoring Dirichlet Nodes
 	int nRows = globK_d_.rows;
     // -- Step 1: Perform Explicit Step
-	// Explicit Forward Step (only if alpha < 1). Uses stored value of vVec
+	// Explicit Forward Step (only if alpha_ < 1). Uses stored value of vVec
 	if (alpha_ < 1) {
         // performs the the addition for d = d + (1-alpha)*deltaT*v
-        addVectors(dVec_d_.data,vVec_d_,dVec_d_.data,nRows,(1-alpha_)*deltaT_);
+        addVectors(dVec_d_.data,vVec_d_,dVec_d_.data,nRows,(1-alpha_)*dt_);
 	}
 
     // -- Step 2: Perform Implicit Step
@@ -374,12 +337,14 @@ void GPUTimeIntegrator::uploadVector(const float* data, int n, DeviceVec& dV){
 
 void GPUTimeIntegrator::uploaddVec_d()
 {
-    uploadVector(femModel_->dVec,dVec_d_);
+    uploadVector(dVec_,dVec_d_);
 }
 
 void GPUTimeIntegrator::uploadFluenceRate()
 {
-    uploadVector(femModel_->FluenceRate, FluenceRate_d_);
+    uploadVector(thermalModel_->fluenceRate, FluenceRate_d_);
+    uploadVector(thermalModel_->fluenceRateElem, FluenceRateElem_d_);
+    uploadVector(thermalModel_->Temp, Temp_d_);
 }
 
 void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
@@ -389,12 +354,12 @@ void GPUTimeIntegrator::downloadVector(Eigen::VectorXf &v,const float *dv)
 
 void GPUTimeIntegrator::downloaddVec_d()
 {
-    downloadVector(femModel_->dVec, dVec_d_.data);
+    downloadVector(dVec_, dVec_d_.data);
 }
 
 void GPUTimeIntegrator::downloadvVec_d()
 {
-    downloadVector(femModel_->vVec, vVec_d_);
+    downloadVector(vVec_, vVec_d_);
 }
 
 void GPUTimeIntegrator::downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source)

@@ -6,7 +6,7 @@
 #include <Eigen/Sparse>
 #include <iostream>
 #include "AmgXSolver.hpp"
-#include "FEM_Simulator.h"
+#include "TimeIntegrators/TimeIntegrator.hpp"
 
 
 struct DeviceCSR {
@@ -24,16 +24,19 @@ struct DeviceVec {
         cusparseDnVecDescr_t vecHandle = nullptr;
     };    
 
-class GPUTimeIntegrator {
+class GPUTimeIntegrator : TimeIntegrator{
 
 public:
     //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-    GPUTimeIntegrator();
-    GPUTimeIntegrator(float alpha, float deltaT);
+    GPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat);
     ~GPUTimeIntegrator();
+    void initialize() override;
+    void applyParameters() override;
+    void singleStep() override;
+    void updateLHS() override;
 
-    void applyParameters(
+    /*void applyParameters(
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
         const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
@@ -45,22 +48,22 @@ public:
         const Eigen::VectorXf& Fk,
         const Eigen::VectorXf& FirrElem,
         bool elemNFR
-    ); 
+    ); */
 
-    void applyParameters();
-    void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
-    void initialize(const Eigen::VectorXf & dVec, Eigen::VectorXf& vVec);
-    void initializeWithModel();
-    void setup(float alpha);
-    void singleStep();
-    void singleStepWithUpdate();
+    
+    
+    //void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
+    
+    //void initializeWithModel();
+    
+    //void singleStepWithUpdate();
     
     void calculateRHS(float* &b_d, int nRows);
     // void calculateLHS(float* b_d, int nRows);
 
-    void setModel(FEM_Simulator* model);
-    void updateModel();
-    void releaseModel();
+    //void setModel(FEM_Simulator* model);
+    //void updateModel();
+    //void releaseModel();
     void getMatricesFromModel();
 
     void uploadAllMatrices(
@@ -86,7 +89,7 @@ public:
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
     void uploadVector(const float* data, int n, DeviceVec& dV);
     void uploaddVec_d();
-    void uploadFluenceRate();
+    void uploadParameterVecs();
 
     // commands to download vectors/matrices from gpu
     void downloadVector(Eigen::VectorXf& v,const float* dv);
@@ -114,20 +117,13 @@ public:
 
     //-----------------------------------------------------------------------------------------------
     // Variable Declarations 
-
-    // Store the model
-    FEM_Simulator* femModel_ = nullptr;
-
-    //Time stepping variables
-    float alpha_ = 1; 
-    float deltaT_ = 0.05;
-
+    // 
     // Store GPU handles
     cusparseHandle_t handle_;
     // Stored Sparse Matrices
-    DeviceCSR Kint_d_, Kconv_d_, M_d_, FirrMat_d_;
+    DeviceCSR K_d_, Q_d_, M_d_, FirrMat_d_, FirrElemMat_d_, Fconv_d_, Fk_d_;
     // Store Dense Vectors
-    DeviceVec FluenceRate_d_, Fq_d_, Fconv_d_, Fk_d_, FirrElem_d_;  
+    DeviceVec FluenceRate_d_, FluenceRateElem_d_, Fq_d_, Fflux_d_, Temp_d_;  
     
     //---GPU resident Global terms --
     DeviceCSR globK_d_;
