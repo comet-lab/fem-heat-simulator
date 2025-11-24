@@ -195,14 +195,14 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
 
                 Element elem;
                 elem.nodes = {
-                    nodeID(i,   j,   k),
-                    nodeID(i + 1, j,   k),
-                    nodeID(i, j + 1, k),
-                    nodeID(i + 1,   j + 1, k),
-                    nodeID(i,   j,   k + 1),
-                    nodeID(i + 1, j,   k + 1),
-                    nodeID(i, j + 1, k + 1),
-                    nodeID(i + 1,   j + 1, k + 1)
+                    nodeID(i,     j,     k),
+                    nodeID(i + 1, j,     k),
+                    nodeID(i + 1, j + 1, k),
+                    nodeID(i,     j + 1, k),
+                    nodeID(i,     j,     k + 1),
+                    nodeID(i + 1, j,     k + 1),
+                    nodeID(i + 1, j + 1, k + 1),
+                    nodeID(i,     j + 1, k + 1)                    
                 };
                 elements.push_back(elem);
             }
@@ -224,10 +224,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(i, j, k0);
             bf.localFaceID = 0;
             bf.nodes = {
-                nodeID(i,   j,   k0),
-                nodeID(i + 1, j,   k0),
-                nodeID(i, j + 1, k0),
-                nodeID(i + 1,   j + 1, k0)
+                nodeID(i,   j,   k0), // 0 
+                nodeID(i, j + 1, k0), // 3
+                nodeID(i + 1,   j + 1, k0), // 2
+                nodeID(i + 1, j,   k0) // 1
             };
             bf.type = bc[0];
             boundaryFaces.push_back(bf);
@@ -242,10 +242,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(i, j, kTop);
             bf.localFaceID = 1;
             bf.nodes = {
-                nodeID(i,   j,   kTop + 1),
-                nodeID(i + 1, j,   kTop + 1),
-                nodeID(i, j + 1, kTop + 1),
-                nodeID(i + 1,   j + 1, kTop + 1)
+                nodeID(i,   j,   kTop + 1), // 4
+                nodeID(i + 1, j,   kTop + 1), // 5
+                nodeID(i + 1,   j + 1, kTop + 1), // 6
+                nodeID(i, j + 1, kTop + 1), //7
             };
             bf.type = bc[1];
             boundaryFaces.push_back(bf);
@@ -260,10 +260,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(i, j0, k);
             bf.localFaceID = 2;
             bf.nodes = {
-                nodeID(i,   j0,   k),
-                nodeID(i + 1, j0,   k),
-                nodeID(i + 1, j0,   k + 1),
-                nodeID(i,   j0,   k + 1)
+                nodeID(i,   j0,   k), // 0
+                nodeID(i + 1, j0,   k), // 1
+                nodeID(i + 1, j0,   k + 1), // 5
+                nodeID(i,   j0,   k + 1) // 4
             };
             bf.type = bc[2];
             boundaryFaces.push_back(bf);
@@ -278,10 +278,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(i, jTop, k);
             bf.localFaceID = 3;
             bf.nodes = {
-                nodeID(i,   jTop + 1,   k),
-                nodeID(i + 1, jTop + 1,   k),
-                nodeID(i + 1, jTop + 1,   k + 1),
-                nodeID(i,   jTop + 1,   k + 1)
+                nodeID(i,     jTop + 1,   k), // 3
+                nodeID(i,     jTop + 1,   k + 1), // 7
+                nodeID(i + 1, jTop + 1,   k + 1), // 6
+                nodeID(i + 1,   jTop + 1,   k) // 2
             };
             bf.type = bc[3];
             boundaryFaces.push_back(bf);
@@ -296,10 +296,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(i0, j, k);
             bf.localFaceID = 4;
             bf.nodes = {
-                nodeID(i0,   j,   k),
-                nodeID(i0,   j + 1, k),
-                nodeID(i0,   j + 1, k + 1),
-                nodeID(i0,   j,   k + 1)
+                nodeID(i0,   j,     k), // 0
+                nodeID(i0,   j,     k + 1), // 4
+                nodeID(i0,   j + 1, k + 1), // 7 
+                nodeID(i0,   j + 1,     k) // 3
             };
             bf.type = bc[4];
             boundaryFaces.push_back(bf);
@@ -314,10 +314,10 @@ Mesh Mesh::buildCubeMesh(const std::vector<float>& xPos, const std::vector<float
             bf.elemID = elemID(iTop, j, k);
             bf.localFaceID = 5;
             bf.nodes = {
-                nodeID(iTop + 1,   j,   k),
-                nodeID(iTop + 1,   j + 1, k),
-                nodeID(iTop + 1,   j + 1, k + 1),
-                nodeID(iTop + 1,   j,   k + 1)
+                nodeID(iTop + 1,   j,     k), // 1
+                nodeID(iTop + 1,   j + 1, k), // 2 
+                nodeID(iTop + 1,   j + 1, k + 1), // 6
+                nodeID(iTop + 1,   j,     k + 1) // 5
             };
             bf.type = bc[5];
             boundaryFaces.push_back(bf);

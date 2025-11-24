@@ -17,19 +17,19 @@ namespace ShapeFunctions {
         * Origin Reference Frame and shape formation
         *           * ---- x     0 --- 1
         *         / |           /|    /|
-        *        /  |          2 --- 3 |
+        *        /  |          3 --- 2 |
         *       y   z          | 4 --| 5
         *                      |/    |/
-        *                      6 --- 7
+        *                      7 --- 6
         * Node order on a face should produce a vector pointing inward 
         */
         static constexpr std::array<std::array<int, 4>, 6> faceConnectivity = { {
-            {0, 2, 3, 1}, // top face 
-            {4, 5, 7, 6},  // bottom face
+            {0, 3, 2, 1}, // top face 
+            {4, 5, 6, 7},  // bottom face
             {0, 1, 5, 4}, // back face
-            {2, 6, 7, 3}, // front face
-            {0, 4, 6, 2}, // Left face
-            {1, 3, 7, 5} // right face
+            {3, 7, 6, 2}, // front face
+            {0, 4, 7, 3}, // Left face
+            {1, 2, 6, 5} // right face
         } };
 
         // Evaluate shape function
@@ -39,12 +39,12 @@ namespace ShapeFunctions {
             switch (A) {
             case 0: return 0.125f * (1 - x) * (1 - y) * (1 - z);
             case 1: return 0.125f * (1 + x) * (1 - y) * (1 - z);
-            case 2: return 0.125f * (1 - x) * (1 + y) * (1 - z);
-            case 3: return 0.125f * (1 + x) * (1 + y) * (1 - z);
+            case 2: return 0.125f * (1 + x) * (1 + y) * (1 - z);
+            case 3: return 0.125f * (1 - x) * (1 + y) * (1 - z);
             case 4: return 0.125f * (1 - x) * (1 - y) * (1 + z);
             case 5: return 0.125f * (1 + x) * (1 - y) * (1 + z);
-            case 6: return 0.125f * (1 - x) * (1 + y) * (1 + z);
-            case 7: return 0.125f * (1 + x) * (1 + y) * (1 + z);
+            case 6: return 0.125f * (1 + x) * (1 + y) * (1 + z);
+            case 7: return 0.125f * (1 - x) * (1 + y) * (1 + z);
             default: return 0.0f;
             }
         }
@@ -64,12 +64,12 @@ namespace ShapeFunctions {
             switch (A) {
             case 0: dN << -0.125f * (1 - y) * (1 - z), -0.125f * (1 - x) * (1 - z), -0.125f * (1 - x) * (1 - y); break;
             case 1: dN << 0.125f * (1 - y) * (1 - z), -0.125f * (1 + x) * (1 - z), -0.125f * (1 + x) * (1 - y); break;
-            case 2: dN << -0.125f * (1 + y) * (1 - z), 0.125f * (1 - x) * (1 - z), -0.125f * (1 - x) * (1 + y); break;
-            case 3: dN << 0.125f * (1 + y) * (1 - z), 0.125f * (1 + x) * (1 - z), -0.125f * (1 + x) * (1 + y); break;
+            case 2: dN << 0.125f * (1 + y) * (1 - z), 0.125f * (1 + x) * (1 - z), -0.125f * (1 + x) * (1 + y); break;
+            case 3: dN << -0.125f * (1 + y) * (1 - z), 0.125f * (1 - x) * (1 - z), -0.125f * (1 - x) * (1 + y); break;
             case 4: dN << -0.125f * (1 - y) * (1 + z), -0.125f * (1 - x) * (1 + z), 0.125f * (1 - x) * (1 - y); break;
             case 5: dN << 0.125f * (1 - y) * (1 + z), -0.125f * (1 + x) * (1 + z), 0.125f * (1 + x) * (1 - y); break;
-            case 6: dN << -0.125f * (1 + y) * (1 + z), 0.125f * (1 - x) * (1 + z), 0.125f * (1 - x) * (1 + y); break;
-            case 7: dN << 0.125f * (1 + y) * (1 + z), 0.125f * (1 + x) * (1 + z), 0.125f * (1 + x) * (1 + y); break;
+            case 6: dN << 0.125f * (1 + y) * (1 + z), 0.125f * (1 + x) * (1 + z), 0.125f * (1 + x) * (1 + y); break;
+            case 7: dN << -0.125f * (1 + y) * (1 + z), 0.125f * (1 - x) * (1 + z), 0.125f * (1 - x) * (1 + y); break;
             default: dN.setZero(); break;
             }
             return dN;
@@ -89,9 +89,12 @@ namespace ShapeFunctions {
             Eigen::Vector2f dN_face;
             switch (face)
             {
-            case 0: case 1: dN_face << dN[0], dN[1]; break;
-            case 2: case 3: dN_face << dN[0], dN[2]; break;
-            case 4: case 5: dN_face << dN[1], dN[2]; break;
+            case 0: dN_face << dN[1], dN[0]; break; // top face
+            case 1: dN_face << dN[0], dN[1]; break; // bot face
+            case 2: dN_face << dN[0], dN[2]; break; // back face
+            case 3: dN_face << dN[2], dN[0]; break; // front face
+            case 4: dN_face << dN[2], dN[1]; break; // left face
+            case 5: dN_face << dN[1], dN[2]; break; // right face
             }
 
             return dN_face;
@@ -119,12 +122,12 @@ namespace ShapeFunctions {
             return {
                 {-0.577350269f, -0.577350269f, -0.577350269f},
                 { 0.577350269f, -0.577350269f, -0.577350269f},
-                {-0.577350269f,  0.577350269f, -0.577350269f},
                 { 0.577350269f,  0.577350269f, -0.577350269f},
+                {-0.577350269f,  0.577350269f, -0.577350269f},
                 {-0.577350269f, -0.577350269f,  0.577350269f},
                 { 0.577350269f, -0.577350269f,  0.577350269f},
-                {-0.577350269f,  0.577350269f,  0.577350269f},
-                { 0.577350269f,  0.577350269f,  0.577350269f}
+                { 0.577350269f,  0.577350269f,  0.577350269f},
+                {-0.577350269f,  0.577350269f,  0.577350269f}
             };
         }
 

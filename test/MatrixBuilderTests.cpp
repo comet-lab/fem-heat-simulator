@@ -101,11 +101,11 @@ TEST_F(HexBuilder, testCalculateJacobian)
 */
 TEST_F(HexBuilder, testCalculateHexLinMe)
 {
-
+	matrixBuilder.precomputeElemJ<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 	Eigen::Matrix<float, 8, 8> Me = matrixBuilder.calculateIntNaNb<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
-	float scale[8] = { 1.0f, 2.0f, 2.0f, 4.0f, 2.0f, 4.0f, 4.0f, 8.0f };
+	float scale[8] = { 1.0f, 2.0f, 4.0f, 2.0f, 2.0f, 4.0f, 8.0f, 4.0f };
 	for (int Ai = 0; Ai < 8; Ai++) 
 	{
 		EXPECT_FLOAT_EQ(1/27.0f,Me(Ai, Ai));
@@ -120,11 +120,11 @@ TEST_F(HexBuilder, testCalculateHexLinMe)
 */
 TEST_F(HexBuilder, testCalculateHexLinKe)
 {
-
+	matrixBuilder.precomputeElemJ<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 	Eigen::Matrix<float, 8, 8> Ke = matrixBuilder.calculateIntdNadNb<ShapeFunctions::HexLinear>(mesh.elements()[0]);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 0.5
-	float scale[8] = { 1.0f, 0.0f, 0.0f, -1/4.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
+	float scale[8] = { 1.0f, 0.0f, -1/4.0f, 0.0f, 0.0f, -1/4.0f, -1/4.0f, -1/4.0f };
 	float tolerance = 0.000001;
 	for (int Ai = 0; Ai < 8; Ai++)
 	{
@@ -156,27 +156,27 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 2) || (A == 3))
-			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the bottom nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
 	}
 
-	//Face 2: Front Face
+	//Face 2: back Face
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::HexLinear>(mesh.elements()[0], 2, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 3) || (A == 2) || (A == 6) || (A == 7))
-			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the front  nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
 	}
 
-	//Face 3: Back Face
+	//Face 3: front Face
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::HexLinear>(mesh.elements()[0], 3, 1);
 	for (int A = 0; A < 8; A++)
 	{
 		if ((A == 0) || (A == 1) || (A == 4) || (A == 5))
-			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
+			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the back nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
 	}
@@ -185,7 +185,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::HexLinear>(mesh.elements()[0], 4, 1);
 	for (int A = 0; A < 8; A++)
 	{
-		if ((A == 1) || (A == 3) || (A == 5) || (A == 7))
+		if ((A == 1) || (A == 2) || (A == 5) || (A == 6))
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
@@ -195,7 +195,7 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::HexLinear>(mesh.elements()[0], 5, 1);
 	for (int A = 0; A < 8; A++)
 	{
-		if ((A == 0) || (A == 2) || (A == 4) || (A == 6))
+		if ((A == 0) || (A == 3) || (A == 4) || (A == 7))
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 0.25);
@@ -204,41 +204,40 @@ TEST_F(HexBuilder, testCalculateFeFlux)
 
 /*
 * Testing the calculation of Feflux. For the single element we have it should be straightforward
-*
+
 */
 TEST_F(HexBuilder, testCalculateFeConv)
 {
-	constexpr int faceNodes[6][4] = {
-		{0,1,2,3}, {4,5,6,7}, {0,1,4,5},
-		{2,3,6,7}, {0,2,4,6}, {1,3,5,7}
-	};
-	std::array<std::array<float, 4>, 4> scale = { {	{ 1, 1 / 2.0f, 1 / 2.0f, 1 / 4.0f},
-													{ 1 / 2.0f, 1, 1 / 4.0f, 1 / 2.0f},
-													{ 1 / 2.0f, 1 / 4.0f, 1, 1 / 2.0f},
-													{ 1 / 4.0f, 1 / 2.0f, 1 / 2.0f, 1} } };
+	// Reminder that for the element[0], the determinant of the Jacobian is 1 / 8 which influences
+	// the scaling values here. 
+	std::array<std::array<float, 4>, 4> scale = { {	{ 1,        1 / 2.0f, 1 / 4.0f, 1 / 2.0f},
+													{ 1 / 2.0f, 1,        1 / 2.0f, 1 / 4.0f},
+													{ 1 / 4.0f, 1 / 2.0f, 1 ,       1 / 2.0f},
+													{ 1 / 2.0f, 1 / 4.0f, 1 / 2.0f, 1       } } };
 	int A = 0;
 	int B = 0;
 	for (int f = 0; f < 6; f++)
 	{
 		Eigen::MatrixXf FeConv = matrixBuilder.calculateFaceIntNaNb<ShapeFunctions::HexLinear>(mesh.elements()[0], f);
 		// all of these nodes should be scaled relative to scale matrix
-		const int* nodes = faceNodes[f];
+		std::array<int,4> nodes = ShapeFunctions::HexLinear::faceConnectivity[f];
 		for (int i = 0; i < 4; i++)
 		{
 			for (int j = 0; j < 4; j++)
 			{
 				A = nodes[i];
 				B = nodes[j];
-				EXPECT_FLOAT_EQ(FeConv(A, B), scale[i][j] / 9.0f);
+				EXPECT_FLOAT_EQ(FeConv(A, B), scale[i][j] / 9.0f) << "A: " << A << " B: " << B;
 			}
 		}
 		// All of these nodes should be on the opposite face so have nodes
 		// that should have a 0 value in the matrix
+		int f2;
 		if (f % 2)
-			f = (f - 1);
+			f2 = (f - 1);
 		else
-			f = (f + 1);
-		nodes = faceNodes[f];
+			f2 = (f + 1);
+		nodes = ShapeFunctions::HexLinear::faceConnectivity[f2];
 		for (int i = 0; i < 4; i++)
 		{
 			for (int j = 0; j < 4; j++)
@@ -373,6 +372,7 @@ TEST_F(TetBuilder, testCalculateJ)
 TEST_F(TetBuilder, testCalculateMe)
 {
 	const int Nne = testTetLin.nNodes;
+	matrixBuilder.precomputeElemJ<ShapeFunctions::TetLinear>(mesh.elements()[0]);
 	Eigen::Matrix<float, Nne, Nne> Me = matrixBuilder.calculateIntNaNb<ShapeFunctions::TetLinear>(elem);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 2.0
@@ -392,6 +392,7 @@ TEST_F(TetBuilder, testCalculateMe)
 TEST_F(TetBuilder, testCalculateKe)
 {
 	const int Nne = testTetLin.nNodes;
+	matrixBuilder.precomputeElemJ<ShapeFunctions::TetLinear>(mesh.elements()[0]);
 	Eigen::Matrix<float, Nne, Nne> Ke = matrixBuilder.calculateIntdNadNb<ShapeFunctions::TetLinear>(elem);
 
 	Eigen::Matrix<float, Nne, Nne> trueKe;
