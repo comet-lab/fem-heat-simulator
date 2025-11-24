@@ -64,8 +64,10 @@ clear mex
 %% Plot Sensor Temps over time
 simulator.plotSensorTemps(sensorTemps);
 
+%% Plot volume temperature information
+simulator.plotVolume();
 %% plot depth irradiance at final time step
-figure(2);
+figure(3);
 clf;
 tiledlayout('flow');
 nexttile()
@@ -79,7 +81,7 @@ ylabel("Normalized Fluence Rate");
 title("Normalized Fluence Rate");
 
 %% Plot Temperature Depth at final time step
-figure(3);
+figure(4);
 clf;
 hold on
 plot(z,Tpred(X==0 & Y==0),...
@@ -89,20 +91,3 @@ grid on;
 xlabel("Depth (cm)");
 ylabel("Temperautre (deg C)");
 title("Temperature Prediction with 2 layers");
-%% Surface Temperature Plot
-figure(4)
-clf;
-tiledlayout('flow')
-nexttile()
-Xs = reshape(X(Z == 0),[nodesPerAxis(1),nodesPerAxis(2)]);
-Ys = reshape(Y(Z == 0),[nodesPerAxis(1),nodesPerAxis(2)]);
-Ts = reshape(Tpred(Z == 0),[nodesPerAxis(1),nodesPerAxis(2)]);
-surf(Xs,Ys,Ts);
-xlabel("X Axis (cm)")
-ylabel("Y Axis (cm)");
-title("Suraface Temperature Plot Two-layer mesh")
-c = colorbar();
-c.Label.String = 'Temperature (deg C)';
-axis equal
-view(0,90);
-colormap('hot')
