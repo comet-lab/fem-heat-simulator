@@ -1,6 +1,6 @@
 function plotVolume(obj)
-%PLOTVOLUME Summary of this function goes here
-%   Detailed explanation goes here
+%PLOTVOLUME Plots volumetric temperature data
+%TODO: This function needs to be updated to plot arbitrary meshes. 
 arguments (Input)
     obj
 end
@@ -85,8 +85,8 @@ uicontrol('Style','slider','Min',1,'Max',Nz,'Value',sz, 'SliderStep',[1/(Nz-1), 
             set(slice, 'XData', squeeze(X(ii,:,:)), 'YData', squeeze(Y(ii,:,:)), 'ZData', squeeze(Z(ii,:,:)), ...
                 'CData', squeeze(data(ii,:,:)));
         elseif dim == 2
-            set(slice, 'XData', reshape(X(:,ii,:),Nx,[]), 'YData', reshape(Y(:,ii,:),Nx,[]), ...
-                'ZData', reshape(Z(:,ii,:),Nx,[]), 'CData', reshape(data(:,ii,:),Nx,[]));
+            set(slice, 'XData', squeeze(X(:,ii,:)), 'YData', squeeze(Y(:,ii,:)), ...
+                'ZData', squeeze(Z(:,ii,:)), 'CData', squeeze(data(:,ii,:)));
         elseif dim == 3
             set(slice, 'CData', data(:,:,ii), 'XData', X(:,:,ii), 'YData', Y(:,:,ii), 'ZData', Z(:,:,ii));
         end
