@@ -84,9 +84,9 @@ public:
 private:
 	struct Sensor
 	{
-		std::array<float, 3> pos;
-		long elemIdx;
-		std::array<float, 3> xi;
+		std::array<float, 3> pos = { 0,0,0 };
+		long elemIdx = 0;
+		std::array<float, 3> xi = { 0,0,0 };
 		float temp = 0;
 	};
 
