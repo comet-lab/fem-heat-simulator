@@ -12,8 +12,13 @@ namespace ShapeFunctions {
         // 0,1,2,3 = vertices
         // 4 = edge 0-1, 5 = edge 1-2, 6 = edge 2-0, 7 = edge 0-3, 8 = edge 1-3, 9 = edge 2-3
 
+        /* Reference for shape functions and numerical integration Schemes: The finite element method: its basis and fundamentals (7th edition)
+        * by O.C. Zienkiewicz, R.L. Taylor, J.Z. Zhu. Note that the weights in their tables are presumed to be multiplied by the volume of the
+        * element. In our case our element volume is 1/6 so we multiply the weights in the table by 1/6. The same is true for area where the area
+        * of any face in the normalized coordinate frame is 1/2.
+        */
         static constexpr int nNodes = 10;
-        static constexpr int nGP = 4;          // volume Gauss points (can adjust for integration order)
+        static constexpr int nGP = 5;          // volume Gauss points (can adjust for integration order)
         static constexpr int nFaceGP = 4;      // 4-point triangular face quadrature
         static constexpr int nFaceNodes = 6;   // 6-node quadratic triangle
         static constexpr int nFaces = 4;
@@ -113,24 +118,39 @@ namespace ShapeFunctions {
             return xi;
         }
 
-        // Volume Gauss points (example 4-point)
+        // Volume Gauss points (example 5-point)
         static inline std::vector<std::array<float, 3>> gaussPoints() {
-            float alpha = 0.58541020f;
-            float beta = 0.13819660f;
-            return { {{alpha,beta,beta}}, {{beta,alpha,beta}}, {{beta,beta,alpha}}, {{beta,beta,beta}} };
+            float alpha = 1 / 4.0f;
+            float beta = 1 / 2.0f;
+            float gamma = 1 / 6.0f;
+            return { {{alpha,alpha,alpha}},
+                {{beta,gamma,gamma}},
+                {{gamma,beta,gamma}},
+                {{gamma,gamma,beta}},
+                {{gamma,gamma,gamma}} };
         }
 
         static inline std::vector<std::array<float, 3>> weights() {
-            return { {{1 / 24.0f,1.0f,1.0f}}, {{1 / 24.0f,1.0f,1.0f}}, {{1 / 24.0f,1.0f,1.0f}}, {{1 / 24.0f,1.0f,1.0f}} };
+            return { {{-4 / 30.0,1.0f,1.0f}},
+                {{9 / 120.0f,1.0f,1.0f}},
+                {{9 / 120.0f,1.0f,1.0f}},
+                {{9 / 120.0f,1.0f,1.0f}},
+                {{9 / 120.0f,1.0f,1.0f}} };
         }
 
         // Face Gauss points (quadratic triangle)
         static inline std::vector<std::array<float, 2>> faceGaussPoints() {
-            return { {{1.0f / 6.0f,1.0f / 6.0f}}, {{2.0f / 3.0f,1.0f / 6.0f}}, {{1.0f / 6.0f,2.0f / 3.0f}}, {{1.0f / 6.0f,1.0f / 3.0f}} };
+            return { {{1.0f / 3.0f, 1.0f / 3.0f}},
+                {{0.6f, 0.2f}},
+                {{0.2f,0.6f}},
+                {{0.2f, 0.2f}} };
         }
 
         static inline std::vector<std::array<float, 2>> faceWeights() {
-            return { {{1 / 6.0f,1.0f}}, {{1 / 6.0f,1.0f}}, {{1 / 6.0f,1.0f}}, {{1 / 6.0f,1.0f}} };
+            return { {{-27 / 96.0f, 1.0f}},
+                {{25 / 96.0f, 1.0f}},
+                {{25 / 96.0f, 1.0f}},
+                {{25 / 96.0f, 1.0f}} };
         }
     };
 }

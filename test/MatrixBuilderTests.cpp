@@ -24,7 +24,7 @@ protected:
 	};
 };
 
-class TetBuilder : public testing::Test {
+class TetLinBuilder : public testing::Test {
 protected:
 	std::vector<Node> nodes;
 	std::vector<BoundaryFace> boundaryFaces;
@@ -57,6 +57,54 @@ protected:
 
 		matrixBuilder.setMesh(mesh);
 		matrixBuilder.precomputeShapeFunctions<ShapeFunctions::TetLinear>();
+	};
+
+	void TearDown() override
+	{
+	};
+};
+
+class TetQuadBuilder : public testing::Test {
+protected:
+	std::vector<Node> nodes;
+	std::vector<BoundaryFace> boundaryFaces;
+	MatrixBuilder matrixBuilder;
+	ShapeFunctions::TetQuadratic testTet;
+	Mesh mesh;
+	Element elem;
+	void SetUp() override {
+
+		// Create a single element with 10 nodes
+		nodes.resize(10);
+		nodes[0].x = 0; nodes[0].y = 0; nodes[0].z = 0;
+		nodes[1].x = 2; nodes[1].y = 0; nodes[1].z = 0;
+		nodes[2].x = 0; nodes[2].y = 2; nodes[2].z = 0;
+		nodes[3].x = 0; nodes[3].y = 0; nodes[3].z = 2;
+		nodes[4].x = 1; nodes[4].y = 0; nodes[4].z = 0;
+		nodes[5].x = 1; nodes[5].y = 1; nodes[5].z = 0;
+		nodes[6].x = 0; nodes[6].y = 1; nodes[6].z = 0;
+		nodes[7].x = 0; nodes[7].y = 0; nodes[7].z = 1;
+		nodes[8].x = 1; nodes[8].y = 0; nodes[8].z = 1;
+		nodes[9].x = 0; nodes[9].y = 1; nodes[9].z = 1;
+		for (int i = 0; i < 10; i++) {
+			elem.nodes.push_back(i);
+		}
+		mesh.setNodes(nodes);
+		mesh.setElements({ elem });
+
+		boundaryFaces.resize(4);
+		for (int i = 0; i < 4; i++) {
+			boundaryFaces[i].elemID = 0;
+			boundaryFaces[i].localFaceID = i;
+			boundaryFaces[i].nodes.assign(testTet.faceConnectivity[i].begin(), testTet.faceConnectivity[i].end());
+			boundaryFaces[i].type = FLUX;
+			boundaryFaces[i].value = 1;
+		}
+		boundaryFaces[0].type = HEATSINK;
+		mesh.setBoundaryFaces(boundaryFaces);
+
+		matrixBuilder.setMesh(mesh);
+		matrixBuilder.precomputeShapeFunctions<ShapeFunctions::TetQuadratic>();
 	};
 
 	void TearDown() override
@@ -277,13 +325,13 @@ TEST_F(HexBuilder, testBuildMatrices)
 /* Testing Calculation of the jacobain when using linear tetrahedral elements
 * Element we are using has Jacobian = diag(2*ones(3,1))
 */
-TEST_F(TetBuilder, testCalculateJ)
+TEST_F(TetLinBuilder, testCalculateJ)
 {
 	const int Nne = ShapeFunctions::TetLinear::nNodes;
 	Eigen::Matrix<float,3,Nne> dNdxi;
 	for (int a = 0; a < Nne; a++)
 	{
-		dNdxi.col(a) = ShapeFunctions::TetLinear::dNdxi({1.0f,-1.0f,0.0f}, a);
+		dNdxi.col(a) = ShapeFunctions::TetLinear::dNdxi({1.0f,0.0f,0.0f}, a);
 	}
 
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case
@@ -308,7 +356,7 @@ TEST_F(TetBuilder, testCalculateJ)
 /* Testing Calculation of the thermal mass matrix when using linear tetrahedral elements
 * Element we are using has Jacobian = diag(2*ones(3,1))
 */
-TEST_F(TetBuilder, testCalculateMe)
+TEST_F(TetLinBuilder, testCalculateMe)
 {
 	const int Nne = testTetLin.nNodes;
 	matrixBuilder.precomputeElemJ<ShapeFunctions::TetLinear>(mesh.elements()[0]);
@@ -328,7 +376,7 @@ TEST_F(TetBuilder, testCalculateMe)
 /* Testing Calculation of the stiffness matrix when using linear tetrahedral elements
 * Element we are using has Jacobian = diag(2*ones(3,1))
 */
-TEST_F(TetBuilder, testCalculateKe)
+TEST_F(TetLinBuilder, testCalculateKe)
 {
 	const int Nne = testTetLin.nNodes;
 	matrixBuilder.precomputeElemJ<ShapeFunctions::TetLinear>(mesh.elements()[0]);
@@ -353,7 +401,7 @@ TEST_F(TetBuilder, testCalculateKe)
 /*
 * Testing construction of FeFlux vector for linear tetrahedral elements
 */
-TEST_F(TetBuilder, testCalculateFeFlux)
+TEST_F(TetLinBuilder, testCalculateFeFlux)
 {
 	// based on elements constructed above, |J_s| = 2 and be constant in the mesh
 	const int nNe = testTetLin.nNodes;
@@ -399,7 +447,7 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 
 }
 
-TEST_F(TetBuilder, testCalculateFeConv)
+TEST_F(TetLinBuilder, testCalculateFeConv)
 {
 	const int nNe = testTetLin.nNodes;
 	const int nFn = testTetLin.nFaceNodes;
@@ -438,8 +486,61 @@ TEST_F(TetBuilder, testCalculateFeConv)
 	}
 }
 
-TEST_F(TetBuilder, testBuildMatrices)
+TEST_F(TetLinBuilder, testBuildMatrices)
 {
 	matrixBuilder.buildMatrices();
 	// This test really just makes sure the function runs, we should add checks on the matrix construction
+}
+
+/* Testing Calculation of the jacobain when using quadratic tetrahedral elements
+* Element we are using has Jacobian = diag(2*ones(3,1))
+*/
+TEST_F(TetQuadBuilder, testCalculateJ)
+{
+	const int Nne = ShapeFunctions::TetQuadratic::nNodes;
+	Eigen::Matrix<float, 3, Nne> dNdxi;
+	for (int a = 0; a < Nne; a++)
+	{
+		// xi position doesn't matter since Jacobian should be constant throughout mesh
+		dNdxi.col(a) = ShapeFunctions::TetQuadratic::dNdxi({ 0.0f,0,0.0f }, a); 
+	}
+
+	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetQuadratic>(elem, dNdxi);
+
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++)
+		{
+			if (i == j)
+			{
+				// diagonal should be 2.0
+				EXPECT_FLOAT_EQ(J(i, j), 2.0f) << "i: " << i << " j: " << j << std::endl;
+			}
+			else
+			{
+				// off diagonal should be 0
+				EXPECT_FLOAT_EQ(J(i, j), 0) << "i: " << i << " j: " << j << std::endl;
+			}
+		}
+	}
+}
+
+
+/* Testing Calculation of the thermal mass matrix when using quadratic tetrahedral elements
+* Element we are using has Jacobian = diag(2*ones(3,1))
+*/
+TEST_F(TetQuadBuilder, testCalculateMe)
+{
+	const int Nne = testTet.nNodes;
+	matrixBuilder.precomputeElemJ<ShapeFunctions::TetQuadratic>(mesh.elements()[0]);
+	Eigen::Matrix<float, Nne, Nne> Me = matrixBuilder.calculateIntNaNb<ShapeFunctions::TetQuadratic>(elem);
+
+	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 2.0
+
+	float scale[Nne] = { 1.0f, 2.0f, 2.0f, 2.0f };
+	for (int Ai = 0; Ai < Nne; Ai++)
+	{
+		EXPECT_FLOAT_EQ(8 / 60.0f, Me(Ai, Ai));
+		EXPECT_FLOAT_EQ((8 / (scale[Ai] * 60.0f)), Me(Ai, 0));
+	}
+
 }
