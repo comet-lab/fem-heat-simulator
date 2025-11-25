@@ -198,6 +198,14 @@ if(BUILD_TESTING)
         GTest::gtest_main
     )
 
+    add_executable(TetLinearTests
+        test/ShapeFunctions/TetLinearTests.cpp
+    )
+    target_link_libraries(TetLinearTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
     if (USE_CUDA)
         add_executable(GPUSolver_Unit_Tests
             test/GPUSolver_Unit_Tests.cpp

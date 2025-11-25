@@ -274,67 +274,6 @@ TEST_F(HexBuilder, testBuildMatrices)
 }
 
 
-/*
-* Testing the construction of the shape functions for Linear Tetrahedral elements
-*/
-TEST_F(TetBuilder, testCalculateN)
-{
-	const int Nne = 4; // 8 nodes in tetrahedral elements with linear shape functions
-	// xi1 has the coordinates at the nodal locations in the element
-	std::array<std::array<float, 3>, Nne> xi1 = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1} } };
-	// xi2 has the coordinates of a different node
-	std::array<std::array<float, 3>, Nne> xi2 = { { {1,0,0},{0,1,0},{0,0,1},{0,0,0} } };
-	for (int Ai = 0; Ai < Nne; Ai++) {
-		float output1 = testTetLin.N(xi1[Ai], Ai);
-		float output2 = testTetLin.N(xi2[Ai], Ai);
-		float output3 = testTetLin.N({ 1/3.0f, 1 / 3.0f, 1 / 3.0f }, Ai);
-
-		EXPECT_FLOAT_EQ(1.0f, output1);
-		EXPECT_FLOAT_EQ(0.0f, output2);
-		if (Ai == 0)
-			EXPECT_NEAR(0.0f, output3,0.000001);
-		else
-			EXPECT_FLOAT_EQ(1 / 3.0f, output3);
-	}
-}
-
-/* Testing the construction of the spatial derivatives of the shape functions
-* for linear tetrahedral elements
-*/
-TEST_F(TetBuilder, testCalculatedNdxi)
-{
-	const int Nne = 4;
-
-	std::array<std::array<float, 3>, Nne> xi1 = { { {0,0,0},{1,0,0},{0,1,0},{0,0,1} } };
-
-	for (int Ai = 0; Ai < Nne; Ai++)
-	{
-		Eigen::Vector3f output1 = testTetLin.dNdxi(xi1[Ai], Ai);
-		switch (Ai) {
-		case 0:
-			ASSERT_FLOAT_EQ(output1[0], -1.0f);
-			ASSERT_FLOAT_EQ(output1[1], -1.0f);
-			ASSERT_FLOAT_EQ(output1[2], -1.0f);
-			break;
-		case 1:
-			ASSERT_FLOAT_EQ(output1[0], 1.0f);
-			ASSERT_FLOAT_EQ(output1[1], 0.0f);
-			ASSERT_FLOAT_EQ(output1[2], 0.0f);
-			break;
-		case 2:
-			ASSERT_FLOAT_EQ(output1[0], 0.0f);
-			ASSERT_FLOAT_EQ(output1[1], 1.0f);
-			ASSERT_FLOAT_EQ(output1[2], 0.0f);
-			break;
-		case 3: 
-			ASSERT_FLOAT_EQ(output1[0], 0.0f);
-			ASSERT_FLOAT_EQ(output1[1], 0.0f);
-			ASSERT_FLOAT_EQ(output1[2], 1.0f);
-			break;
-		}
-	}
-}
-
 /* Testing Calculation of the jacobain when using linear tetrahedral elements
 * Element we are using has Jacobian = diag(2*ones(3,1))
 */

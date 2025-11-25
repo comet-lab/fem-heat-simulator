@@ -8,6 +8,8 @@ namespace ShapeFunctions {
 
     struct TetLinear {
         //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+
         /* Reference for shape functions and numerical integration Schemes: The finite element method: its basis and fundamentals (7th edition)
         * by O.C. Zienkiewicz, R.L. Taylor, J.Z. Zhu. Note that the weights in their tables are presumed to be multiplied by the volume of the 
         * element. In our case our element volume is 1/6 so we multiply the weights in the table by 1/6. The same is true for area where the area
@@ -24,7 +26,7 @@ namespace ShapeFunctions {
             {0, 2, 1}, // base (zeta = 0)
             {0, 1, 3}, // side (eta = 0)
             {1, 2, 3}, // side (1 - xi - eta - zeta = 0)
-            {2, 0, 3}  // side (xi = 0)
+            {0, 3, 2}  // side (xi = 0)
         } };
 
         // Standard linear shape functions in reference (xi,eta,zeta)
@@ -82,10 +84,10 @@ namespace ShapeFunctions {
             const float s = gp[1];
             std::array<float, 3> xi{};
             switch (face) {
-            case 0: xi = { r, s, 0.0f }; break; // nodes are {0,1,2} -> zeta = 0
-            case 1: xi = { s, 0.0f, r}; break; // nodes are {0,1,3} -> eta = 0
+            case 0: xi = { s, r, 0.0f }; break; // nodes are {0,2,1} -> zeta = 0
+            case 1: xi = { r, 0.0f, s}; break; // nodes are {0,1,3} -> eta = 0
             case 2: xi = { 1.0f-r-s, r, s}; break; // nodes are {1,2,3} -> 1 - xi - eta - zeta = 0
-            case 3: xi = { 0, r, s }; break; // nodes are {2,0,3} -> xi = 0 
+            case 3: xi = { 0, s, r }; break; // nodes are {0,3,2} -> xi = 0 
             default: throw std::runtime_error("Invalid face index in TetLinear::mapFaceGPtoXi");
             }
             return xi;
