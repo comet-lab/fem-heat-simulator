@@ -311,12 +311,12 @@ public:
 		Eigen::Matrix<float, ShapeFunc::nNodes, 1> Fe = Eigen::Matrix<float, ShapeFunc::nNodes, 1>::Zero();
 
 		//const auto& gp = ShapeFunc::faceGaussPoints(faceIndex);
-		const auto& w = ShapeFunc::faceWeights(faceIndex);
+		const auto& w = ShapeFunc::faceWeights();
 
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
-			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[faceIndex][i];
-			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
+			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[i];
+			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[i];
 
 			// Compute 2x3 surface Jacobian
 			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
@@ -350,12 +350,12 @@ public:
 
 		Eigen::Matrix<float, nNodes, nNodes> Qe = Eigen::Matrix<float, nNodes, nNodes>::Zero();
 
-		const auto& w = ShapeFunc::faceWeights(faceIndex);
+		const auto& w = ShapeFunc::faceWeights();
 
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
-			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[faceIndex][i];
-			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[faceIndex][i];
+			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[i];
+			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[i];
 
 			// Compute 2x3 surface Jacobian
 			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
@@ -476,32 +476,29 @@ public:
 			dNdxiCache_.push_back(dNdxi);
 		}
 
-		// pre-compute surface shape functions
-		for (int f = 0; f < ShapeFunc::nFaces; f++)
+
+		// Precompute face shape functions and derivatives
+		const auto& gpFace = ShapeFunc::faceGaussPoints();
+		std::vector<Eigen::VectorXf> temporaryNFace(ShapeFunc::nFaceGP);
+		//std::vector<Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes>> temporarydNdxi(ShapeFunc::nFaceGP);
+		std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> temporarydNdxi(ShapeFunc::nFaceGP);
+		std::vector<Eigen::Matrix<float, ShapeFunc::nFaceNodes, ShapeFunc::nFaceNodes>> temporaryNaNbFace(ShapeFunc::nFaceGP);
+		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
-			const auto& gpFace = ShapeFunc::faceGaussPoints(f);
+			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face;
+			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta;
 
-			std::vector<Eigen::VectorXf> temporaryNFace(ShapeFunc::nFaceGP);
-			//std::vector<Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes>> temporarydNdxi(ShapeFunc::nFaceGP);
-			std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> temporarydNdxi(ShapeFunc::nFaceGP);
-			std::vector<Eigen::Matrix<float, ShapeFunc::nFaceNodes, ShapeFunc::nFaceNodes>> temporaryNaNbFace(ShapeFunc::nFaceGP);
-			for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
+			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
-				Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face;
-				Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta;
-
-				for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
-				{
-					N_face(a) = ShapeFunc::N_face(gpFace[i], a, f);
-					dN_dxi_eta.col(a) = ShapeFunc::dNdxi_face(gpFace[i], a, f);
-				}
-				temporaryNFace[i] = N_face;
-				temporaryNaNbFace[i] = N_face * N_face.transpose();
-				temporarydNdxi[i] = dN_dxi_eta;
+				N_face(a) = ShapeFunc::N_face(gpFace[i], a);
+				dN_dxi_eta.col(a) = ShapeFunc::dNdxi_face(gpFace[i], a);
 			}
-			NFaceCache_.push_back(temporaryNFace);
-			dNdxiFaceCache_.push_back(temporarydNdxi);
+			temporaryNFace[i] = N_face;
+			temporaryNaNbFace[i] = N_face * N_face.transpose();
+			temporarydNdxi[i] = dN_dxi_eta;
 		}
+		NFaceCache_ = temporaryNFace;
+		dNdxiFaceCache_ = temporarydNdxi;
 	}
 
 	// really just here for test cases, but I guess someone can use it if they want
@@ -518,12 +515,12 @@ private:
 	// surface shape functions
 	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Vector is face shape functions at gauss point on face
 	// size is nFace x nGP x nFaceNodes
-	std::vector<std::vector<Eigen::VectorXf>> NFaceCache_; 
+	std::vector<Eigen::VectorXf> NFaceCache_; 
 	// Stores multiplication of N*N' for each face shape function at each gauss point
-	std::vector<std::vector<Eigen::MatrixXf>> NaNbFaceCache_;
+	std::vector<Eigen::MatrixXf> NaNbFaceCache_;
 	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Matrix is face derivative shape functions at gauss point on face
 	// size is nFace x nGp x (2 x nFaceNodes)
-	std::vector<std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>>> dNdxiFaceCache_;
+	std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> dNdxiFaceCache_;
 
 	/* Caching jacobians per element*/
 	std::vector<float> detJCache_; //Caching the determinant of the jacobian for each Gauss point

@@ -108,11 +108,11 @@ TEST(HexLinear, testN_face)
 		for (int A = 0; A < testFunctions.nFaceNodes; A++)
 		{
 			std::cout << "Face: " << faceIdx << " A: " << A << std::endl;
-			float output = testFunctions.N_face(gp1, A, faceIdx);
-			float output2 = testFunctions.N_face(gp2, A, faceIdx);
-			float output3 = testFunctions.N_face(gp3, A, faceIdx);
-			float output4 = testFunctions.N_face(gp4, A, faceIdx);
-			float output5 = testFunctions.N_face(gp5, A, faceIdx);
+			float output = testFunctions.N_face(gp1, A);
+			float output2 = testFunctions.N_face(gp2, A);
+			float output3 = testFunctions.N_face(gp3, A);
+			float output4 = testFunctions.N_face(gp4, A);
+			float output5 = testFunctions.N_face(gp5, A);
 			EXPECT_FLOAT_EQ(1 / 4.0f, output);
 			EXPECT_FLOAT_EQ(point2True[A], output2);
 			EXPECT_FLOAT_EQ(point3True[A], output3);
@@ -154,10 +154,10 @@ TEST(HexLinear, testdN_face)
 		for (int A = 0; A < testFunctions.nFaceNodes; A++)
 		{
 			std::cout << "Face: " << faceIdx << " A: " << A << std::endl;
-			Eigen::Vector2f output1 = testFunctions.dNdxi_face(gp1, A, faceIdx);
-			Eigen::Vector2f output2 = testFunctions.dNdxi_face(gp2, A, faceIdx);
-			Eigen::Vector2f output3 = testFunctions.dNdxi_face(gp3, A, faceIdx);
-			Eigen::Vector2f output4 = testFunctions.dNdxi_face(gp4, A, faceIdx);
+			Eigen::Vector2f output1 = testFunctions.dNdxi_face(gp1, A);
+			Eigen::Vector2f output2 = testFunctions.dNdxi_face(gp2, A);
+			Eigen::Vector2f output3 = testFunctions.dNdxi_face(gp3, A);
+			Eigen::Vector2f output4 = testFunctions.dNdxi_face(gp4, A);
 			for (int idx = 0; idx < 2; idx++)
 			{
 				EXPECT_FLOAT_EQ(point1True[A][idx], output1[idx]);

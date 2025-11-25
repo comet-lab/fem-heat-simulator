@@ -64,28 +64,23 @@ namespace ShapeFunctions {
         }
 
         // Face shape function (triangle in barycentric space)
-        static inline float N_face(const std::array<float, 2>& gp, int nodeIdx, int face) {
+        static inline float N_face(const std::array<float, 2>& xi, int A) {
             // Each triangular face uses local coords 
-            int A = faceConnectivity[face][nodeIdx];
-            std::array<float, 3> xi = mapFaceGPtoXi(gp, face);
-            return N(xi, A);
+            switch (A) {
+            case 0: return 1.0f - xi[0] - xi[1]; // 1 if xi,eta,zeta = 0
+            case 1: return xi[0]; // xi
+            case 2: return xi[1]; // eta
+            default: return 0.0f;
+            }
         }
 
-        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& gp, int nodeIdx, int face) {
-            int A = faceConnectivity[face][nodeIdx];
-            std::array<float, 3> xi = mapFaceGPtoXi(gp, face);
-            Eigen::Vector3f dNa = dNdxi(xi, A);
-
-            // For simplicity, select appropriate two components per face
-            Eigen::Vector2f dN_face;
-            switch (face) {
-            case 0: dN_face << (dNa[1] - dNa[0]), (dNa[2] - dNa[0]); break;  // {1, 2, 3} opposite node 0 (xi + eta + zeta) = 1
-            case 1: dN_face << dNa[2], dNa[1]; break; // {0, 3, 2} opposite node 1 (xi = 0)
-            case 2: dN_face << dNa[0], dNa[2]; break; // {0, 1, 3} opposite node 2 (eta = 0)
-            case 3: dN_face << dNa[1], dNa[0]; break; // {0, 2, 1} opposite node 3 (zeta = 0)
-            default: dN_face.setZero(); break;
+        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& xi, int A) {
+            switch (A) {
+            case 0: return Eigen::Vector2f(-1.0f, -1.0f);
+            case 1: return Eigen::Vector2f(1.0f, 0.0f);
+            case 2: return Eigen::Vector2f(0.0f, 1.0f);
+            default: return Eigen::Vector2f::Zero();
             }
-            return dN_face;
         }
 
         // Map face Gauss point to element
@@ -127,14 +122,14 @@ namespace ShapeFunctions {
         }
 
         // 1-point quadrature for triangular face (centroid)
-        static inline std::vector<std::array<float, 2>> faceGaussPoints(int) {
+        static inline std::vector<std::array<float, 2>> faceGaussPoints() {
             //return { { {1.0f / 3.0f, 1.0f / 3.0f} } }; // Single point quadrature
             return { { {1 / 2.0f, 1 / 2.0f},
                 {1 / 2.0f, 0.0f},
                 {0.0f, 1 / 2.0f} } };
         }
 
-        static inline std::vector<std::array<float, 2>> faceWeights(int) {
+        static inline std::vector<std::array<float, 2>> faceWeights() {
             // area: 0.5 for reference triangle
             //return { { {1/2.0f, 1.0f} } };  // single point quadrature
             // 4 point quadrature - again weight isn't distributed between points but instead just scales the volume

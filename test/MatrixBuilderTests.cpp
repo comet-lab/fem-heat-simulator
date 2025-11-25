@@ -355,22 +355,23 @@ TEST_F(TetBuilder, testCalculateKe)
 */
 TEST_F(TetBuilder, testCalculateFeFlux)
 {
+	// based on elements constructed above, |J_s| = 2 and be constant in the mesh
 	const int nNe = testTetLin.nNodes;
 	//Face 0: Bottom Face
 	Eigen::Vector<float, nNe> FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::TetLinear>(elem, 0, 1);
 	for (int A = 0; A < nNe; A++)
 	{
-		if (A == 3)
+		if (A == 0)
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
-			EXPECT_FLOAT_EQ(FeFlux(A), 2/3.0f);
+			EXPECT_FLOAT_EQ(FeFlux(A), sqrt(3) * 2 / 3.0f); // area is larger by factor of sqrt(3) so flux is larger by that amount
 	}
 
 	//Face 1:
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::TetLinear>(elem, 1, 1);
 	for (int A = 0; A < nNe; A++)
 	{
-		if (A == 2)
+		if (A == 1)
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 2 / 3.0f);
@@ -380,17 +381,17 @@ TEST_F(TetBuilder, testCalculateFeFlux)
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::TetLinear>(elem, 2, 1);
 	for (int A = 0; A < nNe; A++)
 	{
-		if (A == 0)
+		if (A == 2)
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
-			EXPECT_FLOAT_EQ(FeFlux(A), sqrt(3)*2 / 3.0f); // area is larger by factor of sqrt(3) so flux is larger by that amount
+			EXPECT_FLOAT_EQ(FeFlux(A), 2 / 3.0f);
 	}
 
 	//Face 3:
 	FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::TetLinear>(elem, 3, 1);
 	for (int A = 0; A < nNe; A++)
 	{
-		if (A==1)
+		if (A == 3)
 			EXPECT_FLOAT_EQ(FeFlux(A), 0);// any input on the top nodes should be 0
 		else
 			EXPECT_FLOAT_EQ(FeFlux(A), 2 / 3.0f);
@@ -406,7 +407,7 @@ TEST_F(TetBuilder, testCalculateFeConv)
 													{ 0.5f, 1.0f, 0.5f},
 													{ 0.5f, 0.5f, 1.0f} } };
 
-	std::array<int, 4> zeroNodes = { 3,2,0,1 }; // node for face = f where Conv value should be 0
+	std::array<int, 4> zeroNodes = { 0,1,2,3 }; // node for face = f where Conv value should be 0
 	int A = 0;
 	int B = 0;
 	for (int f = 0; f < 4; f++)
@@ -420,8 +421,8 @@ TEST_F(TetBuilder, testCalculateFeConv)
 			{
 				A = nodes[i];
 				B = nodes[j];
-				if (f == 2)
-					// when f == 2 we have the slanted face which has a larger jacobian determinant by a factor of sqrt(3)
+				if (f == 0)
+					// when f == 0 we have the slanted face which has a larger jacobian determinant by a factor of sqrt(3)
 					EXPECT_FLOAT_EQ(FeConv(A, B), sqrt(3)*scale[i][j] / 3.0f); 
 				else
 					EXPECT_FLOAT_EQ(FeConv(A, B), scale[i][j] / 3.0f);

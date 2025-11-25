@@ -49,12 +49,16 @@ namespace ShapeFunctions {
             }
         }
 
-        static inline float N_face(const std::array<float, 2>& gp, int nodeIdx, int face)
+        static inline float N_face(const std::array<float, 2>& xi, int A)
         {
-            // A will be a value between 0 and 3. Face will be a value between 0 and 5
-            int A = faceConnectivity[face][nodeIdx];
-            std::array<float, 3> xi = mapFaceGPtoXi(gp, face);
-            return N(xi, A);
+            const float x = xi[0], y = xi[1];
+            switch (A) {
+            case 0: return 0.25f * (1 - x) * (1 - y);
+            case 1: return 0.25f * (1 + x) * (1 - y);
+            case 2: return 0.25f * (1 + x) * (1 + y);
+            case 3: return 0.25f * (1 - x) * (1 + y);
+            default: return 0.0f;
+            }
         }
 
         static inline Eigen::Vector3f dNdxi(const std::array<float, 3>& xi, int A)
@@ -75,28 +79,17 @@ namespace ShapeFunctions {
             return dN;
         }
 
-        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& gp, int nodeIdx, int face)
+        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& xi, int A)
         {
-            int A = faceConnectivity[face][nodeIdx];
-
-            // Construct the full xi for the element, with the fixed coordinate for this face
-            std::array<float, 3> xi = mapFaceGPtoXi(gp, face);
-
-            // Compute full 3D derivative in reference coordinates
-            Eigen::Vector3f dN = dNdxi(xi, A);
-
-            // Select the two derivatives corresponding to the face parametric directions
+            const float x = xi[0], y = xi[1];
             Eigen::Vector2f dN_face;
-            switch (face)
-            {
-            case 0: dN_face << dN[1], dN[0]; break; // top face
-            case 1: dN_face << dN[0], dN[1]; break; // bot face
-            case 2: dN_face << dN[0], dN[2]; break; // back face
-            case 3: dN_face << dN[2], dN[0]; break; // front face
-            case 4: dN_face << dN[2], dN[1]; break; // left face
-            case 5: dN_face << dN[1], dN[2]; break; // right face
+            switch (A) {
+            case 0: dN_face << -0.25f * (1 - y), -0.25 * (1 - x); break;
+            case 1: dN_face << 0.25f * (1 - y), -0.25f * (1 + x); break;
+            case 2: dN_face << 0.25f * (1 + y), 0.25f * (1 + x); break;
+            case 3: dN_face << -0.25f * (1 + y), 0.25f * (1 - x); break;
+            default: dN_face.setZero(); break;
             }
-
             return dN_face;
         }
 
@@ -131,7 +124,7 @@ namespace ShapeFunctions {
             };
         }
 
-        static inline std::vector<std::array<float, 2>> faceGaussPoints(int face)
+        static inline std::vector<std::array<float, 2>> faceGaussPoints()
         {
             // standard 2-point Gauss quadrature in 1D
             const float a = 1.0f / std::sqrt(3.0f);
@@ -148,7 +141,7 @@ namespace ShapeFunctions {
             return std::vector<std::array<float, 3>>(8, { 1.0,1.0,1.0 });
         }
 
-        static inline std::vector<std::array<float, 2>> faceWeights(int face)
+        static inline std::vector<std::array<float, 2>> faceWeights()
         {
             // 2D quad weights = product of 1D weights (both 1.0 for 2-point Gauss)
             std::vector<std::array<float, 2>> w(4);
