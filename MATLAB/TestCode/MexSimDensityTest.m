@@ -6,7 +6,7 @@ sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
 simulator = HeatSimulator();
 simulator.dt = 0.05;
 simulator.alpha = 0.5;
-simulator.useAllCPUs = true;
+simulator.useAllCPUs = false;
 simulator.useGPU = false;
 simulator.silentMode = false;
 
@@ -47,10 +47,12 @@ simulator.thermalInfo = thermalInfo;
 simulator.plotVolume(2);
 
 
-% MESH 2
+%% MESH 2
 z = [0:0.0015:0.05 0.1:0.05:1];
 y = [-1:0.05:-0.5 -0.475:0.025:0.475 0.5:0.05:1];
 x = [-1:0.05:-0.5 -0.475:0.025:0.475 0.5:0.05:1];
+% x = [-1, -0.8, -0.6, -0.4, -0.2, -0.1 , 0.0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0];
+% y = [-1, -0.8, -0.6, -0.4, -0.2, -0.1 , 0.0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0];
 [X,Y,Z] = meshgrid(x,y,z);
 X = X(:); Y = Y(:); Z = Z(:);
 nodesPerAxis = [length(x),length(y),length(z)];
@@ -64,3 +66,6 @@ thermalInfo.fluenceRate = fluenceRate2;
 simulator.thermalInfo = thermalInfo;
 [Tpred2,sensorTemps2] = simulator.solve(simDuration);
 simulator.plotVolume(3);
+
+
+clear mex

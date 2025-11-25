@@ -45,7 +45,8 @@ classdef HeatSimulator < handle
             meshInfo.sensorLocations = obj.sensorLocations;
             thermalInfoStruct = obj.thermalInfo.toStruct();
             settings = struct('finalTime',finalTime,'dt', obj.dt, 'alpha', obj.alpha,...
-                'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU);
+                'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
+                'createMatrices',obj.buildMatrices);
             [T,sensors] = MEX_Heat_Simulation(meshInfo,thermalInfoStruct,settings);
             obj.thermalInfo.temperature = T;
         end

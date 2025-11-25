@@ -140,7 +140,7 @@ public:
         
         // Create global K M and F 
         if (createAllMatrices) { // only need to create the KMF matrices the first time
-            createAllMatrices = false;
+            createAllMatrices = true;
             try {
 #ifdef USE_CUDA
                 if (useGPU)
@@ -427,7 +427,7 @@ public:
     bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& FluenceRate,
         float tissueSize[3],float layerHeight, int elemsInLayer,int boundaryType[6]) {
         // this function checks to see if we need to recreate the global element matrices
-        createAllMatrices = false;
+        createAllMatrices = true;
 
 
         return createAllMatrices;

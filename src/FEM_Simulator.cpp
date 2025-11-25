@@ -310,6 +310,8 @@ void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSensorLocations)
 {
 	int nSensors = tempSensorLocations.size();
+
+	sensorTemps_.clear();
 	sensorTemps_.resize(nSensors);
 	sensors_.clear();
 	sensors_.resize(nSensors);
