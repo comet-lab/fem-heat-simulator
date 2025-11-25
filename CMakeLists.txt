@@ -206,6 +206,14 @@ if(BUILD_TESTING)
         GTest::gtest_main
     )
 
+    add_executable(TetQuadraticTests
+        test/ShapeFunctions/TetQuadraticTests.cpp
+    )
+    target_link_libraries(TetQuadraticTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
     if (USE_CUDA)
         add_executable(GPUSolver_Unit_Tests
             test/GPUSolver_Unit_Tests.cpp
