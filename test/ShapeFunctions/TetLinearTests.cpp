@@ -69,10 +69,10 @@ TEST(HexLinear, testMapFaceGPtoXi)
 {
 	ShapeFunctions::TetLinear testFunctions;
 	std::array<float, 2> gp = { 0.25f,0.5f };
-	std::array<std::array<float, 3>, 4> truthTable = { { {0.5f,0.25f,0.0f}, // 0 - 2 - 1 ; zeta = 0
+	std::array<std::array<float, 3>, 4> truthTable = { { {0.25,0.25f,0.5f}, // 1 - 2 - 3; xi + eta + zeta = 1
+											{0.0,0.5f,0.25f},  // 0 - 3 - 2; xi = 
 											{0.25,0.0f,0.5f}, // 0 - 1 - 3 ; eta = 0
-											{0.25,0.25f,0.5f}, // 1 - 2 - 3; xi + eta + zeta = 1
-											{0.0,0.5f,0.25f}  // 0 - 3 - 2; xi = 
+											{ 0.5f,0.25f,0.0f } // 0 - 2 - 1 ; zeta = 0
 											} }; // right
 	for (int faceIdx = 0; faceIdx < 4; faceIdx++)
 	{

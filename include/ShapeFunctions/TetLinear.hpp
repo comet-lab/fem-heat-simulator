@@ -10,6 +10,16 @@ namespace ShapeFunctions {
         //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 
+        /*
+        *     zeta        3 
+        *    /          / | \ 
+        *   /          /  |  \
+        *  *---> eta  0 --+-- 2
+        *   \          \  |  /
+        *    \          \ | /
+        *     xi          1
+        */
+
         /* Reference for shape functions and numerical integration Schemes: The finite element method: its basis and fundamentals (7th edition)
         * by O.C. Zienkiewicz, R.L. Taylor, J.Z. Zhu. Note that the weights in their tables are presumed to be multiplied by the volume of the 
         * element. In our case our element volume is 1/6 so we multiply the weights in the table by 1/6. The same is true for area where the area
@@ -23,10 +33,10 @@ namespace ShapeFunctions {
 
         // Face connectivity: 4 faces, 3 nodes each
         static constexpr std::array<std::array<int, 3>, 4> faceConnectivity = { {
-            {0, 2, 1}, // base (zeta = 0)
-            {0, 1, 3}, // side (eta = 0)
-            {1, 2, 3}, // side (1 - xi - eta - zeta = 0)
-            {0, 3, 2}  // side (xi = 0)
+            {1, 2, 3}, // opposite node 0 (xi + eta + zeta) = 1
+            {0, 3, 2}, // opposite node 1 (xi = 0)
+            {0, 1, 3}, // opposite node 2 (eta = 0)
+            {0, 2, 1}  // opposite node 3 (zeta = 0)
         } };
 
         // Standard linear shape functions in reference (xi,eta,zeta)
@@ -69,10 +79,10 @@ namespace ShapeFunctions {
             // For simplicity, select appropriate two components per face
             Eigen::Vector2f dN_face;
             switch (face) {
-            case 0: dN_face << dNa[1], dNa[0]; break; // nodes are {0,1,2} -> zeta = 0
-            case 1: dN_face << dNa[0], dNa[2]; break; // nodes are {0,1,3} -> eta = 0
-            case 2: dN_face << (dNa[1]-dNa[0]), (dNa[2]-dNa[0]); break; // Nodes {1,2,3} -> (1 - eta - zeta - xi) = 0
-            case 3: dN_face << dNa[2], dNa[1]; break; // nodes are {2,0,3} -> xi = 0
+            case 0: dN_face << (dNa[1] - dNa[0]), (dNa[2] - dNa[0]); break;  // {1, 2, 3} opposite node 0 (xi + eta + zeta) = 1
+            case 1: dN_face << dNa[2], dNa[1]; break; // {0, 3, 2} opposite node 1 (xi = 0)
+            case 2: dN_face << dNa[0], dNa[2]; break; // {0, 1, 3} opposite node 2 (eta = 0)
+            case 3: dN_face << dNa[1], dNa[0]; break; // {0, 2, 1} opposite node 3 (zeta = 0)
             default: dN_face.setZero(); break;
             }
             return dN_face;
@@ -84,10 +94,10 @@ namespace ShapeFunctions {
             const float s = gp[1];
             std::array<float, 3> xi{};
             switch (face) {
-            case 0: xi = { s, r, 0.0f }; break; // nodes are {0,2,1} -> zeta = 0
-            case 1: xi = { r, 0.0f, s}; break; // nodes are {0,1,3} -> eta = 0
-            case 2: xi = { 1.0f-r-s, r, s}; break; // nodes are {1,2,3} -> 1 - xi - eta - zeta = 0
-            case 3: xi = { 0, s, r }; break; // nodes are {0,3,2} -> xi = 0 
+            case 0: xi = { 1.0f - r - s, r, s }; break; // {1, 2, 3} opposite node 0 (xi + eta + zeta) = 1
+            case 1: xi = { 0, s, r }; break; //  {0, 3, 2} opposite node 1 (xi = 0)
+            case 2: xi = { r, 0.0f, s }; break; //  {0, 1, 3} opposite node 2 (eta = 0)
+            case 3: xi = { s, r, 0.0f }; break; // { 0, 2, 1} opposite node 3 (zeta = 0) 
             default: throw std::runtime_error("Invalid face index in TetLinear::mapFaceGPtoXi");
             }
             return xi;
