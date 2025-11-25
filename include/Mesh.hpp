@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
+#include "ShapeFunctions/TetQuadratic.hpp"
 
 enum BoundaryType {
 	FLUX,

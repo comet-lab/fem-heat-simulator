@@ -1,8 +1,6 @@
 #pragma once
 #include <algorithm>
 #include "Mesh.hpp"
-#include "ShapeFunctions/HexLinear.hpp"
-#include "ShapeFunctions/TetLinear.hpp"
 #include "GlobalMatrices.hpp"
 
 class MatrixBuilder
@@ -38,6 +36,12 @@ public:
 		{
 			buildMatricesT<ShapeFunctions::TetLinear>();
 		}
+		else if ((mesh_->order() == GeometricOrder::QUADRATIC) && (mesh_->elementShape() == Shape::TETRAHEDRAL))
+		{
+			buildMatricesT<ShapeFunctions::TetQuadratic>();
+		}
+		else
+			throw std::runtime_error("Can't build matrices for elements of given order and shape");
 	}
 
 	/*

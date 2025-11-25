@@ -69,6 +69,8 @@ set(HEATSIM_HEADERS
     include/FEM_Simulator.h
     include/MatrixBuilder.hpp
     include/ShapeFunctions/HexLinear.hpp
+    include/ShapeFunctions/TetLinear.hpp
+    include/ShapeFunctions/TetQuadratic.hpp
     include/TimeIntegrators/TimeIntegrator.hpp
     include/TimeIntegrators/CPUTimeIntegrator.hpp
     include/ThermalModel.hpp

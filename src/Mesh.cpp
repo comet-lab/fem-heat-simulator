@@ -129,6 +129,8 @@ std::array<float,3> Mesh::computeXiCoordinates(const Eigen::Vector3f& p,const st
 {
     if ((order_ == LINEAR) && (elementShape_ == TETRAHEDRAL))
         return computeXiCoordinatesT<ShapeFunctions::TetLinear>(p, nodeList);
+    if ((order_ == QUADRATIC) && (elementShape_ == TETRAHEDRAL))
+        return computeXiCoordinatesT<ShapeFunctions::TetQuadratic>(p, nodeList);
     else if ((order_ == LINEAR) && (elementShape_ == HEXAHEDRAL))
         return  computeXiCoordinatesT<ShapeFunctions::HexLinear>(p, nodeList);
     else
