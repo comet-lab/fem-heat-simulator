@@ -6,20 +6,18 @@ class MexFunction : public matlab::mex::Function {
     * Use case MEX_Heat_Simulation(meshInfo,thermalInfo,settings);
     *   meshInfo - struct containing either sensorLocations and [(xpos, ypos, zpos, boundaryCond) OR (nodes,elements,boundaryFaces)]
     *   thermalInfo - struct containing temperature, fluenceRate, MUA, VHC, TC, HTC, FLUX, AmbientTemp
-    *   settings - struct containing dt, alpha, finalTime, silentMode, useGPU, useAllCPUs, createMatrices
+    *   settings - struct containing dt, alpha, finalTime, silentMode, useGPU, useAllCPUs, resetIntegration
     */
 
 private:
-    /*Inputs required : T0, FluenceRate, tissueSize, tfinal, deltat, tissueProperties, BC, Flux, ambientTemp, sensorLocations, beamWaist, time, laserPose, laserPower,
-   OPTIONAL       : (layers), (useAllCPUs), (useGPU), (alpha), (silentMode), (Nn1d), (createAllMatrices), */
     enum VarPlacement {
-        MESH_INFO, THERMAL_INFO, SETTINGS 
+        THERMAL_INFO, SETTINGS, MESH_INFO
     };
 
     const std::vector<std::string> meshFields4 = { "nodes","elements","boundaryFaces","sensorLocations" };
     const std::vector<std::string> meshFields5 = { "xpos","ypos","zpos","boundaryConditions","sensorLocations"};
     const std::vector<std::string> thermalFields = { "temperature","fluenceRate","MUA","VHC","TC","HTC","flux","ambientTemp" };
-    const std::vector<std::string> settingsFields = { "dt","alpha","finalTime" }; // optional fields {"silentMode","useGPU","useAllCPUs","createMatrices"}
+    const std::vector<std::string> settingsFields = { "dt","alpha","finalTime" }; // optional fields {"silentMode","useGPU","useAllCPUs","resetIntegration"}
 
     std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
     FEM_Simulator simulator;
@@ -27,9 +25,10 @@ private:
     std::ostringstream stream;
     /* Default Parameters that are stored as class variables for repeat calls */
     bool silentMode = true;
-    bool useAllCPUs = true;
-    bool useGPU = true;
-    bool createAllMatrices = true;
+    bool useAllCPUs = false;
+    bool useGPU = false;
+    bool buildMatrices = true;
+    bool resetIntegration = false;
     std::chrono::steady_clock::time_point timeRef_ = std::chrono::steady_clock::now();
 #ifdef USE_CUDA
     GPUTimeIntegrator* gpuHandle = nullptr;
@@ -105,8 +104,7 @@ public:
             printDuration("MEX: Set time stepping rate ");
             
             // Set sensor locations
-            matlab::data::StructArray meshInfo = inputs[VarPlacement::MESH_INFO];
-            matlab::data::TypedArray<double> sensorLocations = meshInfo[0]["sensorLocations"];
+            matlab::data::TypedArray<double> sensorLocations = settings[0]["sensorLocations"];
             std::vector<std::array<float, 3>> sLocations;
             for (int s = 0; s < sensorLocations.getDimensions()[0]; s++) {
                 sLocations.push_back({ static_cast<float>(sensorLocations[s][0]), 
@@ -139,20 +137,23 @@ public:
         displayOnMATLAB(matlabPtr, stream, silentMode);
         
         // Create global K M and F 
-        if (createAllMatrices) { // only need to create the KMF matrices the first time
-            createAllMatrices = true;
+        if (buildMatrices) { // only need to create the KMF matrices the first time
+            stream << "MEX: Initializing simulator ... " << std::endl;
+            displayOnMATLAB(matlabPtr, stream, silentMode);
+            buildMatrices = false;
+            resetIntegration = false;
             try {
 #ifdef USE_CUDA
                 if (useGPU)
                 {
-                    stream << "MEX: GPU enabled " << std::endl;
+                    stream << "MEX: GPU enabled ..." << std::endl;
                     displayOnMATLAB(stream);
                     initializeGPU();
                 }
                 else
 #endif  
                 {
-                    stream << "MEX: GPU Disabled " << std::endl;
+                    stream << "MEX: GPU Disabled ..." << std::endl;
                     displayOnMATLAB(matlabPtr, stream, silentMode);
                     simulator.initializeModel();
                 }
@@ -165,7 +166,15 @@ public:
                 displayError(matlabPtr, e.what());
                 return;
             }
-            printDuration("MEX: Matrices Built -- ");
+            printDuration("MEX: Matrices Built and Integrator Initialized -- ");
+        }
+
+        if (resetIntegration)
+        {
+            stream << "MEX: Resetting time integration ..." << std::endl;
+            displayOnMATLAB(matlabPtr, stream, silentMode);
+            simulator.initializeTimeIntegration();
+            printDuration("MEX: Time Integration Initialized -- ");
         }
 
         // Perform time stepping
@@ -225,29 +234,38 @@ public:
     * Inputs: T0, FluenceRate, tissueSize TC, VHC, MUA, HTC, boundaryConditions
      */
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        if (inputs.size() != 3) {
-            displayError(matlabPtr, "Exactly 3 inputs are required");
+        if ((inputs.size() != 3) && (buildMatrices)) {
+            displayError(matlabPtr, "Exactly 3 inputs are required on initialization");
+        }
+        else if ((inputs.size() < 2) || (inputs.size() > 3))
+        {
+            displayError(matlabPtr, "The number of inputs must be 2 or 3. If two inputs are provided, the mesh won't be reset. If 3 inputs are provided, the mesh will be reset.");
+        }
+        if (inputs.size() == 3)
+        {
+            // A mesh was provided so we set our build Matrices flag 
+            buildMatrices = true;
+            // we also check the input type and set the mesh
+            if (inputs[VarPlacement::MESH_INFO].getType() != matlab::data::ArrayType::STRUCT) {
+                displayError(matlabPtr, "Input #1 must be a struct (meshInfo).");
+            }
+            try
+            {
+                checkMeshInfo(inputs[VarPlacement::MESH_INFO]);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Error checking mesh input: " << e.what() << "\n";
+            }
         }
         if (outputs.size() != 2) {
             displayError(matlabPtr, "Exactly 2 outputs must be specified.");
         }
-
-        if (inputs[VarPlacement::MESH_INFO].getType() != matlab::data::ArrayType::STRUCT) {
-            displayError(matlabPtr, "Input #1 must be a struct (meshInfo).");
-        }
-        try
-        {
-            checkMeshInfo(inputs[VarPlacement::MESH_INFO]);
-        }
-        catch (const std::exception & e) {
-            std::cerr << "Error checking mesh input: " << e.what() << "\n";
-        }
-
+        // Check input 1 which is required
         if (inputs[VarPlacement::THERMAL_INFO].getType() != matlab::data::ArrayType::STRUCT) {
             displayError(matlabPtr, "Input #2 must be a struct (thermalInfo).");
         }
         checkThermalInfo(inputs[VarPlacement::THERMAL_INFO]);
-
+        // Check input 2 which is required
         if (inputs[VarPlacement::SETTINGS].getType() != matlab::data::ArrayType::STRUCT) {
             displayError(matlabPtr, "Input #1 must be a struct (Settings).");
         }
@@ -265,7 +283,7 @@ public:
         if (total_num_of_elements != 1) {
             displayError(matlabPtr, "meshInfo must consist of 1 element (struct).");
         }
-        if (nfields == 4)
+        if (nfields == 3)
         { // build mesh from nodes, elements, boundary faces
             if (!checkFieldNames(meshFields4, fieldNames))
             {
@@ -277,7 +295,7 @@ public:
             }
             displayError(matlabPtr, "Have not implemented meshInfo with 3 fields yet");
         }
-        else if (nfields == 5)
+        else if (nfields == 4)
         { // build mesh from xpos, ypos, zpos using a meshgrid
             if (!checkFieldNames(meshFields5, fieldNames))
             {
@@ -307,9 +325,6 @@ public:
         {
             displayError(matlabPtr,"meshInfo should contain either 3 fields (nodes, elements, boundaryFaces) or 4 fields (xpos,ypos,zpos,boundaryConditions)");
         }
-
-        if (meshInfo[0]["sensorLocations"].getDimensions()[1] != 3)
-            displayError(matlabPtr, "sensorLocations must be n x 3");
     }
 
     void checkThermalInfo(matlab::data::StructArray thermalInfo)
@@ -398,6 +413,9 @@ public:
         // finaltime
         if ((settings[0]["finalTime"].getDimensions()[0] != 1) || (settings[0]["finalTime"].getDimensions()[1] != 1))
             displayError(matlabPtr, "finalTime should be a scalar");
+        // Check sensor Locations
+        if (settings[0]["sensorLocations"].getDimensions()[1] != 3)
+            displayError(matlabPtr, "sensorLocations must be n x 3");
         /*if (settings[0]["finalTime"][0] < settings[0]["dt"])
             displayError(matlabPtr, "finalTime should be greater than the timestep");*/
         //optional settings
@@ -416,21 +434,12 @@ public:
             matlab::data::Array cpuArr = settings[0]["useAllCPUs"];
             useAllCPUs = static_cast<bool>(cpuArr[0]);
         }
-        if (hasField(fieldNames, "createMatrices"))
+        if (hasField(fieldNames, "resetIntegration"))
         {
-            matlab::data::Array matArr = settings[0]["createMatrices"];
-            createAllMatrices = createAllMatrices || static_cast<bool>(matArr[0]);
+            matlab::data::Array matArr = settings[0]["resetIntegration"];
+            resetIntegration = static_cast<bool>(matArr[0]);
         }
 
-    }
-
-    bool checkForMatrixReset(int Nn1d, std::vector<std::vector<std::vector<float>>>& T0, std::vector<std::vector<std::vector<float>>>& FluenceRate,
-        float tissueSize[3],float layerHeight, int elemsInLayer,int boundaryType[6]) {
-        // this function checks to see if we need to recreate the global element matrices
-        createAllMatrices = true;
-
-
-        return createAllMatrices;
     }
 
     void resetTimer(){

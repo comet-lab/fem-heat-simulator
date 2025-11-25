@@ -1,5 +1,5 @@
 clear; close all; clc
-
+%%
 sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
 z = 0:0.02:1;
 y = -1:0.025:1;
@@ -47,20 +47,16 @@ simulator.thermalInfo = thermalInfo;
 tic
 simDuration = 1.0;
 deltaT = simulator.dt;
+
 if ~simulator.silentMode
     fprintf("\n");
 end
-% try
-    [Tpred,sensorTemps] = simulator.solve(simDuration);
-% catch exception
-%     disp(exception.message)
-%     for i = 1:length(exception.stack)
-%         fprintf("Line %d in %s\n",exception.stack(i).line,exception.stack(i).file);
-%     end
-% end
+simulator.buildMatrices = false;
+simulator.resetIntegration = true;
+[Tpred,sensorTemps] = simulator.solve(simDuration);
 
 toc
-clear mex
+
 %% Plot Sensor Temps over time
 simulator.plotSensorTemps(sensorTemps);
 

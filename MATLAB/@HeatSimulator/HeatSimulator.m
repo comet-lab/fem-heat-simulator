@@ -12,6 +12,7 @@ classdef HeatSimulator < handle
         silentMode (1,1) logical = false
         useAllCPUs (1,1) logical = false
         useGPU (1,1) logical = false
+        resetIntegration (1,1) logical = true;
         buildMatrices (1,1) logical = true
     end
 
@@ -42,12 +43,15 @@ classdef HeatSimulator < handle
             obj.time = 0:obj.dt:finalTime;
 
             meshInfo = obj.mesh.toStruct();
-            meshInfo.sensorLocations = obj.sensorLocations;
             thermalInfoStruct = obj.thermalInfo.toStruct();
             settings = struct('finalTime',finalTime,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
-                'createMatrices',obj.buildMatrices);
-            [T,sensors] = MEX_Heat_Simulation(meshInfo,thermalInfoStruct,settings);
+                'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
+            if (obj.buildMatrices)
+                [T,sensors] = MEX_Heat_Simulation(thermalInfoStruct,settings,meshInfo);
+            else
+                [T,sensors] = MEX_Heat_Simulation(thermalInfoStruct,settings);
+            end
             obj.thermalInfo.temperature = T;
         end
 
