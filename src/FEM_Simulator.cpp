@@ -298,10 +298,12 @@ void FEM_Simulator::setHTC(float HTC) {
 void FEM_Simulator::setHeatFlux(float heatFlux)
 {
 	thermalModel_->heatFlux = heatFlux;
+	parameterUpdate_ = true;
 }
 
 void FEM_Simulator::setAmbientTemp(float ambientTemp) {
 	thermalModel_->ambientTemp = ambientTemp;
+	parameterUpdate_ = true;
 }
 
 
@@ -309,6 +311,8 @@ void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSe
 {
 	int nSensors = tempSensorLocations.size();
 	sensorTemps_.resize(nSensors);
+	sensors_.clear();
+	sensors_.resize(nSensors);
 	for (int s = 0; s < nSensors; s++)
 	{	
 		Sensor currSens; 
@@ -320,7 +324,7 @@ void FEM_Simulator::setSensorLocations(std::vector<std::array<float, 3>>& tempSe
 		currSens.pos = tempSensorLocations[s];
 		currSens.xi = xi;
 		currSens.temp = 0;
-		sensors_.push_back(currSens);
+		sensors_[s] = currSens;
 		sensorTemps_[s] = 0;
 	}
 }
