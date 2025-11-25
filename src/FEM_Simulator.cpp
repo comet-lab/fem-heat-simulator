@@ -110,6 +110,11 @@ void FEM_Simulator::initializeTimeIntegration()
 {
 	auto startTime = std::chrono::steady_clock::now();
 	parameterUpdate_ = false;
+	if (solver_) // if it already exists lets make sure to clear the memory
+	{
+		delete solver_;
+		solver_ = nullptr;
+	}
 	solver_ = new CPUTimeIntegrator(*thermalModel_, *globalMatrices_, alpha_, dt_);
 	solver_->initialize();
 	startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
