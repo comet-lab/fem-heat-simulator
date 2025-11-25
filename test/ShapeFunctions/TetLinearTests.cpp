@@ -65,7 +65,7 @@ TEST(TetLinear, testdNdxi)
 	}
 }
 
-TEST(HexLinear, testMapFaceGPtoXi)
+TEST(TetLinear, testMapFaceGPtoXi)
 {
 	ShapeFunctions::TetLinear testFunctions;
 	std::array<float, 2> gp = { 0.25f,0.5f };
@@ -83,7 +83,7 @@ TEST(HexLinear, testMapFaceGPtoXi)
 	}
 }
 
-TEST(HexLinear, testN_face)
+TEST(TetLinear, testN_face)
 {
 	ShapeFunctions::TetLinear testFunctions;
 	// gauss point for integration: (xi,eta) for a face
@@ -119,7 +119,7 @@ TEST(HexLinear, testN_face)
 	}
 }
 
-TEST(HexLinear, testdN_face)
+TEST(TetLinear, testdN_face)
 {
 	ShapeFunctions::TetLinear testFunctions;
 	// gauss point for integration: (xi,eta) for a face
