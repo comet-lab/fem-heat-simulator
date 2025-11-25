@@ -27,8 +27,8 @@ private:
     bool silentMode = true;
     bool useAllCPUs = false;
     bool useGPU = false;
-    bool buildMatrices = true;
-    bool resetIntegration = false;
+    bool buildMatrices = true; // build matrices will build global matrices and reset time integration
+    bool resetIntegration = false; // uses current global matrices but resets time integration
     std::chrono::steady_clock::time_point timeRef_ = std::chrono::steady_clock::now();
 #ifdef USE_CUDA
     GPUTimeIntegrator* gpuHandle = nullptr;
