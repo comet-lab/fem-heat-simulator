@@ -121,36 +121,63 @@ namespace ShapeFunctions {
         // Volume Gauss points (example 5-point)
         static inline std::vector<std::array<float, 3>> gaussPoints() {
             float alpha = 1 / 4.0f;
-            float beta = 1 / 2.0f;
-            float gamma = 1 / 6.0f;
-            return { {{alpha,alpha,alpha}},
-                {{beta,gamma,gamma}},
-                {{gamma,beta,gamma}},
-                {{gamma,gamma,beta}},
-                {{gamma,gamma,gamma}} };
+            float beta = 0.78571428571429f;
+            float gamma = 0.07142857142857f;
+            float delta = 0.3994035762f;
+            float rho = 0.1005964238f;
+            return { {{alpha, alpha, alpha}}, // centroid
+                {{beta, gamma, gamma}},
+                {{gamma, beta, gamma}},
+                {{gamma, gamma, beta}},
+                {{gamma, gamma, gamma}},
+                {{delta, rho, rho}},
+                {{rho, delta, rho}},
+                {{rho, rho, delta}},
+                {{rho, delta, delta}},
+                {{delta, rho, delta}},
+                {{delta, delta, rho}} };
         }
 
         static inline std::vector<std::array<float, 3>> weights() {
-            return { {{-4 / 30.0,1.0f,1.0f}},
-                {{9 / 120.0f,1.0f,1.0f}},
-                {{9 / 120.0f,1.0f,1.0f}},
-                {{9 / 120.0f,1.0f,1.0f}},
-                {{9 / 120.0f,1.0f,1.0f}} };
+            float w1 = -0.0131555555555556f;
+            float w2 = 0.007622222222222f;
+            float w3 = 0.024888888888889f;
+            return { {{w1,1.0f,1.0f}},
+                {{w2,1.0f,1.0f}},
+                {{w2,1.0f,1.0f}},
+                {{w2,1.0f,1.0f}},
+                {{w2,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}},
+                {{w3,1.0f,1.0f}} };
         }
 
         // Face Gauss points (quadratic triangle)
         static inline std::vector<std::array<float, 2>> faceGaussPoints() {
-            return { {{1.0f / 3.0f, 1.0f / 3.0f}},
-                {{0.6f, 0.2f}},
-                {{0.2f,0.6f}},
-                {{0.2f, 0.2f}} };
+            float alpha = 0.091576213509771f;
+            float beta = 0.816847572980458f;
+            float gamma = 0.445948490915965f;
+            float delta = 0.108103018168070f;
+            return { {{alpha, beta}},
+                {{beta, alpha}},
+                {{alpha, alpha}},
+                {{gamma, delta}},
+                {{delta, gamma}},
+                {{gamma, gamma}} };
         }
 
         static inline std::vector<std::array<float, 2>> faceWeights() {
-            return { {{-27 / 96.0f, 1.0f}},
-                {{25 / 96.0f, 1.0f}},
-                {{25 / 96.0f, 1.0f}},
-                {{25 / 96.0f, 1.0f}} };
+            float w1 = 0.054975871827661;
+            float w2 = 0.111690794839005f;
+            return { {{w1, 1.0f}},
+                {{w1, 1.0f}},
+                {{w1, 1.0f}},
+                {{w2, 1.0f}},
+                {{w2, 1.0f}}, 
+                {{w2, 1.0f}} };
         }
     };
 }
