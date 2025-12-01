@@ -12,14 +12,9 @@ namespace ShapeFunctions {
         // 0,1,2,3 = vertices
         // 4 = edge 0-1, 5 = edge 1-2, 6 = edge 2-0, 7 = edge 0-3, 8 = edge 1-3, 9 = edge 2-3
 
-        /* Reference for shape functions and numerical integration Schemes: The finite element method: its basis and fundamentals (7th edition)
-        * by O.C. Zienkiewicz, R.L. Taylor, J.Z. Zhu. Note that the weights in their tables are presumed to be multiplied by the volume of the
-        * element. In our case our element volume is 1/6 so we multiply the weights in the table by 1/6. The same is true for area where the area
-        * of any face in the normalized coordinate frame is 1/2.
-        */
-        static constexpr int nNodes = 10;
-        static constexpr int nGP = 11;          // volume Gauss points (can adjust for integration order)
-        static constexpr int nFaceGP = 6;      // 4-point triangular face quadrature
+        static constexpr int nNodes = 10;       // 10 point serendipity element
+        static constexpr int nGP = 11;          // 11-point volume Gauss points from Keast 1985 "MODERATE-DEGREE TETRAHEDRAL QUADRATURE FORMULAS"
+        static constexpr int nFaceGP = 6;      // 6-point triangular face quadrature from Dunavant 
         static constexpr int nFaceNodes = 6;   // 6-node quadratic triangle
         static constexpr int nFaces = 4;
 

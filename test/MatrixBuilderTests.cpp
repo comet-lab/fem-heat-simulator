@@ -570,6 +570,54 @@ TEST_F(TetQuadBuilder, testCalculateKe)
 
 }
 
+
+/*
+* Testing \int (Na|J_s|)dS for quadratic tetrahedrals
+*/
+TEST_F(TetQuadBuilder, testCalculateFeFlux)
+{
+
+	
+	// based on elements constructed above, |J_s| = 4 and be constant in the mesh
+	const int nNe = testTet.nNodes;
+	const int nFn = testTet.nFaceNodes;
+	float tolerance = 0.000001;
+
+	std::array<float, nFn> scale = { 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f };
+	for (int f = 0; f < 4; f++)
+	{
+		std::array<int, nFn> nodes = testTet.faceConnectivity[f];
+		Eigen::Vector<float, nNe> FeFlux = matrixBuilder.calculateFaceIntNa<ShapeFunctions::TetQuadratic>(elem, f, 1);
+		for (int i = 0; i < nFn; i++)
+		{
+			int A = nodes[i];
+			if (f == 0)
+				EXPECT_NEAR(FeFlux(A), 4 * sqrt(3) * scale[i] / 6.0f,tolerance); // area is larger by factor of sqrt(3) so flux is larger by that amount
+			else
+				EXPECT_NEAR(FeFlux(A), 4 * scale[i] / 6.0f, tolerance);
+		}
+		// determine which nodes are missing 
+		std::array<bool, 10> present{};   // initialized to false
+		for (int x : nodes)
+			present[x] = true;
+
+		std::array<int, 4> missing{};
+		int idx = 0;
+		for (int i = 0; i < 10; ++i)
+			if (!present[i])
+				missing[idx++] = i;
+		// all nodes not on face should be 0
+		for (int i : missing)
+		{
+			EXPECT_FLOAT_EQ(FeFlux(i), 0);
+		}
+
+	}
+}
+
+/*
+* Testing \int (Na*Nb|J_s|)dS for quadratic tetrahedrals
+*/
 TEST_F(TetQuadBuilder, testCalculateFeConv)
 {
 	const int nNe = testTet.nNodes;

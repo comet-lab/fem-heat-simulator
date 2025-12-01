@@ -302,7 +302,7 @@ public:
 	}
 
 	/*
-	* @brief calculates the integral (N * q J_s| dS) for the given face
+	* @brief calculates the integral (N * q * |J_s| dS) for the given face
 	* @param elem current element
 	* @param faceIndex face on the element
 	* @param q if we want to scale by a coefficient or input value (pretty much unused)
