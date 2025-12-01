@@ -15,7 +15,7 @@ classdef Mesh
 
     methods
         function obj = Mesh(varargin)
-            if (nargin >= 1)
+            if (nargin >= 1) && (nargin < 3)
                 % assume we received a geometry object or femodel object
                 % and potentially a list of boundaryTypes for each face in
                 % the geometry

@@ -51,7 +51,7 @@ deltaT = simulator.dt;
 if ~simulator.silentMode
     fprintf("\n");
 end
-simulator.buildMatrices = false;
+simulator.buildMatrices = true;
 simulator.resetIntegration = true;
 [Tpred,sensorTemps] = simulator.solve(simDuration);
 
