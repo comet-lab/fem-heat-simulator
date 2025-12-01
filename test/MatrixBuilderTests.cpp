@@ -76,16 +76,16 @@ protected:
 
 		// Create a single element with 10 nodes
 		nodes.resize(10);
-		nodes[0].x = 0; nodes[0].y = 0; nodes[0].z = 0;
-		nodes[1].x = 2; nodes[1].y = 0; nodes[1].z = 0;
-		nodes[2].x = 0; nodes[2].y = 2; nodes[2].z = 0;
-		nodes[3].x = 0; nodes[3].y = 0; nodes[3].z = 2;
-		nodes[4].x = 1; nodes[4].y = 0; nodes[4].z = 0;
-		nodes[5].x = 1; nodes[5].y = 1; nodes[5].z = 0;
-		nodes[6].x = 0; nodes[6].y = 1; nodes[6].z = 0;
-		nodes[7].x = 0; nodes[7].y = 0; nodes[7].z = 1;
-		nodes[8].x = 1; nodes[8].y = 0; nodes[8].z = 1;
-		nodes[9].x = 0; nodes[9].y = 1; nodes[9].z = 1;
+		nodes[0].x = 0; nodes[0].y = 0; nodes[0].z = 0; // 0
+		nodes[1].x = 2; nodes[1].y = 0; nodes[1].z = 0; // 1
+		nodes[2].x = 0; nodes[2].y = 2; nodes[2].z = 0; // 2
+		nodes[3].x = 0; nodes[3].y = 0; nodes[3].z = 2; // 3
+		nodes[4].x = 1; nodes[4].y = 0; nodes[4].z = 0; // 4: 0-1
+		nodes[5].x = 1; nodes[5].y = 1; nodes[5].z = 0; // 5: 1-2
+		nodes[6].x = 0; nodes[6].y = 1; nodes[6].z = 0; // 6: 2-0
+		nodes[7].x = 0; nodes[7].y = 0; nodes[7].z = 1; // 7: 0-3
+		nodes[8].x = 1; nodes[8].y = 0; nodes[8].z = 1; // 8: 1-3
+		nodes[9].x = 0; nodes[9].y = 1; nodes[9].z = 1; // 9: 2-3
 		for (int i = 0; i < 10; i++) {
 			elem.nodes.push_back(i);
 		}
@@ -568,4 +568,60 @@ TEST_F(TetQuadBuilder, testCalculateKe)
 		EXPECT_NEAR(2.0f * rowScale[Ai] / 30.0f , Ke(Ai, 0), toler);
 	}
 
+}
+
+TEST_F(TetQuadBuilder, testCalculateFeConv)
+{
+	const int nNe = testTet.nNodes;
+	const int nFn = testTet.nFaceNodes;
+	std::array<std::array<float, nFn>, nFn> scale = { {	{ 1.0f,     -1 / 6.0f, -1 / 6.0f,  0.0f,       -4 / 6.0f,  0.0f},
+													{    -1 / 6.0f,  1.0f,     -1 / 6.0f,  0.0f,        0.0f,     -4 / 6.0f},
+													{    -1 / 6.0f, -1 / 6.0f,  1.0f,     -4.0 / 6.0f,  0.0f,      0.0f},
+													{     0.0f,      0.0f,     -4 / 6.0f,  32 / 6.0f,   16 / 6.0f, 16 / 6.0f},
+													{    -4 / 6.0f,  0.0f,      0.0f,      16 / 6.0f,   32 / 6.0f, 16 / 6.0f},
+													{     0.0f,     -4 / 6.0f,  0.0f,      16 / 6.0f,   16 / 6.0f, 32 / 6.0f}} };
+
+	int A = 0;
+	int B = 0;
+	float tolerance = 0.000001;
+	for (int f = 0; f < 4; f++)
+	{
+		Eigen::MatrixXf FeConv = matrixBuilder.calculateFaceIntNaNb<ShapeFunctions::TetQuadratic>(elem, f);
+		// all of these nodes should be scaled relative to scale matrix
+		std::array<int, nFn> nodes = testTet.faceConnectivity[f];
+		for (int i = 0; i < nFn; i++)
+		{
+			for (int j = 0; j < nFn; j++)
+			{
+				A = nodes[i];
+				B = nodes[j];
+				// both get multilied by 4 because of det(J) = 4
+				if (f == 0)
+					// when f == 0 we have the slanted face which has a larger jacobian determinant by a factor of sqrt(3)
+					EXPECT_NEAR(FeConv(A, B), 4 * sqrt(3) * scale[i][j] / 60.0f, tolerance);
+				else
+					EXPECT_NEAR(FeConv(A, B), 4 *  scale[i][j] / 60.0f, tolerance);
+			}
+		}
+		// determine which nodes are missing 
+		std::array<bool, 10> present{};   // initialized to false
+		for (int x : nodes)
+			present[x] = true;
+
+		std::array<int, 4> missing{};
+		int idx = 0;
+		for (int i = 0; i < 10; ++i)
+			if (!present[i])
+				missing[idx++] = i;
+		// All of these nodes should not be on our current face
+		// that should have a 0 value in the matrix
+		for (int j = 0; j < nNe; j++)
+		{
+			for (int i : missing)
+			{
+				EXPECT_FLOAT_EQ(FeConv(i, j), 0);
+				EXPECT_FLOAT_EQ(FeConv(j, i), 0);
+			}
+		}
+	}
 }

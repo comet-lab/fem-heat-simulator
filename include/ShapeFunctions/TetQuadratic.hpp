@@ -29,7 +29,7 @@ namespace ShapeFunctions {
             {1, 2, 3, 5, 9, 8},  // face opposite node 0
             {0, 3, 2, 7, 9, 6},  // face opposite node 1
             {0, 1, 3, 4, 8, 7},  // face opposite node 2
-            {0, 2, 1, 4, 6, 5}   // face opposite node 3
+            {0, 2, 1, 6, 5, 4}   // face opposite node 3
         } };
 
         // Quadratic tetrahedral shape functions in barycentric coords
@@ -161,12 +161,12 @@ namespace ShapeFunctions {
             float beta = 0.816847572980458f;
             float gamma = 0.445948490915965f;
             float delta = 0.108103018168070f;
-            return { {{alpha, beta}},
+            return { {{alpha, alpha}},
+                {{alpha, beta}},
                 {{beta, alpha}},
-                {{alpha, alpha}},
+                {{gamma, gamma}},
                 {{gamma, delta}},
-                {{delta, gamma}},
-                {{gamma, gamma}} };
+                {{delta, gamma}} };
         }
 
         static inline std::vector<std::array<float, 2>> faceWeights() {
