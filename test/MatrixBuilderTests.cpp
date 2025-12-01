@@ -548,3 +548,24 @@ TEST_F(TetQuadBuilder, testCalculateMe)
 	}
 
 }
+
+/* Testing Calculation of the thermal mass matrix when using quadratic tetrahedral elements
+* Element we are using has Jacobian = diag(2*ones(3,1))
+*/
+TEST_F(TetQuadBuilder, testCalculateKe)
+{
+	const int Nne = testTet.nNodes;
+	matrixBuilder.precomputeElemJ<ShapeFunctions::TetQuadratic>(mesh.elements()[0]);
+	Eigen::Matrix<float, Nne, Nne> Ke = matrixBuilder.calculateIntdNadNb<ShapeFunctions::TetQuadratic>(elem);
+
+	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 2.0
+	float toler = 0.00001;
+	float rowScale[Nne] = { 9.0f, 1.0 , 1.0 , 1.0 , -6.0, 2.0f, -6.0f, -6.0f, 2.0f, 2.0f};
+	float diagScale[Nne] = { 9.0f, 3.0f, 3.0f, 3.0f, 24.0f, 16.0f, 24.0f, 24.0f, 16.0f, 16.0f };
+	for (int Ai = 0; Ai < Nne; Ai++)
+	{
+		EXPECT_NEAR(2.0f * diagScale[Ai] / 30.0f, Ke(Ai, Ai), toler); // multiplied by 2 because of Jacobian
+		EXPECT_NEAR(2.0f * rowScale[Ai] / 30.0f , Ke(Ai, 0), toler);
+	}
+
+}
