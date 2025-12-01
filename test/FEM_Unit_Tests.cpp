@@ -40,6 +40,43 @@ public:
 	static void TearDownTestSuite() {}
 };
 
+class SingleElem : public testing::Test {
+public:
+
+	FEM_Simulator* femSim = nullptr;
+	std::vector<Node> nodes;
+	Element elem;
+	std::vector<BoundaryFace> boundaryFaces;
+
+	Mesh mesh;
+	float mua = 1.0f;
+	float tc = 1.0f;
+	float vhc = 1.0f;
+	float htc = 1.0f;
+
+	void SetUp() override {
+		// q0_ remains empty
+		mesh = Mesh::buildCubeMesh({ 2,2,1 }, { 2,2,2 }, { FLUX,FLUX,FLUX,FLUX,FLUX,FLUX });
+
+		Eigen::VectorXf Temp = Eigen::VectorXf::Constant(8, 0.0f);
+		femSim = new FEM_Simulator(mua, vhc, tc, htc);
+		femSim->setMesh(mesh);
+		femSim->setTemp(Temp);
+		femSim->buildMatrices();
+	}
+
+	// ~QueueTest() override = default;
+	void TearDown() override {
+		std::cout << "Teardown" << std::endl;
+		delete femSim;
+		femSim = nullptr;
+	}
+
+	static void SetUpTestSuite() {}
+
+	static void TearDownTestSuite() {}
+};
+
 TEST_F(BaseSim, testSetFluenceRate) {
 
 	std::array<float, 6> laserPose = { 0,0,-20,0,0,0 };
@@ -80,4 +117,14 @@ TEST_F(BaseSim, testSetSensorTemps) {
 	EXPECT_FLOAT_EQ(sTemps[4], 20.0 / 2.0f);
 	EXPECT_FLOAT_EQ(sTemps[5], 20.0 / 4.0f);
 	EXPECT_FLOAT_EQ(sTemps[6], 0.0);
+}
+
+TEST_F(SingleElem, testSetSensorLocation) {
+	Eigen::VectorXf Temp = Eigen::VectorXf::Constant(8, 0.0f);
+	Temp(4) = 20; // make the node at the center of the top surface 
+	femSim->setTemp(Temp);
+	// Check sensors at various positions in the tissue
+	std::vector<std::array<float, 3>> sensorLocations = { {{0.0,0.0,0.0}, {0.0,0.0,0.05},{0.0,0.0,0.5},{0.0,0.0,0.95},
+		{0.0,0.0,0.98}} };
+	femSim->setSensorLocations(sensorLocations);
 }
