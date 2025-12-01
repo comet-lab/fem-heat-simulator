@@ -18,8 +18,8 @@ namespace ShapeFunctions {
         * of any face in the normalized coordinate frame is 1/2.
         */
         static constexpr int nNodes = 10;
-        static constexpr int nGP = 5;          // volume Gauss points (can adjust for integration order)
-        static constexpr int nFaceGP = 4;      // 4-point triangular face quadrature
+        static constexpr int nGP = 11;          // volume Gauss points (can adjust for integration order)
+        static constexpr int nFaceGP = 6;      // 4-point triangular face quadrature
         static constexpr int nFaceNodes = 6;   // 6-node quadratic triangle
         static constexpr int nFaces = 4;
 
