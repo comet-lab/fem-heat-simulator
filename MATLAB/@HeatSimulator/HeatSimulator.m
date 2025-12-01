@@ -157,15 +157,7 @@ classdef HeatSimulator < handle
             elements = obj.mesh.elements';     % nElem x nNe tranposed for patch
             nodes = obj.mesh.nodes'; % tranposed to be n x 3 for patch
             data = obj.thermalInfo.temperature;
-
-            firstTimeFlag = false;
-            if isempty(xrange) || isempty(yrange) || isempty(zrange)
-                firstTimeFlag = true;
-                xrange = [min(nodes(:,1)) max(nodes(:,1))];
-                yrange = [min(nodes(:,2)) max(nodes(:,2))];
-                zrange = [min(nodes(:,3)) max(nodes(:,3))];
-            end
-
+            
             % ----- GET ALL FACES FOR EVERY ELEMENT --- %
             nElem = size(elements,1);
             nNe = size(elements,2);
@@ -223,15 +215,24 @@ classdef HeatSimulator < handle
                 end
             end
             facesKey = sort(facesAll, 2);             % only for comparison
-            [~, uniqueIdx] = unique(facesKey, 'rows'); % indices of unique faces
+            [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
+            counts = accumarray(ic, 1); % count the number of times each unique key appears
             facesUnique = facesAll(uniqueIdx, :);      % preserve original node order
+            facesUnique = facesUnique(counts==1,:);
 
             axis(ax);
-            hPatch = patch('Faces', facesUnique, ...
-                'Vertices', nodes, ...
-                'FaceVertexCData', data, ...
-                'FaceColor', 'interp', ...       % smooth coloring
-                'EdgeColor', 'none');
+            if isempty(ax.Children)
+                hPatch = patch('Faces', facesUnique, ...
+                    'Vertices', nodes, ...
+                    'FaceVertexCData', data, ...
+                    'FaceColor', 'interp', ...       % smooth coloring
+                    'EdgeColor', 'none');
+            else
+                % reuse existing patch
+                hPatch = ax.Children(1);
+                set(hPatch, 'Faces', facesUnique);
+            end
+            
             hold off
             cb = colorbar;
             clim([min(data,[],'all'),max(data,[],'all')]);
@@ -254,7 +255,8 @@ classdef HeatSimulator < handle
             end
 
             % Delete old patch and update
-            delete(data.hPatch);
+            % delete(data.hPatch); % patch is now updated directly in
+            % function with set(hPatch, 'Faces', newFaces);
             data.hPatch = plotVolumetricChunk(data.obj, data.ax, ...
                 data.xrange, data.yrange, data.zrange);
 
