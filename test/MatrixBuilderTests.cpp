@@ -535,12 +535,16 @@ TEST_F(TetQuadBuilder, testCalculateMe)
 	Eigen::Matrix<float, Nne, Nne> Me = matrixBuilder.calculateIntNaNb<ShapeFunctions::TetQuadratic>(elem);
 
 	// The truth values were calculated in matlab assuming deltaX = deltaY = deltaZ = 2.0
-
-	float scale[Nne] = { 1.0f, 2.0f, 2.0f, 2.0f };
+	float toler = 0.00001;
+	float scale[Nne] = { 1.0f, 1.0 / 6.0f, 1.0 / 6.0f, 1.0 / 6.0f, -2.0 / 3.0f, -1.0f, -2 / 3.0f, -2 / 3.0f, -1.0f, -1.0f };
 	for (int Ai = 0; Ai < Nne; Ai++)
 	{
-		EXPECT_FLOAT_EQ(8 / 60.0f, Me(Ai, Ai));
-		EXPECT_FLOAT_EQ((8 / (scale[Ai] * 60.0f)), Me(Ai, 0));
+		if (Ai < 4)
+			EXPECT_NEAR(8 * 1 / 420.0f, Me(Ai, Ai),toler); // multiplied by 8 because of Jacobian
+		else
+			EXPECT_NEAR(8 * 16 / (3 * 420.0f), Me(Ai, Ai), toler); // midpoint nodes are slighly different.
+
+		EXPECT_NEAR((8 * scale[Ai] / (420.0f)), Me(Ai, 0),toler);
 	}
 
 }
