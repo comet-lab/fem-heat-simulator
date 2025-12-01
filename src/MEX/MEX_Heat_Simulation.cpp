@@ -135,7 +135,7 @@ public:
 #endif
         stream << "MEX: Number of threads: " << Eigen::nbThreads() << std::endl;
         displayOnMATLAB(matlabPtr, stream, silentMode);
-        
+
         // Create global K M and F 
         if (buildMatrices) { // only need to create the KMF matrices the first time
             stream << "MEX: Initializing simulator ... " << std::endl;
@@ -168,7 +168,7 @@ public:
             }
             printDuration("MEX: Matrices Built and Integrator Initialized -- ");
         }
-
+        
         if (resetIntegration)
         {
             stream << "MEX: Resetting time integration ..." << std::endl;
@@ -293,7 +293,59 @@ public:
                     oss << meshFields4[i] << " ";
                 displayError(matlabPtr, oss.str());
             }
-            displayError(matlabPtr, "Have not implemented meshInfo with 3 fields yet");
+            /* Extract nodes from input */
+            matlab::data::TypedArray<double> nodesArr = meshInfo[0]["nodes"];
+            std::vector<Node> nodes(nodesArr.getDimensions()[1]);
+
+            //stream << "Dimension of nodes: (" << nodesArr.getDimensions()[0] << " x " << nodesArr.getDimensions()[1] << ") nodes" << std::endl;
+            //displayOnMATLAB(matlabPtr, stream, false);
+            for (int i = 0; i < nodesArr.getDimensions()[1]; i++)
+            {
+                nodes[i].x = nodesArr[0][i];
+                nodes[i].y = nodesArr[1][i];
+                nodes[i].z = nodesArr[2][i];
+            }
+
+            /* Extract Elements from input */
+            matlab::data::TypedArray<double> elemArr = meshInfo[0]["elements"];
+            long nodesPerElem = elemArr.getDimensions()[0];
+            long numElems = elemArr.getDimensions()[1];
+            std::vector<Element> elements(numElems);
+            //stream << "Dimension of elements: (" << nodesPerElem << " x " << numElems << ") elements" << std::endl;
+            //displayOnMATLAB(matlabPtr, stream, false);
+            for (int e = 0; e < numElems; e++)
+            {
+                for (int n = 0; n < nodesPerElem; n++)
+                {
+                    elements[e].nodes.push_back(elemArr[n][e] - 1); // convert 1-based indexing to 0-based indexing.
+                }
+            }
+            /* Extract boundary faces from input */
+            matlab::data::StructArray boundaryFaceStruct = meshInfo[0]["boundaryFaces"];
+            float numFaces = boundaryFaceStruct.getDimensions()[0];
+            std::vector<BoundaryFace> boundaryFaces(numFaces);
+            stream << "Dimension of boundaryFaces: (" << numFaces << " x " << boundaryFaceStruct.getDimensions()[1] << ") faces" << std::endl;
+            displayOnMATLAB(matlabPtr, stream, false);
+            for (int j = 0; j < numFaces; j++)
+            {   
+                // boundary face type
+                matlab::data::TypedArray<double> typeArr = boundaryFaceStruct[j]["type"];
+                int type = static_cast<int>(typeArr[0]);
+                boundaryFaces[j].type = static_cast<BoundaryType>(type);
+                // boundar face element ID
+                matlab::data::TypedArray<double> elemArr = boundaryFaceStruct[j]["elemID"];
+                boundaryFaces[j].elemID = static_cast<long>(elemArr[0]) - 1; // matlab is 1 indexing so we convert here to 0 indexing
+                // boundary face local face ID
+                matlab::data::TypedArray<double> localFaceArr = boundaryFaceStruct[j]["localFaceID"];
+                boundaryFaces[j].localFaceID = static_cast<long>(localFaceArr[0]) - 1; // matlab is 1 indexing so we convert here to 0 indexing
+                // boundary face nodes
+                matlab::data::TypedArray<double> nodeIDArr = boundaryFaceStruct[j]["nodes"];
+                for (int i = 0; i < nodeIDArr.getDimensions()[0]; i++)
+                {
+                    boundaryFaces[j].nodes.push_back(nodeIDArr[i] - 1);
+                }
+            }
+            mesh = Mesh(nodes, elements, boundaryFaces);
         }
         else if (nfields == 4)
         { // build mesh from xpos, ypos, zpos using a meshgrid

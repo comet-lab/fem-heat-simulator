@@ -1,6 +1,27 @@
 classdef Mesh
-    %MESH Summary of this class goes here
-    %   Detailed explanation goes here
+    %MESH object to store nodes, elements, and boundary faces for use in
+    %the FEM Heat Simulator
+    %   Properties
+    %       nodes - (3xn) vector with the x,y,z position of every node in
+    %               the mesh
+    %       elements - (Ne x e) vector with the nodes in each element
+    %                   Ne is the number of nodes per element
+    %                   e is the number of elements in the mesh
+    %       boundaryFaces - (f x 1) struct with information on each
+    %                       boundary face. Each face contains the following
+    %                       fields:
+    %                       elemID - element face belongs to
+    %                       nodes - node indicies belonging to face
+    %                       type - 0: flux, 1: convection, 2: heat sink
+    %                       localFaceID - face number in element
+    %
+    %   The mesh object uses 1 indexing and the MEX file does the necessary
+    %   conversion to 0 based indexing. For example, if we have a single 
+    %   element mesh with eight nodes, the element will contain nodes
+    %   [1,8]. Once passed into the MEX file, the c++ code will have an
+    %   element with nodes [0,7]. This applies to node indicies, element
+    %   indicies, localFaceIDs, etc. 
+    %
 
     properties
         xpos (1,:) double
@@ -54,7 +75,7 @@ classdef Mesh
                 obj.zpos = varargin{3};
                 obj.boundaryConditions = varargin{4};
                 obj = obj.buildCubeMesh(obj.xpos,obj.ypos,obj.zpos,obj.boundaryConditions);
-                obj.useXYZ = true;
+                obj.useXYZ = false;
             end
         end
 
@@ -121,41 +142,41 @@ classdef Mesh
             %% --- Build boundary faces ---
             obj.boundaryFaces = [];
 
-            % --- 1) Bottom face (z = 0), local face 0 ---
+            % --- 1) Bottom face (z = 0), local face 1 ---
             [i,j] = ndgrid(1:Nx-1, 1:Ny-1);
             k = ones(size(i));
-            obj.boundaryFaces = Mesh.makeSquareFaces(i,j,k, 0, bc(1), [1 4 3 2], Ny, Nx);
+            obj.boundaryFaces = Mesh.makeSquareFaces(i,j,k, 1, bc(1), [1 4 3 2], Ny, Nx);
             % obj.boundaryFaces = [obj.boundaryFaces;BF];
 
-            % --- 2) Top face (z = max), local face 1 ---
+            % --- 2) Top face (z = max), local face 2 ---
             [i,j] = ndgrid(1:Nx-1, 1:Ny-1);
             k = (Nz-1)*ones(size(i));
-            BF = Mesh.makeSquareFaces(i,j,k, 1, bc(2), [5 6 7 8], Nx, Ny);
+            BF = Mesh.makeSquareFaces(i,j,k, 2, bc(2), [5 6 7 8], Nx, Ny);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
 
-            % --- 3) Back face (y = min), local face 2 ---
+            % --- 3) Back face (y = min), local face 3 ---
             [i,k] = ndgrid(1:Nx-1, 1:Nz-1);
             j = ones(size(i));
-            BF = Mesh.makeSquareFaces(i,j,k, 2, bc(3), [1 2 6 5], Nx, Nz);
+            BF = Mesh.makeSquareFaces(i,j,k, 3, bc(3), [1 2 6 5], Nx, Nz);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
-            % --- 4) Front face (y = max), local face 3 ---
+            % --- 4) Front face (y = max), local face 4 ---
             [i,k] = ndgrid(1:Nx-1, 1:Nz-1);
             j = (Ny-1)*ones(size(i));
-            BF = Mesh.makeSquareFaces(i,j,k, 3, bc(4), [4 8 7 3], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 4, bc(4), [4 8 7 3], Nz, Nx);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
-            % --- 5) Left face (x = min), local face 4 ---
+            % --- 5) Left face (x = min), local face 5 ---
             [j,k] = ndgrid(1:Ny-1, 1:Nz-1);
             i = ones(size(j));
-            BF = Mesh.makeSquareFaces(i,j,k, 4, bc(5), [1 5 8 4], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 5, bc(5), [1 5 8 4], Nz, Nx);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
-            % --- 6) Right face (x = max), local face 5 ---
+            % --- 6) Right face (x = max), local face 6 ---
             [j,k] = ndgrid(1:Ny-1, 1:Nz-1);
             i = (Nx-1)*ones(size(j));
-            BF = Mesh.makeSquareFaces(i,j,k, 5, bc(6), [2 3 7 6], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 6, bc(6), [2 3 7 6], Nz, Nx);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
             fprintf(" Done.");
@@ -250,7 +271,7 @@ classdef Mesh
                 for lf = 1:4
                     fn = elemNodes(faceNodePattern{lf});
                     allFaces(idx).nodes       = sort(fn(:));  % row, sorted for matching
-                    allFaces(idx).elementID   = eid;
+                    allFaces(idx).elemID   = eid;
                     allFaces(idx).localFaceID = lf;
                     idx = idx + 1;
                 end
@@ -267,7 +288,7 @@ classdef Mesh
             counts = accumarray(ic, 1); % count the number of times each unique key appears
 
             % Allocate boundaryFaces (worst case = all faces)
-            boundaryFaces = struct('elementID',{},'localFaceID',{},'nodeIDs',{},'type',{});
+            boundaryFaces = struct('elemID',{},'localFaceID',{},'nodes',{},'type',{});
             b = 1;
 
             % --- Extract faces that occur exactly once (boundary) ---
@@ -276,9 +297,9 @@ classdef Mesh
                     idxFace = ic == k;
                     f = allFaces(idxFace); % Using logical indexing
 
-                    boundaryFaces(b).elementID   = f.elementID;
+                    boundaryFaces(b).elemID      = f.elemID;
                     boundaryFaces(b).localFaceID = f.localFaceID;
-                    boundaryFaces(b).nodeIDs     = f.nodes;
+                    boundaryFaces(b).nodes       = f.nodes;
                     boundaryFaces(b).type        = 0;   % default user boundary type
                     b = b + 1;
                 end

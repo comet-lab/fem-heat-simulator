@@ -1,6 +1,6 @@
 clear; close all; clc
 %%
-sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 1];
+sensorPositions = [0,0,0.1; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 0.98];
 z = 0:0.02:1;
 y = -1:0.025:1;
 x = -1:0.025:1;
@@ -42,7 +42,7 @@ thermalInfo.fluenceRate = fluenceRate;
 simulator.thermalInfo = thermalInfo;
 
 
-% Running MEX File
+%% Running MEX File
 
 tic
 simDuration = 1.0;
@@ -56,7 +56,6 @@ simulator.resetIntegration = true;
 [Tpred,sensorTemps] = simulator.solve(simDuration);
 
 toc
-
 %% Plot Sensor Temps over time
 simulator.plotSensorTemps(sensorTemps);
 
