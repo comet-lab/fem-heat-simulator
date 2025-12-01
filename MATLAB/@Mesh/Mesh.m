@@ -24,14 +24,13 @@ classdef Mesh
     %
 
     properties
-        xpos (1,:) double
-        ypos (1,:) double
-        zpos (1,:) double
-        boundaryConditions (6,1)
         nodes (3,:) double
         elements (:,:) double
         boundaryFaces (:,1) struct
         useXYZ (1,1) logical = false;
+        xpos (1,:) double
+        ypos (1,:) double
+        zpos (1,:) double
     end
 
     methods
@@ -73,8 +72,8 @@ classdef Mesh
                 obj.xpos = varargin{1};
                 obj.ypos = varargin{2};
                 obj.zpos = varargin{3};
-                obj.boundaryConditions = varargin{4};
-                obj = obj.buildCubeMesh(obj.xpos,obj.ypos,obj.zpos,obj.boundaryConditions);
+                boundaryConditions = varargin{4};
+                obj = obj.buildCubeMesh(obj.xpos,obj.ypos,obj.zpos,boundaryConditions);
                 obj.useXYZ = false;
             end
         end
@@ -83,16 +82,9 @@ classdef Mesh
             %METHOD1 Summary of this method goes here
             %   Detailed explanation goes here
             S = struct();
-            if obj.useXYZ
-                S.xpos = obj.xpos;
-                S.ypos = obj.ypos;
-                S.zpos = obj.zpos;
-                S.boundaryConditions = obj.boundaryConditions;
-            else
-                S.nodes = obj.nodes;
-                S.elements = obj.elements;
-                S.boundaryFaces = obj.boundaryFaces;
-            end
+            S.nodes = obj.nodes;
+            S.elements = obj.elements;
+            S.boundaryFaces = obj.boundaryFaces;
         end
 
         function obj = buildCubeMesh(obj, xPos, yPos, zPos, bc)

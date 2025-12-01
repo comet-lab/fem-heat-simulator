@@ -60,7 +60,7 @@ toc
 simulator.plotSensorTemps(sensorTemps);
 
 %% Plot volume temperature information
-simulator.plotVolume();
+simulator.createVolumetricFigure();
 %% plot depth irradiance at final time step
 figure(3);
 clf;
