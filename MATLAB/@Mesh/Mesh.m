@@ -298,7 +298,7 @@ classdef Mesh
             end
         end
 
-        function facesAll = identifyAllFaces(elements)
+        function [allFaces,elemID,localFaceID] = identifyAllFaces(elements)
             %IDENTIFYALLFACES identifies all the faces in a Mesh
             %   This will have repeat faces that are shared between
             %   elements
@@ -308,8 +308,13 @@ classdef Mesh
             %   Outputs:
             %       faces: (nE x nF) Contains a list of nodes corresponding
             %               to each face
-            %               nE is the number of faces 
+            %               nE is the number of faces and
             %               nF is the number of nodes on a face. 
+            %       elemID: (nE x 1) contains the element ID of each face
+            %       localFaceID: (nE x 1) contains the local face numbering
+            %                    for each face
+            %       counts: (nE x 1) contains the number of times each face
+            %               appears in the list of elements
             %
             arguments
                 elements (:,:)
@@ -343,7 +348,7 @@ classdef Mesh
 
             % Preallocate max possible faces
             nFaces = size(faceNodePattern,1);
-            facesAll = zeros(nElem * nFaces, nNf);
+            allFaces = zeros(nElem * nFaces, nNf);
             elemID = zeros(nElem * nFaces,1);
             localFaceID = zeros(nElem * nFaces, 1);
             % --- Enumerate faces for all elements ---
@@ -351,7 +356,7 @@ classdef Mesh
             for k = 1:nElem
                 for f = 1:nFaces
                     % extract appropriate nodes idxs from element
-                    facesAll(row, :) = elements(faceNodePattern{f,:},k);
+                    allFaces(row, :) = elements(faceNodePattern{f,:},k);
                     elemID(row) = k;
                     localFaceID(row) = f;
                     row = row + 1;
