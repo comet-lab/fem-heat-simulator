@@ -298,6 +298,77 @@ classdef Mesh
             end
         end
 
+        function [faces,elemID,localFaceID,counts] = identifyAllFaces(elements)
+            %IDENTIFYALLFACES identifies all the unique faces in a Mesh
+            %   A unique face is simply a face in the mesh. 
+            %
+            %   Inputs:
+            %       elements: (nNe x nElems) 
+            %   Outputs:
+            %       faces: (nE x nF) Contains a list of nodes corresponding
+            %               to each face
+            %               nE is the number of unique faces and
+            %               nF is the number of nodes on a face. 
+            %       elemID: (nE x 1) contains the element ID of each face
+            %       localFaceID: (nE x 1) contains the local face numbering
+            %                    for each face
+            %       counts: (nE x 1) contains the number of times each face
+            %               appears in the list of elements
+            %
+            arguments
+                elements (:,:)
+            end
+            
+            nElem = size(elements,2);
+            nNe = size(elements,1);
+
+            if nNe == 10
+                nNf = 6;
+                % --- Quadratic tet face-node patterns ---
+                faceNodePattern = {
+                    [1, 2, 3, 5, 9, 8]+1;   % face 1: Opposite node 1
+                    [0, 3, 2, 7, 9, 6]+1;   % face 2: Opposite node 2
+                    [0, 1, 3, 4, 8, 7]+1;   % face 3: Opposite node 3
+                    [0, 2, 1, 6, 5, 4]+1    % face 4: Opposite node 4
+                    };
+            elseif nNe == 8
+                % --- Linear Hex face-node patterns ---
+                % add one for 1 indexing
+                nNf = 4;
+                faceNodePattern = {
+                    [0, 3, 2, 1]+1;  % z = -1
+                    [4, 5, 6, 7]+1;  % z = 1
+                    [0, 1, 5, 4]+1;  % y = -1
+                    [3, 7, 6, 2]+1;  % y = 1
+                    [0, 4, 7, 3]+1;  % x = -1
+                    [1, 2, 6, 5]+1  % x = 1
+                    };
+            end
+
+            % Preallocate max possible faces
+            nFaces = size(faceNodePattern,1);
+            facesAll = zeros(nElem * nFaces, nNf);
+            elemID = zeros(nElem * nFaces,1);
+            localFaceID = zeros(nElem * nFaces, 1);
+            % --- Enumerate faces for all elements ---
+            row = 1;
+            for k = 1:nElem
+                for f = 1:nFaces
+                    % extract appropriate nodes idxs from element
+                    facesAll(row, :) = elements(faceNodePattern{f,:},k);
+                    elemID(row) = k;
+                    localFaceID(row) = f;
+                    row = row + 1;
+                end
+            end
+            facesKey = sort(facesAll, 2);             % only for comparison
+            [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
+            faces = facesAll(uniqueIdx, :);      % preserve original node order
+            elemID = elemID(uniqueIdx);            % remove duplicates
+            localFaceID = localFaceID(uniqueIdx); % remove duplicates
+            counts = accumarray(ic, 1); % number of occurances for each face
+        end
+
         function boundaryFaces = classifyBoundaryFaces(boundaryFaces, geometry, geomFaceType)
             % classifyBoundaryFaces
             %

@@ -79,7 +79,7 @@ classdef HeatSimulator < handle
             end
 
             nodes = obj.mesh.nodes';
-            elements = obj.mesh.elements';
+            elements = obj.mesh.elements;
             temp = obj.thermalInfo.temperature;
 
             % Initial ranges
@@ -96,7 +96,8 @@ classdef HeatSimulator < handle
             ax = axes(fig,'Position',[0.3 0.1 0.65 0.85]);
 
             % --- Initial plot ---
-            hPatch = plotVolumetricChunk(obj, ax, xrange, yrange, zrange);
+            [faces,~,~,counts] = Mesh.identifyAllFaces(elements);
+            hPatch = plotVolumetricChunk(obj, faces, ax, xrange, yrange, zrange);
 
             xlabel(ax,'X Axis (cm)'); ylabel(ax,'Y Axis (cm)'); zlabel(ax,'Z Axis (cm)');
             grid(ax,'on'); colormap(ax,'hot'); colorbar(ax); view(ax,35,45); axis(ax,'equal');
@@ -110,7 +111,7 @@ classdef HeatSimulator < handle
             yPos = 0.9;  % start near top
 
             % Create sliders for X, Y, Z
-            data = struct('obj', obj, 'ax', ax, 'nodes', nodes, 'elements', elements, ...
+            data = struct('obj', obj, 'ax', ax, 'faces',faces, ...
                 'temp', temp, 'hPatch', hPatch, 'xrange', xrange, ...
                 'yrange', yrange, 'zrange', zrange);
 
@@ -143,94 +144,53 @@ classdef HeatSimulator < handle
 
             guidata(fig,data);
         end
-        function hPatch = plotVolumetricChunk(obj,ax,xrange,yrange,zrange)
+        function hPatch = plotVolumetricChunk(obj,elementFaces,ax,xrange,yrange,zrange)
             %PLOTVOLUME Plots volumetric temperature data
             %TODO: This function needs to be updated to plot arbitrary meshes.
             arguments (Input)
                 obj
+                elementFaces
                 ax = gca
                 xrange double = []
                 yrange double = []
                 zrange double = []
             end
 
-            elements = obj.mesh.elements';     % nElem x nNe tranposed for patch
-            nodes = obj.mesh.nodes'; % tranposed to be n x 3 for patch
+            elements = obj.mesh.elements;
+            nodes = obj.mesh.nodes;
             data = obj.thermalInfo.temperature;
             
             % ----- GET ALL FACES FOR EVERY ELEMENT --- %
-            nElem = size(elements,1);
-            nNe = size(elements,2);
-
-            % Compute bounding boxes for each element
-            xMaxElem = max(reshape(nodes(elements(:),1), nElem, nNe), [], 2);  % max x per element
-            xMinElem = min(reshape(nodes(elements(:),1), nElem, nNe), [], 2);
-            yMaxElem = max(reshape(nodes(elements(:),2), nElem, nNe), [], 2);
-            yMinElem = min(reshape(nodes(elements(:),2), nElem, nNe), [], 2);
-            zMaxElem = max(reshape(nodes(elements(:),3), nElem, nNe), [], 2);
-            zMinElem = min(reshape(nodes(elements(:),3), nElem, nNe), [], 2);
+            nNe = size(elements,1);
+            nElem = size(elements,2);
+            nFn = size(elementFaces,2);
+            nFaces = size(elementFaces,1);
+            
+            % Compute bounding boxes for each face
+            xMaxElem = max(reshape(nodes(1,elementFaces), nFaces, nFn), [], 2);  % max x per element
+            xMinElem = min(reshape(nodes(1,elementFaces), nFaces, nFn), [], 2);
+            yMaxElem = max(reshape(nodes(2,elementFaces), nFaces, nFn), [], 2);
+            yMinElem = min(reshape(nodes(2,elementFaces), nFaces, nFn), [], 2);
+            zMaxElem = max(reshape(nodes(3,elementFaces), nFaces, nFn), [], 2);
+            zMinElem = min(reshape(nodes(3,elementFaces), nFaces, nFn), [], 2);
 
             % Keep only elements that intersect the ranges
             keep = (xMinElem <= xrange(2)) & (xMaxElem >= xrange(1)) & ...
                 (yMinElem <= yrange(2)) & (yMaxElem >= yrange(1)) & ...
                 (zMinElem <= zrange(2)) & (zMaxElem >= zrange(1));
 
-            elementsSlice = elements(keep,:);
-            nElem = size(elementsSlice,1);
-            nNe = size(elementsSlice,2);
-
-            if nNe == 10
-                nNf = 6;
-                % --- Quadratic tet face-node patterns ---
-                faceNodePattern = {
-                    [1, 2, 3, 5, 9, 8]+1;   % face 1: Opposite node 1
-                    [0, 3, 2, 7, 9, 6]+1;   % face 2: Opposite node 2
-                    [0, 1, 3, 4, 8, 7]+1;   % face 3: Opposite node 3
-                    [0, 2, 1, 6, 5, 4]+1    % face 4: Opposite node 4
-                    };
-            elseif nNe == 8
-                % --- Linear Hex face-node patterns ---
-                % add one for 1 indexing
-                nNf = 4;
-                faceNodePattern = {
-                    [0, 3, 2, 1]+1;  % z = -1
-                    [4, 5, 6, 7]+1;  % z = 1
-                    [0, 1, 5, 4]+1;  % y = -1
-                    [3, 7, 6, 2]+1;  % y = 1
-                    [0, 4, 7, 3]+1;  % x = -1
-                    [1, 2, 6, 5]+1  % x = 1
-                    };
-            end
-
-            % Preallocate max possible faces
-            nFaces = size(faceNodePattern,1);
-            facesAll = zeros(nElem * nFaces, nNf);
-            % --- Enumerate faces for all elements ---
-            row = 1;
-            for k = 1:nElem
-                for f = 1:nFaces
-                    % extract appropriate nodes idxs from element
-                    facesAll(row, :) = elementsSlice(k,faceNodePattern{f,:});
-                    row = row + 1;
-                end
-            end
-            facesKey = sort(facesAll, 2);             % only for comparison
-            [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
-            counts = accumarray(ic, 1); % count the number of times each unique key appears
-            facesUnique = facesAll(uniqueIdx, :);      % preserve original node order
-            facesUnique = facesUnique(counts==1,:);
-
+            elementFaces = elementFaces(keep,:);
             axis(ax);
             if isempty(ax.Children)
-                hPatch = patch('Faces', facesUnique, ...
-                    'Vertices', nodes, ...
+                hPatch = patch('Faces', elementFaces, ...
+                    'Vertices', nodes', ... % need to tranpose nodes
                     'FaceVertexCData', data, ...
                     'FaceColor', 'interp', ...       % smooth coloring
                     'EdgeColor', 'none');
             else
                 % reuse existing patch
                 hPatch = ax.Children(1);
-                set(hPatch, 'Faces', facesUnique);
+                set(hPatch, 'Faces', elementFaces);
             end
             
             hold off
@@ -257,8 +217,8 @@ classdef HeatSimulator < handle
             % Delete old patch and update
             % delete(data.hPatch); % patch is now updated directly in
             % function with set(hPatch, 'Faces', newFaces);
-            data.hPatch = plotVolumetricChunk(data.obj, data.ax, ...
-                data.xrange, data.yrange, data.zrange);
+            data.hPatch = plotVolumetricChunk(data.obj, data.faces, ...
+                data.ax, data.xrange, data.yrange, data.zrange);
 
             guidata(fig,data);
         end
