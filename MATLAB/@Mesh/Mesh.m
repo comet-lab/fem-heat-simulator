@@ -298,22 +298,18 @@ classdef Mesh
             end
         end
 
-        function [faces,elemID,localFaceID,counts] = identifyAllFaces(elements)
-            %IDENTIFYALLFACES identifies all the unique faces in a Mesh
-            %   A unique face is simply a face in the mesh. 
+        function facesAll = identifyAllFaces(elements)
+            %IDENTIFYALLFACES identifies all the faces in a Mesh
+            %   This will have repeat faces that are shared between
+            %   elements
             %
             %   Inputs:
             %       elements: (nNe x nElems) 
             %   Outputs:
             %       faces: (nE x nF) Contains a list of nodes corresponding
             %               to each face
-            %               nE is the number of unique faces and
+            %               nE is the number of faces 
             %               nF is the number of nodes on a face. 
-            %       elemID: (nE x 1) contains the element ID of each face
-            %       localFaceID: (nE x 1) contains the local face numbering
-            %                    for each face
-            %       counts: (nE x 1) contains the number of times each face
-            %               appears in the list of elements
             %
             arguments
                 elements (:,:)
@@ -361,12 +357,12 @@ classdef Mesh
                     row = row + 1;
                 end
             end
-            facesKey = sort(facesAll, 2);             % only for comparison
-            [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
-            faces = facesAll(uniqueIdx, :);      % preserve original node order
-            elemID = elemID(uniqueIdx);            % remove duplicates
-            localFaceID = localFaceID(uniqueIdx); % remove duplicates
-            counts = accumarray(ic, 1); % number of occurances for each face
+            % facesKey = sort(facesAll, 2);             % only for comparison
+            % [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
+            % faces = facesAll(uniqueIdx, :);      % preserve original node order
+            % elemID = elemID(uniqueIdx);            % remove duplicates
+            % localFaceID = localFaceID(uniqueIdx); % remove duplicates
+            % counts = accumarray(ic, 1); % number of occurances for each face
         end
 
         function boundaryFaces = classifyBoundaryFaces(boundaryFaces, geometry, geomFaceType)

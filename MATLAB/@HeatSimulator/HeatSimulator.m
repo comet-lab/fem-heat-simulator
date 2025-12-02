@@ -96,8 +96,8 @@ classdef HeatSimulator < handle
             ax = axes(fig,'Position',[0.3 0.1 0.65 0.85]);
 
             % --- Initial plot ---
-            [faces,~,~,counts] = Mesh.identifyAllFaces(elements);
-            hPatch = plotVolumetricChunk(obj, faces, ax, xrange, yrange, zrange);
+            allFaces = Mesh.identifyAllFaces(elements);
+            hPatch = plotVolumetricChunk(obj, allFaces, ax, xrange, yrange, zrange);
 
             xlabel(ax,'X Axis (cm)'); ylabel(ax,'Y Axis (cm)'); zlabel(ax,'Z Axis (cm)');
             grid(ax,'on'); colormap(ax,'hot'); colorbar(ax); view(ax,35,45); axis(ax,'equal');
@@ -111,7 +111,7 @@ classdef HeatSimulator < handle
             yPos = 0.9;  % start near top
 
             % Create sliders for X, Y, Z
-            data = struct('obj', obj, 'ax', ax, 'faces',faces, ...
+            data = struct('obj', obj, 'ax', ax, 'faces', allFaces, ...
                 'temp', temp, 'hPatch', hPatch, 'xrange', xrange, ...
                 'yrange', yrange, 'zrange', zrange);
 
@@ -180,6 +180,11 @@ classdef HeatSimulator < handle
                 (zMinElem <= zrange(2)) & (zMaxElem >= zrange(1));
 
             elementFaces = elementFaces(keep,:);
+            [~, uniqueIdx, ic] = unique(sort(elementFaces, 2), 'rows'); % indices of unique faces
+            elementFaces = elementFaces(uniqueIdx, :);      % preserve original node order
+            counts = accumarray(ic, 1); % number of occurances for each face
+            elementFaces = elementFaces(counts==1,:); % get only faces on boundary of region
+
             axis(ax);
             if isempty(ax.Children)
                 hPatch = patch('Faces', elementFaces, ...
