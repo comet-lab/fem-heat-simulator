@@ -1,14 +1,62 @@
 classdef HeatSimulator < handle
-    %HEATSIMULATOR Summary of this class goes here
-    %   Detailed explanation goes here
+    %HEATSIMULATOR This class controls the time stepping of the FEM
+    %Simulator
+    %   All information regarding running simulations should go through
+    %   this class. For example, to set the fluence rate of the laser use
+    %   
+    %       simulator.thermalInfo.fluenceRate = ...
+    %
+    %   HeatSimulator is a handle class (not a value class). This means if
+    %   you try to make a copy with
+    %
+    %       simulator2 = simulator1
+    %       simulator2.thermalInfo.Temp = 0
+    %
+    %   both simulator objects will have the thermalInfo.temp = 0. Use the
+    %   deepCopy() function to create a copy. Note that the Mesh object is
+    %   also a handle object. Deep copy will not create a deep copy of the
+    %   Mesh object and so even with
+    %
+    %       simulator2 = simulator1.deepCopy()
+    %       simulator2.mesh.nodes = 0
+    %
+    %   simulator1 will have its mesh.nodes attribute altered.
+    %
+    %   Properties
+    %       mesh Mesh - stores the mesh information
+    %       thermalInfo ThermalInfo - stores the thermalInformation of the
+    %           mesh
+    %       dt double - size of time step
+    %       alpha double - implicit vs explicit integration lever
+    %       time double - stores time points simulated with solve
+    %       sensorLocations (:,3) double - stores the locations in the mesh
+    %           that we want to get specific temperature information
+    %       sensorTemps (:,:) double - sensor temperatures at each time
+    %           point. This is populated after calling solve()
+    %       silentMode logical - whether the MEX should print statements
+    %       useAllCPUs logical - whether the simulator should use all the
+    %           CPUs in the C++ code
+    %       useGPU logical - whether the simulator should run on a GPU
+    %       resetIntegration logical - setting to true will reset the time
+    %           integration in the MEX file, essentially reseting the
+    %           time derivative of our temperature
+    %       buildMatrices logical - setting to true will have the MEX code
+    %           build the global matrices from the mesh object. False will
+    %           not pass a mesh struct into the MEX file.
+    %
+    %
 
     properties
         mesh Mesh
         thermalInfo ThermalModel
+        % Storage for time steping
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
-        time (:,1) double
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
+        time (:,1) double
+        % storage for sensor data
         sensorLocations (:,3) double
+        sensorTemps (:,:) double
+        % storage for miscellaneous settings
         silentMode (1,1) logical = false
         useAllCPUs (1,1) logical = false
         useGPU (1,1) logical = false
@@ -22,7 +70,21 @@ classdef HeatSimulator < handle
             %   Detailed explanation goes here
         end
 
-        function [T,sensors] = solve(obj, finalTime, dt, alpha)
+        function newObj = deepCopy(obj)
+            newObj = HeatSimulator();
+            newObj.mesh = Mesh;
+            newObj.thermalInfo = obj.thermalInfo;
+            newObj.dt = obj.dt;
+            newObj.alpha = obj.alpha;
+            newObj.sensorLocations = obj.sensorLocations;
+            newObj.silentMode = obj.silentMode;
+            newObj.useAllCPUs = obj.useAllCPUs;
+            newObj.useGPU = obj.useGPU;
+            newObj.resetIntegration = obj.resetIntegration;
+            newObj.buildMatrices = obj.buildMatrices;
+        end
+
+        function [T,sensorData] = solve(obj, finalTime, dt, alpha)
             arguments
                 obj (1,1) HeatSimulator
                 finalTime (1,1) {mustBeGreaterThan(finalTime,0)}
@@ -48,19 +110,24 @@ classdef HeatSimulator < handle
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
                 'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
             if (obj.buildMatrices)
-                [T,sensors] = MEX_Heat_Simulation(thermalInfoStruct,settings,meshInfo);
+                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,meshInfo);
             else
-                [T,sensors] = MEX_Heat_Simulation(thermalInfoStruct,settings);
+                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings);
             end
             obj.thermalInfo.temperature = T;
+            obj.sensorTemps = sensorData;
         end
 
-        function ax = plotSensorTemps(obj,sensorTemps)
-            figure(1);
+        function ax = plotSensorTemps(obj,figureNum)
+            arguments
+                obj
+                figureNum = 1
+            end
+            figure(figureNum);
             clf;
             hold on;
             for ss = 1:size(obj.sensorLocations,1)
-                plot(obj.time,sensorTemps(:,ss),'LineWidth',2,'DisplayName',...
+                plot(obj.time,obj.sensorTemps(:,ss),'LineWidth',2,'DisplayName',...
                     sprintf("(%g,%g,%g)",obj.sensorLocations(ss,:)));
             end
             hold off
