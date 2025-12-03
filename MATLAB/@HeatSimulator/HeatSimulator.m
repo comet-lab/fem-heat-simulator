@@ -128,7 +128,7 @@ classdef HeatSimulator < handle
             hold on;
             for ss = 1:size(obj.sensorLocations,1)
                 plot(obj.time,obj.sensorTemps(:,ss),'LineWidth',2,'DisplayName',...
-                    sprintf("(%g,%g,%g)",obj.sensorLocations(ss,:)));
+                    sprintf("Sensor@(%g,%g,%g) cm",obj.sensorLocations(ss,:)));
             end
             hold off
             grid on;
