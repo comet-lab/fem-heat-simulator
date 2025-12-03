@@ -96,8 +96,8 @@ classdef HeatSimulator < handle
             ax = axes(fig,'Position',[0.3 0.1 0.65 0.85]);
 
             % --- Initial plot ---
-            faceData = Mesh.identifyAllFaces(elements);
-            hPatch = plotVolumetricChunk(obj, faceData, ax, xrange, yrange, zrange);
+            faceData = Mesh.identifyUniqueFaces(elements);
+            hPatch = plotVolumetricChunk(obj, faceData, xrange, yrange, zrange, ax);
 
             xlabel(ax,'X Axis (cm)'); ylabel(ax,'Y Axis (cm)'); zlabel(ax,'Z Axis (cm)');
             grid(ax,'on'); colormap(ax,'hot'); colorbar(ax); view(ax,35,45); axis(ax,'equal');
@@ -144,26 +144,50 @@ classdef HeatSimulator < handle
 
             guidata(fig,data);
         end
-        function hPatch = plotVolumetricChunk(obj,faceData,ax,xrange,yrange,zrange)
+        function hPatch = plotVolumetricChunk(obj,faceData,xrange,yrange,zrange,ax)
             %PLOTVOLUME Plots volumetric temperature data
             %TODO: This function needs to be updated to plot arbitrary meshes.
             arguments (Input)
                 obj
                 faceData
+                xrange (1,2) double
+                yrange (1,2) double
+                zrange (1,2) double
                 ax = gca
-                xrange double = []
-                yrange double = []
-                zrange double = []
             end
 
             nodes = obj.mesh.nodes;
-            elements = obj.mesh.elements;
             data = obj.thermalInfo.temperature;
-            
+            facesToPlot = obj.sortBoundaryFaces(faceData,xrange,yrange,zrange);
+
+            axis(ax);
+            if isempty(ax.Children)
+                hPatch = patch('Faces', facesToPlot, ...
+                    'Vertices', nodes', ... % need to tranpose nodes
+                    'FaceVertexCData', data, ...
+                    'FaceColor', 'interp', ...       % smooth coloring
+                    'EdgeColor', 'none');
+            else
+                % reuse existing patch
+                hPatch = ax.Children(1);
+                set(hPatch, 'Faces', facesToPlot);
+            end
+
+            hold off
+            clim([min(data,[],'all'),max(data,[],'all')]);
+        end
+
+
+        function boundaryFaces = sortBoundaryFaces(obj,faceData,xrange,yrange,zrange)
+            %SORTBOUNDARYFACES - takes a list of face data and a cuboid
+            %region in x,y,z to produce faces that are on the boundary of
+            %the region for plotting
             % ----- GET ALL FACES FOR EVERY ELEMENT --- %
+            nodes = obj.mesh.nodes;
+            elements = obj.mesh.elements;
             nElem = size(elements,2);
             nNe = size(elements,1);
-            
+
             % Compute bounding boxes for each face
             xMaxElem = max(reshape(nodes(1,elements), nNe, nElem), [], 1);  % max x per element
             xMinElem = min(reshape(nodes(1,elements), nNe, nElem), [], 1);
@@ -183,28 +207,13 @@ classdef HeatSimulator < handle
             in1 = false(size(elem1)); in2 = false(size(elem2));
             in1(elem1>0) = inSlice(elem1(elem1>0));
             in2(elem2>0) = inSlice(elem2(elem2>0));
-            
+
             mask = (in1 & ~in2) | (~in1 & in2) | (elem2==0 & in1);
-            
-            facesToPlot = faceData.faces(mask, :);
-            
-            axis(ax);
-            if isempty(ax.Children)
-                hPatch = patch('Faces', facesToPlot, ...
-                    'Vertices', nodes', ... % need to tranpose nodes
-                    'FaceVertexCData', data, ...
-                    'FaceColor', 'interp', ...       % smooth coloring
-                    'EdgeColor', 'none');
-            else
-                % reuse existing patch
-                hPatch = ax.Children(1);
-                set(hPatch, 'Faces', facesToPlot);
-            end
-            
-            hold off
-            cb = colorbar;
-            clim([min(data,[],'all'),max(data,[],'all')]);
+
+            boundaryFaces = faceData.faces(mask, :);
+
         end
+
     end
 
     methods (Static)
@@ -226,7 +235,7 @@ classdef HeatSimulator < handle
             % delete(data.hPatch); % patch is now updated directly in
             % function with set(hPatch, 'Faces', newFaces);
             data.hPatch = plotVolumetricChunk(data.obj, data.faces, ...
-                data.ax, data.xrange, data.yrange, data.zrange);
+               data.xrange, data.yrange, data.zrange, data.ax);
 
             guidata(fig,data);
         end

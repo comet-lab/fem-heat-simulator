@@ -298,23 +298,33 @@ classdef Mesh
             end
         end
 
-        function faceData = identifyAllFaces(elements)
+        function faceData = identifyUniqueFaces(elements)
             %IDENTIFYALLFACES identifies all the faces in a Mesh
-            %   This will have repeat faces that are shared between
-            %   elements
+            %   Will not put duplicate faces. Any face shared by two
+            %   elements will have that information stored in elemID and
+            %   localFaceID
             %
             %   Inputs:
             %       elements: (nNe x nElems)
             %   Outputs:
-            %       faces: (nE x nF) Contains a list of nodes corresponding
-            %               to each face
-            %               nE is the number of faces and
-            %               nF is the number of nodes on a face.
-            %       elemID: (nE x 1) contains the element ID of each face
-            %       localFaceID: (nE x 1) contains the local face numbering
-            %                    for each face
-            %       counts: (nE x 1) contains the number of times each face
-            %               appears in the list of elements
+            %       faceData: Struct with fields
+            %           faces: (nE x nF) Contains a list of nodes corresponding
+            %                  to each unique face
+            %                  nE is the number of faces and
+            %                  nF is the number of nodes on a face.
+            %           elemID: (nE x 2) contains the element ID of each.
+            %                   If a face belongs to more than one element,
+            %                   the elemID will contain indicies for both
+            %                   elements. Any value of 0 indiciates no
+            %                   element
+            %           localFaceID: (nE x 2) contains the local face numbering
+            %                        for each face. Like elemID, if it
+            %                        belongs to two elements it will
+            %                        contain an second non-zero value
+            %                        indiciating the local face id for the
+            %                        second element.
+            %           counts: (nE x 1) contains the number of times each face
+            %                   appears in the list of elements
             %
             arguments
                 elements (:,:)
