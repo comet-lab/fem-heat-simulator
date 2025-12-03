@@ -1,4 +1,4 @@
-classdef Mesh
+classdef Mesh < handle
     %MESH object to store nodes, elements, and boundary faces for use in
     %the FEM Heat Simulator
     %   Properties
@@ -27,10 +27,6 @@ classdef Mesh
         nodes (3,:) double
         elements (:,:) double
         boundaryFaces (:,1) struct
-        useXYZ (1,1) logical = false;
-        xpos (1,:) double
-        ypos (1,:) double
-        zpos (1,:) double
     end
 
     methods
@@ -69,12 +65,11 @@ classdef Mesh
                 obj.elements = varargin{2};
                 obj.boundaryFaces = varargin{3};
             elseif (nargin == 4)
-                obj.xpos = varargin{1};
-                obj.ypos = varargin{2};
-                obj.zpos = varargin{3};
+                xpos = varargin{1};
+                ypos = varargin{2};
+                zpos = varargin{3};
                 boundaryConditions = varargin{4};
-                obj = obj.buildCubeMesh(obj.xpos,obj.ypos,obj.zpos,boundaryConditions);
-                obj.useXYZ = false;
+                obj = obj.buildCubeMesh(xpos,ypos,zpos,boundaryConditions);
             end
         end
 
