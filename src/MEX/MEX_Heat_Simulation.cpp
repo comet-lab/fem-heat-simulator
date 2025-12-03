@@ -324,8 +324,8 @@ public:
             matlab::data::StructArray boundaryFaceStruct = meshInfo[0]["boundaryFaces"];
             float numFaces = boundaryFaceStruct.getDimensions()[0];
             std::vector<BoundaryFace> boundaryFaces(numFaces);
-            stream << "Dimension of boundaryFaces: (" << numFaces << " x " << boundaryFaceStruct.getDimensions()[1] << ") faces" << std::endl;
-            displayOnMATLAB(matlabPtr, stream, false);
+            //stream << "Dimension of boundaryFaces: (" << numFaces << " x " << boundaryFaceStruct.getDimensions()[1] << ") faces" << std::endl;
+            //displayOnMATLAB(matlabPtr, stream, false);
             for (int j = 0; j < numFaces; j++)
             {   
                 // boundary face type
