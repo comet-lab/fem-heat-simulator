@@ -233,8 +233,8 @@ classdef Mesh
             %
             %   boundaryFaces = makeBoundaryFaces(mesh)
             %
-            %   mesh.Elements must be 10xN (quadratic tetrahedral elements)
-            %   mesh.Nodes    must be 3xM
+            %   mesh.Elements must be nNe x E 
+            %   mesh.Nodes    must be 3xN
             %
             %   Output fields:
             %       elementID   - tetra index in mesh.Elements
@@ -242,59 +242,25 @@ classdef Mesh
             %       nodeIDs     - 6 node IDs defining that quadratic face
             %       type        - default = 0 (user can assign later)
 
-            elements = mesh.Elements;     % 10 x Ne
-            Ne = size(elements,2);
+            elements = mesh.Elements;     % nNe x N
+            
+            faceData = Mesh.identifyUniqueFaces(elements);
+            % faces on the boundary of the mesh only appear once
+            uniqueIdx = faceData.counts == 1;
+            % Extract boundary faces, elemID, and localFaceID
+            faces = faceData.faces(uniqueIdx,:);
+            elemIDs = faceData.elemID(uniqueIdx,1);
+            localFaceIDs = faceData.localFaceID(uniqueIdx,1);
 
-            % --- Quadratic tet face-node patterns ---
-            faceNodePattern = {
-                [1, 2, 3, 5, 9, 8]+1;   % face 1: Opposite node 1
-                [0, 3, 2, 7, 9, 6]+1;   % face 2: Opposite node 2
-                [0, 1, 3, 4, 8, 7]+1;   % face 3: Opposite node 3
-                [0, 2, 1, 6, 5, 4]+1    % face 4: Opposite node 4
-                };
 
-            % Preallocate max possible faces (4 per element)
-            allFaces(Ne*4).nodes = [];
-            idx = 1;
-
-            % --- Enumerate faces for all elements ---
-            for eid = 1:Ne
-                elemNodes = elements(:,eid);
-                for lf = 1:4
-                    fn = elemNodes(faceNodePattern{lf});
-                    allFaces(idx).nodes       = sort(fn(:));  % row, sorted for matching
-                    allFaces(idx).elemID   = eid;
-                    allFaces(idx).localFaceID = lf;
-                    idx = idx + 1;
-                end
-            end
-
-            % Trim unused prealloc (in case)
-            allFaces = allFaces(1:(idx-1));
-
-            % --- Create hash keys for identifying repeated faces ---
-            keys = cellfun(@(x) sprintf('%d_', x), {allFaces.nodes}, 'UniformOutput', false);
-
-            % Unique face sets
-            [uniqueKeys, ~, ic] = unique(keys);
-            counts = accumarray(ic, 1); % count the number of times each unique key appears
-
-            % Allocate boundaryFaces (worst case = all faces)
+            % --- SET BOUNDARY FACES STRUCT ---
             boundaryFaces = struct('elemID',{},'localFaceID',{},'nodes',{},'type',{});
-            b = 1;
-
-            % --- Extract faces that occur exactly once (boundary) ---
-            for k = 1:numel(uniqueKeys)
-                if counts(k) == 1
-                    idxFace = ic == k;
-                    f = allFaces(idxFace); % Using logical indexing
-
-                    boundaryFaces(b).elemID      = f.elemID;
-                    boundaryFaces(b).localFaceID = f.localFaceID;
-                    boundaryFaces(b).nodes       = f.nodes;
-                    boundaryFaces(b).type        = 0;   % default user boundary type
-                    b = b + 1;
-                end
+            % we have already isolated 
+            for k = 1:size(faces,1)
+                boundaryFaces(k).elemID      = elemIDs(k);
+                boundaryFaces(k).localFaceID = localFaceIDs(k);
+                boundaryFaces(k).nodes       = faces(k,:);
+                boundaryFaces(k).type        = 0;   % default user boundary type
             end
         end
 
