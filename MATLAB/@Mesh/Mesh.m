@@ -93,15 +93,8 @@ classdef Mesh
             Ny = numel(yPos);
             Nz = numel(zPos);
             %% --- Build nodes ---
-            fprintf("Building Nodes...")
-            tic
             [Y, X, Z] = meshgrid(yPos, xPos, zPos);
             obj.nodes = [X(:)'; Y(:)'; Z(:)'];
-            fprintf("... Done building nodes");
-            toc
-
-            fprintf("Building Elements...");
-            tic
 
             % Element grid indices (lower-left-front corner of each voxel)
             [i, j, k] = ndgrid(1:Nx-1, 1:Ny-1, 1:Nz-1);
@@ -127,9 +120,6 @@ classdef Mesh
 
             % Build all elements at once (8 × numElems)
             obj.elements = base.' + offsets.' + 1;
-
-            fprintf("Done.");
-            toc
 
             %% --- Build boundary faces ---
             obj.boundaryFaces = [];
@@ -170,9 +160,6 @@ classdef Mesh
             i = (Nx-1)*ones(size(j));
             BF = Mesh.makeSquareFaces(i,j,k, 6, bc(6), [2 3 7 6], Nz, Nx);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
-
-            fprintf(" Done.");
-            toc
 
         end
     end
