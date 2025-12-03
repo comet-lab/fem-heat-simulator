@@ -211,9 +211,7 @@ classdef HeatSimulator < handle
             mask = (in1 & ~in2) | (~in1 & in2) | (elem2==0 & in1);
 
             boundaryFaces = faceData.faces(mask, :);
-
         end
-
     end
 
     methods (Static)
