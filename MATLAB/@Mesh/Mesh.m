@@ -16,11 +16,11 @@ classdef Mesh
     %                       localFaceID - face number in element
     %
     %   The mesh object uses 1 indexing and the MEX file does the necessary
-    %   conversion to 0 based indexing. For example, if we have a single 
+    %   conversion to 0 based indexing. For example, if we have a single
     %   element mesh with eight nodes, the element will contain nodes
     %   [1,8]. Once passed into the MEX file, the c++ code will have an
     %   element with nodes [0,7]. This applies to node indicies, element
-    %   indicies, localFaceIDs, etc. 
+    %   indicies, localFaceIDs, etc.
     %
 
     properties
@@ -51,7 +51,7 @@ classdef Mesh
                 obj.boundaryFaces = Mesh.makeBoundaryFaces(femesh);
 
                 % if two arguments were passed in then we also have boundary type
-                if (nargin == 2) 
+                if (nargin == 2)
                     boundaryType = varargin{2};
                     if (length(boundaryType) < geom.NumFaces)
                         warning("Input 2 (boundaryType) only has %d entries but " + ...
@@ -298,18 +298,18 @@ classdef Mesh
             end
         end
 
-        function [allFaces,elemID,localFaceID] = identifyAllFaces(elements)
+        function faceData = identifyAllFaces(elements)
             %IDENTIFYALLFACES identifies all the faces in a Mesh
             %   This will have repeat faces that are shared between
             %   elements
             %
             %   Inputs:
-            %       elements: (nNe x nElems) 
+            %       elements: (nNe x nElems)
             %   Outputs:
             %       faces: (nE x nF) Contains a list of nodes corresponding
             %               to each face
             %               nE is the number of faces and
-            %               nF is the number of nodes on a face. 
+            %               nF is the number of nodes on a face.
             %       elemID: (nE x 1) contains the element ID of each face
             %       localFaceID: (nE x 1) contains the local face numbering
             %                    for each face
@@ -319,7 +319,7 @@ classdef Mesh
             arguments
                 elements (:,:)
             end
-            
+
             nElem = size(elements,2);
             nNe = size(elements,1);
 
@@ -362,12 +362,39 @@ classdef Mesh
                     row = row + 1;
                 end
             end
-            % facesKey = sort(facesAll, 2);             % only for comparison
-            % [~, uniqueIdx, ic] = unique(facesKey, 'rows'); % indices of unique faces
-            % faces = facesAll(uniqueIdx, :);      % preserve original node order
-            % elemID = elemID(uniqueIdx);            % remove duplicates
-            % localFaceID = localFaceID(uniqueIdx); % remove duplicates
-            % counts = accumarray(ic, 1); % number of occurances for each face
+            facesKey = sort(allFaces, 2);             % only for comparison
+            % get unique faces
+            [faceKey, ia, ic] = unique(facesKey, 'rows', 'stable');
+            counts = accumarray(ic, 1); % number of occurances for each face
+            nUnique = size(ia,1);
+            faceToElem = zeros(nUnique,2); % faces can share two elements
+            faceToFaceID = zeros(nUnique,2);
+
+            % Some unique faces can be grabbed by a second index. The
+            % variablce ic contains how to go from uniqueFace -> allFaces
+            % so we will use that to find the second occurance of each face
+            % in the unique face ID
+            % We find which indicies from allFaces are not in ia which
+            % means they are duplicates
+            dupIdx = setdiff(1:size(facesKey,1), ia); % logical array to isolate faces with 2 elements
+            % dupIdx contains the row in allFaces pertaining to a
+            % duplicated face, we can now calculate the row in the
+            % uniqueFaces by using ic
+            dupRows = ic(dupIdx);   % rows in allFaces that belong to a repeated face
+
+            % Now fill in the output arrays
+            uniqueFaces = allFaces(ia,:);
+            faceToElem(:,1)   = elemID(ia);
+            faceToElem(dupRows,2)   = elemID(dupIdx);
+            faceToFaceID(:,1) = localFaceID(ia);
+            faceToFaceID(dupRows,2) = localFaceID(dupIdx);
+
+            % package
+            faceData.faces       = uniqueFaces;    % nFaces x nNodesPerFace
+            faceData.elemID      = faceToElem;  % nFaces x 2
+            faceData.faceKey     = faceKey;     % nFaces x nNodesPerFace (sorted)
+            faceData.localFaceID = faceToFaceID;
+            faceData.counts = counts;
         end
 
         function boundaryFaces = classifyBoundaryFaces(boundaryFaces, geometry, geomFaceType)
