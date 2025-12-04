@@ -215,7 +215,7 @@ classdef Mesh < handle
             %
             %   boundaryFaces = makeBoundaryFaces(mesh)
             %
-            %   mesh.Elements must be nNe x E 
+            %   mesh.Elements must be nNe x E
             %   mesh.Nodes    must be 3xN
             %
             %   Output fields:
@@ -225,7 +225,7 @@ classdef Mesh < handle
             %       type        - default = 0 (user can assign later)
 
             elements = mesh.Elements;     % nNe x N
-            
+
             faceData = Mesh.identifyUniqueFaces(elements);
             % faces on the boundary of the mesh only appear once
             uniqueIdx = faceData.counts == 1;
@@ -237,7 +237,7 @@ classdef Mesh < handle
 
             % --- SET BOUNDARY FACES STRUCT ---
             boundaryFaces = struct('elemID',{},'localFaceID',{},'nodes',{},'type',{});
-            % we have already isolated 
+            % we have already isolated
             for k = 1:size(faces,1)
                 boundaryFaces(k).elemID      = elemIDs(k);
                 boundaryFaces(k).localFaceID = localFaceIDs(k);
@@ -414,6 +414,51 @@ classdef Mesh < handle
             end
 
         end
+        function x = geometricSpacing(a, b, n, sStart, flip)
+            % Geometric spacing with fixed number of points
+            % a, b      - start and end coordinates
+            % n         - total number of points
+            % sStart    - first spacing (largest)
+            % flip      - optional, true to put largest spacing at b instead of a
+            %
+            % Output:
+            % x         - vector of coordinates from a to b
 
+            if nargin < 5
+                flip = false;
+            end
+
+            if n < 2
+                error('Number of points n must be at least 2');
+            end
+
+            L = b - a;        % total length
+            m = n - 1;        % number of spacings
+
+            % Handle r = 1 case (uniform spacing)
+            if abs(sStart*m - L) < 1e-12
+                r = 1;
+            else
+                % Solve geometric series equation for r
+                fun = @(r) sStart*(1 - r^m)/(1 - r) - L;
+                r = fzero(fun, [0, 0.99]);  % r in (0,1)
+            end
+
+            % Build spacings
+            d = sStart * r.^(0:m-1);
+
+            % Adjust slightly to hit exactly b
+            scale = L / sum(d);
+            d = d * scale;
+
+            % Build coordinates
+            x = a + [0, cumsum(d)];
+
+            % Flip coordinates if needed (largest spacing at b)
+            if flip
+                x = b - (x - a);
+                x = fliplr(x);  % optional to ensure ascending order
+            end
+        end
     end
 end

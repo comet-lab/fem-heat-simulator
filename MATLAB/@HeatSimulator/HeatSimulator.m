@@ -24,7 +24,7 @@ classdef HeatSimulator < handle
     %
     %   Properties
     %       mesh Mesh - stores the mesh information
-    %       thermalInfo ThermalInfo - stores the thermalInformation of the
+    %       thermalInfo ThermalModel - stores the thermalInformation of the
     %           mesh
     %       dt double - size of time step
     %       alpha double - implicit vs explicit integration lever
@@ -118,25 +118,49 @@ classdef HeatSimulator < handle
             obj.sensorTemps = sensorData;
         end
 
-        function ax = plotSensorTemps(obj,figureNum)
+        function createSensorTempsFigure(obj,figureNum)
             arguments
                 obj
-                figureNum = 1
+                figureNum = 1;
             end
-            figure(figureNum);
-            clf;
-            hold on;
-            for ss = 1:size(obj.sensorLocations,1)
-                plot(obj.time,obj.sensorTemps(:,ss),'LineWidth',2,'DisplayName',...
-                    sprintf("Sensor@(%g,%g,%g) cm",obj.sensorLocations(ss,:)));
-            end
-            hold off
+            fig = figure(figureNum);
+            clf(fig);
+            fig.Name = 'SensorTemperatures';
+
+            obj.plotSensorTemps();
+
             grid on;
             xlabel("Time (s)");
             ylabel("Temperature (deg C)");
             title("Sensor temperature over time");
             legend()
-            ax = gca;
+        end
+
+
+        function ax = plotSensorTemps(obj,ax,plotOpts)
+            arguments
+                obj
+                ax = gca;
+                plotOpts.Marker = 'none'
+                plotOpts.LineWidth = 2;
+                plotOpts.LineStyle {mustBeMember(plotOpts.LineStyle,{'-','--',':','-.'})} = '-'
+                plotOpts.ColorOrder (:,3) = colororder
+            end
+            % make sure we have enough colors and stack if we don't
+            while size(obj.sensorLocations,1) > size(plotOpts.ColorOrder,1)
+                plotOpts.ColorOrder = [plotOpts.ColorOrder;plotOpts.ColorOrder];
+            end
+            axis(ax);
+            hold on;
+            markerIndices = 1:ceil(length(obj.time)/20):length(obj.time);
+            for ss = 1:size(obj.sensorLocations,1)
+                plot(obj.time,obj.sensorTemps(:,ss),'LineWidth',plotOpts.LineWidth,...
+                    'Marker',plotOpts.Marker,'LineStyle',plotOpts.LineStyle,...
+                    'DisplayName',sprintf("Sensor@(%g,%g,%g) cm",obj.sensorLocations(ss,:)),...
+                    'Color',plotOpts.ColorOrder(ss,:),'MarkerIndices',markerIndices);
+            end
+            hold off
+            
         end
 
         function createVolumetricFigure(obj,figureNum)
@@ -303,6 +327,43 @@ classdef HeatSimulator < handle
                data.xrange, data.yrange, data.zrange, data.ax);
 
             guidata(fig,data);
+        end
+
+        function compareSimSensors(figNum,simObjs)
+            arguments
+                figNum double = []
+            end
+            arguments (Repeating)
+                simObjs HeatSimulator
+            end
+
+            if isempty(figNum)
+                figNum = 1;
+            end
+            if ~isscalar(figNum)
+                error("figNum should be a scalar")
+            end
+            figure(figNum);
+            clf;
+            tiledlayout;
+            nexttile();
+            nSims = numel(simObjs);     % number of repeated simObj inputs
+            legendText = {};
+            markers = ["+","o","*",".","x","s","d","^","v",">","<","p","h","none"];
+            for i = 1:nSims
+                sim = simObjs{i};       % each element is a HeatSimulator
+                sim.plotSensorTemps('Marker',markers(i));
+                for ss = 1:size(sim.sensorLocations,1)
+                    legendText = [legendText sprintf("Sim %d Sensor %d",i,ss)];
+                end
+            end
+            grid on;
+            title("Comparison of Sensor Data From Different Simulators");
+            xlabel("Time (s)")
+            ylabel("Temperature (°C)")
+            leg = legend(legendText,'NumColumns',nSims);
+            leg.Layout.Tile = 'east';
+            set(gca,'FontSize',15)
         end
     end
 end
