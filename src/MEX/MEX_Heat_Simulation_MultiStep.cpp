@@ -550,17 +550,17 @@ public:
         displayOnMATLAB(stream);
     }
 
-#ifdef USE_CUDA
-    void initializeGPU(){
-        if (!gpuHandle){
-            gpuHandle = new GPUTimeIntegrator();
-        }
-        simulator.buildMatrices();
-        gpuHandle->setAlpha(simulator.alpha_);
-        gpuHandle->setDeltaT(simulator.deltaT_);
-        gpuHandle->setModel(&simulator);
-//         std::cout << "Model Assigned" << std::endl;
-        gpuHandle->initializeWithModel();
-    }
-#endif 
+// #ifdef USE_CUDA
+//     void initializeGPU(){
+//         if (!gpuHandle){
+//             gpuHandle = new GPUTimeIntegrator();
+//         }
+//         simulator.buildMatrices();
+//         gpuHandle->setAlpha(simulator.alpha_);
+//         gpuHandle->setDeltaT(simulator.deltaT_);
+//         gpuHandle->setModel(&simulator);
+// //         std::cout << "Model Assigned" << std::endl;
+//         gpuHandle->initializeWithModel();
+//     }
+// #endif 
 };

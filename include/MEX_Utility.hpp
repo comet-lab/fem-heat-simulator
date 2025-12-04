@@ -2,10 +2,6 @@
 #include "mexAdapter.hpp"
 #include "FEM_Simulator.h"
 
-#ifdef USE_CUDA
-#include "GPUTimeIntegrator.cuh"
-#endif
-
 /* Helper function to convert a matlab array to a std vector*/
 inline std::vector<std::vector<std::vector<float>>> convertMatlabArrayTo3DVector(const matlab::data::Array& matlabArray) {
     std::vector<std::vector<std::vector<float>>> result;

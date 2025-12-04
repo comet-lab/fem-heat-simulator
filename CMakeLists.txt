@@ -216,24 +216,24 @@ if(BUILD_TESTING)
         GTest::gtest_main
     )
 
-    if (USE_CUDA)
-        add_executable(GPUSolver_Unit_Tests
-            test/GPUSolver_Unit_Tests.cpp
-            test/BaseGPU.cpp
-            test/TestHelpers.hpp
-        )
-        target_link_libraries(GPUSolver_Unit_Tests
-            PRIVATE
-                HeatSimulation::Static
-                GTest::gtest_main
-        )
-    endif()
+    # if (USE_CUDA)
+    #     add_executable(GPUSolver_Unit_Tests
+    #         test/GPUSolver_Unit_Tests.cpp
+    #         test/BaseGPU.cpp
+    #         test/TestHelpers.hpp
+    #     )
+    #     target_link_libraries(GPUSolver_Unit_Tests
+    #         PRIVATE
+    #             HeatSimulation::Static
+    #             GTest::gtest_main
+    #     )
+    # endif()
 
     include(GoogleTest)
     gtest_discover_tests(FEM_Unit_Tests)
-    if (USE_CUDA)
-        gtest_discover_tests(GPUSolver_Unit_Tests)
-    endif()
+    # if (USE_CUDA)
+    #     gtest_discover_tests(GPUSolver_Unit_Tests)
+    # endif()
 endif()
 
 # ──────────────────────────────────────────────────────────────

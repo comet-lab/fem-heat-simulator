@@ -97,6 +97,7 @@ void FEM_Simulator::buildMatrices()
 	if (!mesh_)
 		throw std::runtime_error("Mesh has not been set yet. Cannot build matrices");
 	globalMatrices_ = std::make_shared<GlobalMatrices>(mb.buildMatrices(*mesh_));
+	fluenceUpdate_ = false;
 }
 
 void FEM_Simulator::initializeTimeIntegration(float alpha, float dt)
@@ -138,7 +139,6 @@ void FEM_Simulator::initializeModel()
 	This function does not need to be called if we are only changing the fluenceRate, or the value of tissue properties
 	*/
 	buildMatrices();
-	fluenceUpdate_ = false;
 	initializeTimeIntegration();
 	// We are now ready to call single step
 }

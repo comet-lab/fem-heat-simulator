@@ -30,9 +30,6 @@ private:
     bool buildMatrices = true; // build matrices will build global matrices and reset time integration
     bool resetIntegration = false; // uses current global matrices but resets time integration
     std::chrono::steady_clock::time_point timeRef_ = std::chrono::steady_clock::now();
-#ifdef USE_CUDA
-    GPUTimeIntegrator* gpuHandle = nullptr;
-#endif
         
 
 public:
@@ -44,10 +41,6 @@ public:
 
     ~MexFunction()
     {
-        #ifdef USE_CUDA
-        delete gpuHandle;
-        gpuHandle = nullptr;
-        #endif
         return;
     }
 
@@ -141,24 +134,10 @@ public:
             stream << "MEX: Initializing simulator ... " << std::endl;
             displayOnMATLAB(matlabPtr, stream, silentMode);
             buildMatrices = false;
-            resetIntegration = false;
-            try {
-#ifdef USE_CUDA
-                if (useGPU)
-                {
-                    stream << "MEX: GPU enabled ..." << std::endl;
-                    displayOnMATLAB(stream);
-                    initializeGPU();
-                }
-                else
-#endif  
-                {
-                    stream << "MEX: GPU Disabled ..." << std::endl;
-                    displayOnMATLAB(matlabPtr, stream, silentMode);
-                    simulator.initializeModel();
-                }
-                /*stream << "Global matrices created" << std::endl;
-                displayOnMATLAB(stream);*/
+            resetIntegration = true;
+            try
+            {
+                simulator.buildMatrices();
             }
             catch (const std::exception& e) {
                 stream << "MEX: Error in building Matrices" << std::endl;
@@ -166,14 +145,28 @@ public:
                 displayError(matlabPtr, e.what());
                 return;
             }
-            printDuration("MEX: Matrices Built and Integrator Initialized -- ");
+            printDuration("MEX: Matrices Built -- ");
         }
         
         if (resetIntegration)
         {
-            stream << "MEX: Resetting time integration ..." << std::endl;
+            resetIntegration = false;
+            if (useGPU)
+            {   
+                int isEnabled = simulator.enableGPU();
+                if (isEnabled)
+                    stream << "MEX: GPU Enabled ... " << std::endl;
+                else
+                    stream << "MEX: GPU Disabled ..." << std::endl;
+            }
+            else
+            {
+                simulator.disableGPU();
+                stream << "MEX: GPU Disabled ..." << std::endl;
+            }
             displayOnMATLAB(matlabPtr, stream, silentMode);
             simulator.initializeTimeIntegration();
+
             printDuration("MEX: Time Integration Initialized -- ");
         }
 
@@ -184,25 +177,14 @@ public:
         std::vector<std::vector<float>> sensorTemps(numSteps);
         try 
         { //
-#ifdef USE_CUDA
-            if (this->useGPU)
-            {
-                stream << "MEX: GPU time step " << std::endl;
-                displayOnMATLAB(stream);
-                multiStepGPU(simDuration);
-            }
-            else
-#endif  
-            {
-                stream << "MEX: CPU time step " << std::endl;
-                displayOnMATLAB(matlabPtr, stream, silentMode);
+            stream << "MEX: CPU time step " << std::endl;
+            displayOnMATLAB(matlabPtr, stream, silentMode);
+            simulator.updateTemperatureSensors();
+            sensorTemps[0] = simulator.sensorTemps();
+            for (int i = 1; i < numSteps; i++) {
+                simulator.singleStep();
                 simulator.updateTemperatureSensors();
-                sensorTemps[0] = simulator.sensorTemps();
-                for (int i = 1; i < numSteps; i++) {
-                    simulator.singleStep();
-                    simulator.updateTemperatureSensors();
-                    sensorTemps[i] = simulator.sensorTemps();
-                }
+                sensorTemps[i] = simulator.sensorTemps();
             }
         }
         catch (const std::exception& e) {
@@ -505,28 +487,28 @@ public:
         displayOnMATLAB(matlabPtr, stream, silentMode);
     }
 
-#ifdef USE_CUDA
-    void initializeGPU(){
-        if (!gpuHandle){
-            gpuHandle = new GPUTimeIntegrator();
-        }
-        simulator.buildMatrices();
-        gpuHandle->setAlpha(simulator.alpha_);
-        gpuHandle->setDeltaT(simulator.dt_);
-        gpuHandle->setModel(&simulator);
-        gpuHandle->initializeWithModel();
-    }
+// #ifdef USE_CUDA
+//     void initializeGPU(){
+//         if (!gpuHandle){
+//             gpuHandle = new GPUTimeIntegrator();
+//         }
+//         simulator.buildMatrices();
+//         gpuHandle->setAlpha(simulator.alpha_);
+//         gpuHandle->setDeltaT(simulator.dt_);
+//         gpuHandle->setModel(&simulator);
+//         gpuHandle->initializeWithModel();
+//     }
 
-    void multiStepGPU(float totalTime){
-        auto startTime = std::chrono::steady_clock::now();
-        int numSteps = round(totalTime / simulator.dt_);
-        simulator.initializeSensorTemps(numSteps);
-        simulator.updateTemperatureSensors(0);
-        for (int i = 1; i <= numSteps; i++) {
-            gpuHandle->singleStepWithUpdate();
-            simulator.updateTemperatureSensors(i);
-        }
-    }
-#endif 
+//     void multiStepGPU(float totalTime){
+//         auto startTime = std::chrono::steady_clock::now();
+//         int numSteps = round(totalTime / simulator.dt_);
+//         simulator.initializeSensorTemps(numSteps);
+//         simulator.updateTemperatureSensors(0);
+//         for (int i = 1; i <= numSteps; i++) {
+//             gpuHandle->singleStepWithUpdate();
+//             simulator.updateTemperatureSensors(i);
+//         }
+//     }
+// #endif 
 
 };
