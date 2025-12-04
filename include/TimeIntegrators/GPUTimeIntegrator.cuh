@@ -24,7 +24,7 @@ struct DeviceVec {
         cusparseDnVecDescr_t vecHandle = nullptr;
     };    
 
-class GPUTimeIntegrator : TimeIntegrator{
+class GPUTimeIntegrator : public TimeIntegrator{
 
 public:
     //EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -35,48 +35,12 @@ public:
     void applyParameters() override;
     void singleStep() override;
     void updateLHS() override;
-
-    /*void applyParameters(
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& FirrMat,
-        float TC, float HTC, float VHC, float MUA,
-        const Eigen::VectorXf& FluenceRate,
-        const Eigen::VectorXf& Fq,
-        const Eigen::VectorXf& Fconv,
-        const Eigen::VectorXf& Fk,
-        const Eigen::VectorXf& FirrElem,
-        bool elemNFR
-    ); */
-
-    
-    
-    //void applyParameters(float TC, float HTC, float VHC, float MUA, bool elemNFR);
-    
-    //void initializeWithModel();
-    
-    //void singleStepWithUpdate();
     
     void calculateRHS(float* &b_d, int nRows);
-    // void calculateLHS(float* b_d, int nRows);
 
-    //void setModel(FEM_Simulator* model);
-    //void updateModel();
-    //void releaseModel();
     void getMatricesFromModel();
 
-    void uploadAllMatrices(
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kint,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& Kconv,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& M,
-        const Eigen::SparseMatrix<float, Eigen::RowMajor>& FirrMat,
-        const Eigen::VectorXf& FluenceRate,
-        const Eigen::VectorXf& Fq,
-        const Eigen::VectorXf& Fconv,
-        const Eigen::VectorXf& Fk,
-        const Eigen::VectorXf& FirrElem
-    ); 
+    void uploadAllMatrices(); 
     
     // Clear Structs 
     void freeCSR(DeviceCSR& dA);
@@ -89,7 +53,7 @@ public:
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
     void uploadVector(const float* data, int n, DeviceVec& dV);
     void uploaddVec_d();
-    void uploadParameterVecs();
+    void uploadFluenceRate();
 
     // commands to download vectors/matrices from gpu
     void downloadVector(Eigen::VectorXf& v,const float* dv);
@@ -117,11 +81,11 @@ public:
 
     //-----------------------------------------------------------------------------------------------
     // Variable Declarations 
-    // 
+    
     // Store GPU handles
     cusparseHandle_t handle_;
     // Stored Sparse Matrices
-    DeviceCSR K_d_, Q_d_, M_d_, FirrMat_d_, FirrElemMat_d_, Fconv_d_, Fk_d_;
+    DeviceCSR K_d_, Q_d_, M_d_, Fint_d_, FintElem_d_, Fconv_d_, Fk_d_;
     // Store Dense Vectors
     DeviceVec FluenceRate_d_, FluenceRateElem_d_, Fq_d_, Fflux_d_, Temp_d_;  
     

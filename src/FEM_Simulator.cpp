@@ -115,7 +115,14 @@ void FEM_Simulator::initializeTimeIntegration()
 		delete solver_;
 		solver_ = nullptr;
 	}
-	solver_ = new CPUTimeIntegrator(*thermalModel_, *globalMatrices_, alpha_, dt_);
+#ifdef USE_CUDA
+	if (gpuEnabled_)
+		solver_ = new GPUTimeIntegrator(*thermalModel_, *globalMatrices_, alpha_, dt_);
+	else
+#endif
+	{
+		solver_ = new CPUTimeIntegrator(*thermalModel_, *globalMatrices_, alpha_, dt_);
+	}
 	solver_->initialize();
 	startTime = printDuration("Initial Matrix Factorization Completed: ", startTime);
 }
@@ -346,6 +353,50 @@ void FEM_Simulator::setMesh(const Mesh& mesh)
 {
 	mesh_ = &mesh;
 	initializeContainers();
+}
+
+int FEM_Simulator::enableGPU()
+{
+	return setGPU(true);
+}
+
+void FEM_Simulator::disableGPU()
+{
+	setGPU(false);
+}
+
+int FEM_Simulator::setGPU(bool useGPU)
+{
+	// returns 1 if the gpu was enabled and 0 otherwise
+
+	if (solver_ && (useGPU != gpuEnabled_))
+	{
+		// if we are turning off or turning on the gpu, reset the solver
+		delete solver_;
+		solver_ = nullptr;	
+	}
+#ifdef USE_CUDA
+	if (useGPU)
+	{
+		// Check to make sure we have a cuda device 
+		int deviceCount = 0;
+		cudaError_t error = cudaGetDeviceCount(&deviceCount);
+
+		if (error != cudaSuccess) {
+			if (!silentMode)
+				std::cout << "CUDA error: " << cudaGetErrorString(error) << "\n";
+		}
+
+		if (deviceCount > 0)
+		{
+			gpuEnabled_ = true;
+			return 1;
+		}	
+	}
+#endif
+	// default behavior
+	gpuEnabled_ = false;
+	return 0;
 }
 
 std::chrono::steady_clock::time_point FEM_Simulator::printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime) {

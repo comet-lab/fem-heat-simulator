@@ -5,10 +5,15 @@
 #include <functional>
 #include <chrono>
 #include <stdexcept>
+#include <memory>
 #include "MatrixBuilder.hpp"
 #include "TimeIntegrators/TimeIntegrator.hpp"
 #include "TimeIntegrators/CPUTimeIntegrator.hpp"
 #include "ThermalModel.hpp"
+
+#ifdef USE_CUDA
+#include "TimeIntegrators/GPUTimeIntegrator.cuh"
+#endif
 
 /* These are needed here so that compiler is aware and MATLAB mex doesn't crash */
 //class TimeIntegrator; // specifically for compiling and circular references
@@ -37,6 +42,8 @@ public:
 	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
+	int enableGPU();
+	void disableGPU();
 	Eigen::VectorXf Temp() const { return thermalModel_->Temp; }
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
@@ -97,6 +104,7 @@ private:
 	std::shared_ptr<GlobalMatrices> globalMatrices_ = nullptr;
 	std::unique_ptr<ThermalModel> thermalModel_ = nullptr;
 	TimeIntegrator* solver_ = nullptr;
+	bool gpuEnabled_ = false;
 	float alpha_ = 0.5; // time step weight
 	float dt_ = 0.01; // time step [s]
 	
@@ -106,6 +114,8 @@ private:
 	std::vector<float> sensorTemps_; // stored temperature information for each sensor
 
 	std::chrono::steady_clock::time_point printDuration(const std::string& message, std::chrono::steady_clock::time_point startTime);
+
+	int setGPU(bool useGPU);
 };
 
 template<typename ShapeFunc>

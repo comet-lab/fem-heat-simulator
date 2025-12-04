@@ -23,7 +23,7 @@ public:
 	virtual void updateLHS() = 0;
 	
 
-	virtual void singleStep(float alpha, float dt)
+	void singleStep(float alpha, float dt)
 	{
 		setAlpha(alpha);
 		setDt(dt);

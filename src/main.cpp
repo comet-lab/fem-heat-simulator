@@ -3,10 +3,6 @@
 
 #include "FEM_Simulator.h"
 
-#ifdef USE_CUDA
-#include "GPUTimeIntegrator.cuh"
-#endif
-
 int main()
 {
     std::cout << "Starting Program" << std::endl;
@@ -52,8 +48,8 @@ int main()
     simulator.setDt(0.05f);
     simulator.setHeatFlux(0.0);
     simulator.setAmbientTemp(24.0f);
-
     simulator.silentMode = false;
+    simulator.enableGPU();
 
  
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.05f}, {0,0,0.5f}, {0,0,0.95f},{0,0,0.5} };
@@ -91,40 +87,6 @@ int main()
     std::cout << "Right Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
     std::cout << "Back Face Temp: " << outputTemp((nodesPerAxis[1]-1) / 2 * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
     std::cout << "Left Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
-
-
-#ifdef USE_CUDA
-    // GPU Usage
-    simulator.setTemp(Temp_);// reset temperature
-    simulator.setFluenceRate(laserPose, 0, 0.0168); // set fluence rate
-    simulator.buildMatrices(); // set fluence rate
-    GPUTimeIntegrator gpuHandle(simulator.alpha_, simulator.dt_);
-    std::cout << "\nGPU Handle created " << std::endl;
-    gpuHandle.setModel(&simulator);
-    std::cout << "Model Assigned" << std::endl;
-    gpuHandle.initializeWithModel();
-    simulator.initializeSensorTemps(round(totalTime/simulator.dt_));
-    simulator.updateTemperatureSensors(0);
-    start = std::chrono::high_resolution_clock::now();
-    std::cout << "Model initialized" << std::endl;
-    for (int i = 1; i <= round(totalTime/simulator.dt_); i++) {
-        simulator.setFluenceRate(laserPose, 0.5 + i/10.0, 0.0168);
-        simulator.setMUA(i*5 + 20);
-        gpuHandle.singleStepWithUpdate();
-        simulator.updateTemperatureSensors(i);
-    }
-    duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
-    std::cout << "Time-Stepping Duration GPU: " << duration.count()/1000000.0 << std::endl;
-    start = std::chrono::high_resolution_clock::now();
-
-    Eigen::VectorXf outputTemp = simulator.Temp();
-    std::cout << "Top Face Temp: " <<  outputTemp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0]) << std::endl;
-    std::cout << "Bottom Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) / 2 * nodesPerAxis[0] + nodesPerAxis[0]*nodesPerAxis[1]*(nodesPerAxis[2]-1)) << std::endl;
-    std::cout << "Front Face Temp: " << outputTemp(nodesPerAxis[0] + nodesPerAxis[1] / 2 * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
-    std::cout << "Right Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + (nodesPerAxis[1]-1) * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
-    std::cout << "Back Face Temp: " << outputTemp((nodesPerAxis[1]-1) / 2 * nodesPerAxis[0] + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
-    std::cout << "Left Face Temp: " << outputTemp((nodesPerAxis[0]-1) / 2 + nodesPerAxis[0] * nodesPerAxis[1] * (nodesPerAxis[2]-1) / 2) << std::endl;
-#endif
     
     /* Printing Results*/
     if (nodesPerAxis[0] <= 5) {

@@ -80,11 +80,11 @@ set(HEATSIM_HEADERS
 # GPU sources (conditionally)
 if(USE_CUDA)
     list(APPEND HEATSIM_SRC
-        src/GPUTimeIntegrator.cu
+        src/TimeIntegrators/GPUTimeIntegrator.cu
         src/AmgXSolver.cpp
     )
     list(APPEND HEATSIM_HEADERS
-        include/GPUTimeIntegrator.cuh
+        include/TimeIntegrators/GPUTimeIntegrator.cuh
         include/AmgXSolver.hpp
     )
 endif()
