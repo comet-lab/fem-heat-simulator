@@ -112,7 +112,7 @@ void GPUTimeIntegrator::applyParameters()
     // std::cout << "Ambient temp convection" << std::endl;
     // globF += Fflux*qn --> added flux at the boundary
     addVectors(globF_d_, Fflux_d_.data, globF_d_, nRows, thermalModel_.heatFlux);
-    std::cout << "Heat Flux" << std::endl;
+    // std::cout << "Heat Flux" << std::endl;
 
     // globF += Fconv*Temp*HTC --> Forcing vector due to dirichlet on convection
     float* Fconv_d_temp = nullptr; // temporary device storage for FConv*Temp
@@ -128,7 +128,7 @@ void GPUTimeIntegrator::applyParameters()
     multiplySparseVector(Fk_d_, Temp_d_, Fk_d_temp); // perform multiplication
 
     addVectors(globF_d_, Fk_d_temp, globF_d_, nRows, thermalModel_.TC); // adds to F
-    // std::cout << "Convection due to current temp at dirichlet nodes" << std::endl;
+    // std::cout << "Conduction due to current temp at dirichlet nodes" << std::endl;
 
     // ---------------- Step 5: Free temporary GPU vectors ----------------
     // std::cout << "Apply Parameters Step 5" << std::endl;
@@ -138,6 +138,8 @@ void GPUTimeIntegrator::applyParameters()
     Firr_elem_d = nullptr;
     CHECK_CUDA(cudaFree(Fconv_d_temp));
     Fconv_d_temp = nullptr;
+    CHECK_CUDA(cudaFree(Fk_d_temp));
+    Fk_d_temp = nullptr;
 }
 
 void GPUTimeIntegrator::initialize(){
