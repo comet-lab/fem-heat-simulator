@@ -183,7 +183,6 @@ public:
             sensorTemps[0] = simulator.sensorTemps();
             for (int i = 1; i < numSteps; i++) {
                 simulator.singleStep();
-                simulator.updateTemperatureSensors();
                 sensorTemps[i] = simulator.sensorTemps();
             }
         }

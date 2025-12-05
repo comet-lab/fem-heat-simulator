@@ -78,6 +78,7 @@ void FEM_Simulator::singleStep() {
 	Eigen::VectorXf dVec = solver_->singleStepWithUpdate();
 	// Adjust our Temp with new d vector
 	thermalModel_->Temp(globalMatrices_->validNodes) = dVec;
+	updateTemperatureSensors();
 }
 
 void FEM_Simulator::updateSolver()
