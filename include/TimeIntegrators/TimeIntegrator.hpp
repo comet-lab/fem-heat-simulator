@@ -17,10 +17,19 @@ public:
 		vVec_.setZero(globalMatrices_.nNonDirichlet);*/
 	}
 	virtual ~TimeIntegrator() = default;
-	virtual void applyParameters() = 0;
+	virtual void calculateGlobF() = 0;
+	virtual void calculateGlobM() = 0;
+	virtual void calculateGlobK() = 0;
 	virtual void initialize() = 0;
 	virtual void singleStep() = 0;
 	virtual void updateLHS() = 0;
+
+	virtual void applyParameters()
+	{
+		calculateGlobK();
+		calculateGlobM();
+		calculateGlobF();
+	}
 	
 
 	void singleStep(float alpha, float dt)

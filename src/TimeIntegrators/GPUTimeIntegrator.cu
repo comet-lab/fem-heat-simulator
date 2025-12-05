@@ -54,35 +54,18 @@ void GPUTimeIntegrator::freeModelMatrices()
 // =====================
 // Apply Parameters
 // =====================
-void GPUTimeIntegrator::applyParameters()
+void GPUTimeIntegrator::calculateGlobF()
 {
     // upload the fluence rate vector to GPU from thermalModel before applying parameters
     // because of current setup, applyParameters doesn't know if fluence rate or just coefficients were changed
     // so we update both. 
     uploadFluenceRate();
-    // These variables get set in here so we want to make sure they are free
-    freeCSR(globK_d_);
-    freeCSR(globM_d_);
+    long nRows = globalMatrices_.nNonDirichlet;
     if (globF_d_)
     {
         CHECK_CUDA(cudaFree(globF_d_));
         globF_d_ = nullptr; // <--- IMPORTANT
     }
-    long nRows = K_d_.rows;
-    // ---------------- Step 1: Compute globK ----------------
-    // This will perform Kint*TC + Kconv*HTC = globK
-    // std::cout << "Apply Parameters Step 1" << std::endl;
-    addSparse(K_d_, thermalModel_.TC, Q_d_, thermalModel_.HTC, globK_d_);
-    // addSparse naturally will define globK_d_ properly as a DeviceCSR
-
-    // ---------------- Step 2: Set globM ----------------
-    // this will perform M*VHC + M*0 = globM
-    // std::cout << "Apply Parameters Step 2" << std::endl;
-    addSparse(M_d_, thermalModel_.VHC, M_d_, 0, globM_d_); // Already scaled
-    // addSparse naturally will define globM_d properly as a DeviceCSR
-
-    // ---------------- Step 3: Compute Firr ----------------
-    // std::cout << "Apply Parameters Step 3" << std::endl;
     float *Firr_d = nullptr;
     float* Firr_elem_d = nullptr;
 
@@ -140,6 +123,18 @@ void GPUTimeIntegrator::applyParameters()
     Fconv_d_temp = nullptr;
     CHECK_CUDA(cudaFree(Fk_d_temp));
     Fk_d_temp = nullptr;
+}
+
+void GPUTimeIntegrator::calculateGlobM()
+{
+    // this will perform M*VHC + M*0 = globM
+    addSparse(M_d_, thermalModel_.VHC, M_d_, 0, globM_d_); // Already scaled
+}
+
+void GPUTimeIntegrator::calculateGlobK()
+{
+    // This will perform Kint*TC + Kconv*HTC = globK
+    addSparse(K_d_, thermalModel_.TC, Q_d_, thermalModel_.HTC, globK_d_);
 }
 
 void GPUTimeIntegrator::initialize(){

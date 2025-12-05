@@ -11,7 +11,9 @@ public:
 
 	CPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat) 
 		: TimeIntegrator(thermalModel, globalMatrices, alpha, deltat) {}
-	void applyParameters() override;
+    void calculateGlobF() override;
+    void calculateGlobM() override;
+    void calculateGlobK() override;
 	void initialize() override;
 	void singleStep() override;
 	void updateLHS() override;

@@ -34,7 +34,9 @@ public:
 
     /* Base class overrides */
     void initialize() override;
-    void applyParameters() override;
+    void calculateGlobF() override;
+    void calculateGlobM() override;
+    void calculateGlobK() override;
     void singleStep() override;
     Eigen::VectorXf singleStepWithUpdate() override;
     void updateLHS() override;
