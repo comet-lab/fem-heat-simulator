@@ -8,6 +8,8 @@ GPUTimeIntegrator::GPUTimeIntegrator(const ThermalModel& thermalModel, const Glo
       amgxSolver_(AmgXSolver::getInstance())
 {
     CHECK_CUSPARSE(cusparseCreate(&handle_));
+    uploadAllMatrices();
+    std::cout << "Matrices Uploaded" << std::endl;
 }
 
 GPUTimeIntegrator::~GPUTimeIntegrator() {
@@ -102,19 +104,31 @@ void GPUTimeIntegrator::applyParameters()
     // globF = Firr*MUA
     CHECK_CUDA(cudaMemcpy(globF_d_, Firr_d, nRows * sizeof(float),
                             cudaMemcpyDeviceToDevice));
-    // globF = Firr*MUA + FirrElem*MUA
+    // globF += FirrElem*MUA
     addVectors(globF_d_, Firr_elem_d, globF_d_, nRows, thermalModel_.MUA);
-    // globF = Firr*MUA + FirrElem*MUA + Fq*HTC*Tinf --> added convection due to ambient temp
+    // std::cout << "Element Fluence Rate" << std::endl;
+    // globF += Fq*HTC*Tinf --> added convection due to ambient temp
     addVectors(globF_d_, Fq_d_.data, globF_d_, nRows, thermalModel_.HTC * thermalModel_.ambientTemp);
-    // globF = Firr*MUA + FirrElem*MUA + Fq*HTC*Tinf + Fflux*qn --> added flux at the boundary
+    // std::cout << "Ambient temp convection" << std::endl;
+    // globF += Fflux*qn --> added flux at the boundary
     addVectors(globF_d_, Fflux_d_.data, globF_d_, nRows, thermalModel_.heatFlux);
+    std::cout << "Heat Flux" << std::endl;
 
-    // globF = Firr*MUA + FirrElem*MUA + Fk*HTC + F_q + Fconv*TC*Temp --> Forcing vector due to dirichlet 
+    // globF += Fconv*Temp*HTC --> Forcing vector due to dirichlet on convection
     float* Fconv_d_temp = nullptr; // temporary device storage for FConv*Temp
-    CHECK_CUDA(cudaMalloc((void**)&Fconv_d_, nRows * sizeof(float))); // allocate rows
+    CHECK_CUDA(cudaMalloc((void**)&Fconv_d_temp, nRows * sizeof(float))); // allocate rows
     multiplySparseVector(Fconv_d_, Temp_d_, Fconv_d_temp); // perform multiplication
 
-    addVectors(globF_d_, Fconv_d_temp, globF_d_, nRows, thermalModel_.TC); // adds to F
+    addVectors(globF_d_, Fconv_d_temp, globF_d_, nRows, thermalModel_.HTC); // adds to F
+    // std::cout << "Convection due to current temp at dirichlet nodes" << std::endl;
+
+    // globF += F_k*Temp --> Forcing vector due to dirichlet on conduction
+    float* Fk_d_temp = nullptr; // temporary device storage for FConv*Temp
+    CHECK_CUDA(cudaMalloc((void**)&Fk_d_temp, nRows * sizeof(float))); // allocate rows
+    multiplySparseVector(Fk_d_, Temp_d_, Fk_d_temp); // perform multiplication
+
+    addVectors(globF_d_, Fk_d_temp, globF_d_, nRows, thermalModel_.TC); // adds to F
+    // std::cout << "Convection due to current temp at dirichlet nodes" << std::endl;
 
     // ---------------- Step 5: Free temporary GPU vectors ----------------
     // std::cout << "Apply Parameters Step 5" << std::endl;
@@ -132,9 +146,13 @@ void GPUTimeIntegrator::initialize(){
     simply passed in, and the v vector is assigned through the equation M*v = (F - K*d).
     */
     // -- Step 0: Upload dVec to GPU and save as attribute -- 
-    dVec_.resize(globalMatrices_.nNonDirichlet);
+    applyParameters();
+    int nRows = globalMatrices_.nNonDirichlet;
+    dVec_.resize(nRows);
+    vVec_.resize(nRows);
     dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
-    int nRows = dVec_.size();
+    
+    // std::cout << "dVec has size: " << nRows << std::endl;
     uploadVector(dVec_,dVec_d_);
     // -- Step1: Construct Right Hand Side of Ax = b
     // In this case b = (F - K*d);
@@ -160,7 +178,7 @@ void GPUTimeIntegrator::initialize(){
     CHECK_CUDA(cudaMalloc((void**)&vVec_d_, nRows * sizeof(float)));
 
     // Solve directly into vVec_d_
-    amgxSolver_.solve(b_d, vVec_d_);
+    amgxSolver_.solve(b_d, vVec_d_);    
 
     // -- Step 4: Assign attribute to solution and return to eigen
     // Copy to host
@@ -276,6 +294,7 @@ void GPUTimeIntegrator::uploadFluenceRate()
     uploadVector(thermalModel_.fluenceRate, FluenceRate_d_);
     uploadVector(thermalModel_.fluenceRateElem, FluenceRateElem_d_);
     uploadVector(thermalModel_.Temp, Temp_d_);
+    std::cout << "Fluence Rate Parameters Uploaded" << std::endl;
 }
 
 void GPUTimeIntegrator::downloaddVec_d()
