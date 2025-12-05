@@ -49,7 +49,7 @@ int main()
     simulator.setHeatFlux(0.0);
     simulator.setAmbientTemp(24.0f);
     simulator.silentMode = false;
-    simulator.disableGPU();
+    simulator.enableGPU();
 
  
     std::vector<std::array<float, 3>> tempSensorLocations = { {0, 0, 0.0}, {0,0,0.05f}, {0,0,0.5f}, {0,0,0.95f},{0,0,0.5} };

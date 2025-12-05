@@ -150,8 +150,8 @@ void GPUTimeIntegrator::initialize(){
     // -- Step 0: Upload dVec to GPU and save as attribute -- 
     applyParameters();
     int nRows = globalMatrices_.nNonDirichlet;
+    vVec_ = Eigen::VectorXf::Zero(nRows);
     dVec_.resize(nRows);
-    vVec_.resize(nRows);
     dVec_ = thermalModel_.Temp(globalMatrices_.validNodes);
     
     // std::cout << "dVec has size: " << nRows << std::endl;
@@ -162,13 +162,13 @@ void GPUTimeIntegrator::initialize(){
     float* b_d;
     calculateRHS(b_d, nRows);
 
-    // -- Step 2: construct Left Hand Side of Ax = b
+    // -- Step 2: construct Left Hand Side of Ax = b and put into AMGX
     // In this case it is just A = M so we run setup with alpha = 0 and dt = 0;
     // std::cout << "Initialize Step 2" << std::endl;
-    float holdAlpha = alpha_;
-    alpha_ = 0;
-    updateLHS(); // alpha = 0, dt = 0 because we are doing forward euler essentially to get v
-    alpha_ = holdAlpha;
+    amgxSolver_.uploadMatrix(globM_d_.rows, globM_d_.cols, globM_d_.nnz,
+        globM_d_.data_d, globM_d_.rowPtr_d, globM_d_.colIdx_d);
+    // call setup
+    amgxSolver_.setup();
 
     // -- Step 3: Solve using AMGX so we can have a linear solver
     // std::cout << "Initialize Step 3" << std::endl;
@@ -182,9 +182,13 @@ void GPUTimeIntegrator::initialize(){
     // Solve directly into vVec_d_
     amgxSolver_.solve(b_d, vVec_d_);    
 
-    // -- Step 4: Assign attribute to solution and return to eigen
+    // -- Step 4a: Assign attribute to solution and return to eigen
     // Copy to host
     CHECK_CUDA(cudaMemcpy(vVec_.data(), vVec_d_, nRows*sizeof(float), cudaMemcpyDeviceToHost));
+
+
+    // -- Step 4b: initialize the LHS of the actual Euler equation for the first time step
+    updateLHS();
 
     // -- Cleanup
     CHECK_CUDA( cudaFree(b_d) ); // free memory of RHS which was temporary
@@ -239,14 +243,9 @@ void GPUTimeIntegrator::singleStep(){
 	}
 
     // -- Step 2: Perform Implicit Step
-
     // -- Step 2a: Calculate vVec using Ax = b --> (M + alpha*dt*K)v = (F - K*d);
     float* b_d; // temporary variable to store (F - K*d);
-    CHECK_CUDA( cudaMalloc(&b_d, sizeof(float)*nRows) ); // allocate memory for RHS
-    // Multiplication of K*d --> b_d
-    multiplySparseVector(globK_d_, dVec_d_, b_d); 
-    // Subtraction of (F - b_d) --> b_d
-    addVectors(globF_d_, b_d, b_d, nRows, -1); // scale is negative one to subtract v2 from v1
+    calculateRHS(b_d,nRows);
 
     amgxSolver_.solve(b_d,vVec_d_); // solve for v
 
