@@ -58,9 +58,12 @@ void FEM_Simulator::multiStep(float duration) {
 		std::cout << "MultiStep(): Number of threads " << Eigen::nbThreads() << std::endl;
 	}
 
+	updateSolver(); // Handle any changes in fluence rate or parameters before solving
 	for (int t = 1; t <= numSteps; t++) {
-		singleStep();
+		solver_->singleStep();
 	}
+	Eigen::VectorXf dVec = solver_->dVec(); // retrieve dVec
+	thermalModel_->Temp(globalMatrices_->validNodes) = dVec;
 	updateTemperatureSensors();
 	startTime = printDuration("Time Stepping Completed in ", startTime);
 }
@@ -71,6 +74,14 @@ void FEM_Simulator::singleStep() {
 	it is assumed that initializeModel() has already been run to create the global matrices and perform initial factorization
 	of the matrix inversion. This function can handle changes in fluence rate or changes in tissue properties. 
 	*/
+	updateSolver();
+	Eigen::VectorXf dVec = solver_->singleStepWithUpdate();
+	// Adjust our Temp with new d vector
+	thermalModel_->Temp(globalMatrices_->validNodes) = dVec;
+}
+
+void FEM_Simulator::updateSolver()
+{
 	if (!solver_)
 		throw std::runtime_error("Solver not initialized. Call initializeModel() or initializeTimeIntegration before singleStep()");
 
@@ -87,10 +98,6 @@ void FEM_Simulator::singleStep() {
 			parameterUpdate_ = false;
 		}
 	}
-	Eigen::VectorXf dVec = solver_->singleStepWithUpdate();
-
-	// Adjust our Temp with new d vector
-	thermalModel_->Temp(globalMatrices_->validNodes) = dVec;
 }
 
 void FEM_Simulator::buildMatrices()

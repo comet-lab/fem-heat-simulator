@@ -32,6 +32,7 @@ public:
 	~FEM_Simulator();
 	void multiStep(float duration); // simulates multiple steps of time integration
 	void singleStep();// simulates a single step of time integration
+	void updateSolver(); // determines whether the solver needs to update its global matrices
 	void buildMatrices(); // creates global matrices and performs spatial discretization
 	void initializeTimeIntegration(float alpha, float dt); // initializes solver for time integration
 	void initializeTimeIntegration(); // initializes solver for time integration
