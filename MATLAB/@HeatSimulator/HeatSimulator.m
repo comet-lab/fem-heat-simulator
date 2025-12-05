@@ -75,6 +75,7 @@ classdef HeatSimulator < handle
             newObj = HeatSimulator();
             newObj.mesh = Mesh;
             newObj.thermalInfo = obj.thermalInfo;
+            newObj.laser = obj.laser;
             newObj.dt = obj.dt;
             newObj.alpha = obj.alpha;
             newObj.sensorLocations = obj.sensorLocations;
