@@ -95,6 +95,23 @@ Eigen::VectorXf convertMatlabArrayToEigenVector(const matlab::data::Array& matla
     return result;
 }
 
+/** @brief Convert a matlab array to a Eigen::MatrixXf
+*
+*
+*/
+Eigen::MatrixXf convertMatlabArrayToEigenMatrix(const matlab::data::Array& matlabArray) {
+    const size_t rows = matlabArray.getDimensions()[0];
+    const size_t cols = matlabArray.getDimensions()[1];
+
+    Eigen::MatrixXf mat(rows, cols);
+    for (size_t j = 0; j < cols; ++j) {
+        for (size_t i = 0; i < rows; ++i) {
+            mat(i, j) = static_cast<float>(matlabArray[i][j]);
+        }
+    }
+    return mat;
+}
+
 /* Helper function to generate an error message from given string,
  * and display it over MATLAB command prompt.
  */
