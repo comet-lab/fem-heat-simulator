@@ -77,10 +77,12 @@ void FEM_Simulator::singleStep() {
 	if (fluenceUpdate_ || parameterUpdate_) {
 		// only happens if fluenceUpdate is true
 		//happens regardless of fluenceUpdate or parameterUpdate but has to happen after Firr update
-		solver_->applyParameters();
+		solver_->calculateGlobF(); 
 		fluenceUpdate_ = false;
 
 		if (parameterUpdate_) { // Happens only if parameters were updated
+			solver_->calculateGlobK();
+			solver_->calculateGlobM();
 			solver_->updateLHS();
 			parameterUpdate_ = false;
 		}
