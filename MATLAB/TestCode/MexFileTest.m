@@ -18,7 +18,6 @@ simulator.silentMode = false;
 simulator.mesh = mesh;
 simulator.sensorLocations = sensorPositions;
 
-
 thermalInfo = ThermalModel();
 thermalInfo.MUA = 400;
 thermalInfo.TC = 0.0062;
@@ -27,37 +26,30 @@ thermalInfo.HTC = 0.008;
 thermalInfo.ambientTemp = 24;
 thermalInfo.flux = 0;
 thermalInfo.temperature = 20*ones(prod(nodesPerAxis),1);
-
-w0 = 0.0167; % beam Waist [cm]
-focalPoint = 35; % distance from waist to target [cm]
-w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
-I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
-
-[X,Y,Z] = meshgrid(x,y,z);
-X = X(:); Y = Y(:); Z = Z(:);
-fluenceRate = single(I(X,Y,Z,thermalInfo.MUA));
-thermalInfo.fluenceRate = fluenceRate;
-
-
 simulator.thermalInfo = thermalInfo;
 
+w0 = 0.0168;
+lambda = 10.6e-4;
+laser = Laser(w0,lambda,thermalInfo.MUA);
+laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
+laser = laser.calculateIrradiance(mesh);
+simulator.laser = laser;
 
 %% Heating Phase
 tic
-simDuration = 15.0;
-deltaT = simulator.dt;
+timePoints = 0:simulator.dt:5.0;
 
 if ~simulator.silentMode
     fprintf("\n");
 end
 simulator.buildMatrices = true;
 simulator.resetIntegration = true;
-simulator.solve(simDuration);
+simulator.solve(timePoints);
 %% Cooling phase
-simulator.thermalInfo.fluenceRate = zeros(size(simulator.thermalInfo.fluenceRate));
+simulator.laser.fluenceRate = zeros(size(simulator.laser.fluenceRate));
 simulator.buildMatrices = false;
 simulator.resetIntegration = false;
-[Tpred, ~] = simulator.solve(simDuration);
+[Tpred, ~] = simulator.solve(timePoints);
 
 toc
 %% Plot Sensor Temps over time
@@ -66,6 +58,14 @@ simulator.createSensorTempsFigure();
 %% Plot volume temperature information
 simulator.createVolumetricFigure();
 %% plot depth irradiance at final time step
+focalPoint = 35; % distance from waist to target [cm]
+w = @(z) w0 * sqrt(1 + (z.*lambda./(pi*w0.^2)).^2);
+I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
+
+[X,Y,Z] = meshgrid(x,y,z);
+X = X(:); Y = Y(:); Z = Z(:);
+fluenceRate = single(I(X,Y,Z,thermalInfo.MUA));
+
 figure(3);
 clf;
 tiledlayout('flow');

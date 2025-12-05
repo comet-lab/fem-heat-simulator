@@ -171,8 +171,11 @@ public:
         try 
         {             
             for (int i = 1; i < numTimePoints; i++) {
-                simulator.multiStep(simTime[i]-simTime[i-1]);
+                if (multiStep)
+                    simulator.setFluenceRate(laserPose.col(i), laserPower[i], beamWaist);
+                simulator.multiStep(simTime[i] - simTime[i - 1]);
                 sensorTemps[i] = simulator.sensorTemps();
+
             }
         }
         catch (const std::exception& e) {

@@ -11,7 +11,6 @@ classdef ThermalModel
         flux (1,1) double = 0 % flux value W/cm^2
         ambientTemp (1,1) double = 24 % ambient temp °C
         temperature (:,1) double
-        fluenceRate (:,1) double
     end
 
     methods

@@ -49,6 +49,7 @@ classdef HeatSimulator < handle
     properties
         mesh Mesh
         thermalInfo ThermalModel
+        laser Laser
         % Storage for time steping
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
@@ -84,10 +85,31 @@ classdef HeatSimulator < handle
             newObj.buildMatrices = obj.buildMatrices;
         end
 
-        function [T,sensorData] = solve(obj, simDuration, dt, alpha)
+        function [T,sensorData] = solve(obj, timePoints, dt, alpha)
+            %SOLVE - solves the heat equation and returns temperature at
+            %specific spatio-temporal coordiantes and the final temperature
+            %at each node
+            %   This function runs the heat equation for the duration
+            %   specified in the timePoints input. It will return the
+            %   temperature of the entire mesh after the specified duration
+            %   as well as the temperature at each sensor location, at each
+            %   time point specified in timePoints. The time step size of
+            %   the simulator is dependent on dt. 
+            %
+            %   timePoints is expected to start at 0 and end at some
+            %   nonzero time.
+            %
+            %   Additionally, this function will update the objects
+            %   collective time and sensorTemps attributes if
+            %   resetIntegration is false. This allows the user to call
+            %   solve multiple times, and the object will track the
+            %   temperature at the sensor locations across all solve calls.
+            %
+            %   [T,sensorData] = simulator.solve([0,1])
+            %       this will return sensorData with 2 rows.
             arguments
                 obj (1,1) HeatSimulator
-                simDuration (1,1) {mustBeGreaterThan(simDuration,0)}
+                timePoints (:,1) {mustBeGreaterThanOrEqual(timePoints,0)}
                 dt double {mustBeGreaterThan(dt,0)} = []
                 alpha double {mustBeInRange(alpha,0,1)} = []
             end
@@ -100,34 +122,39 @@ classdef HeatSimulator < handle
             end
             obj.dt = dt;
             obj.alpha = alpha;
-            if (simDuration < obj.dt)
-                error('Final time must be greater than the time step.');
-            end
-            
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Conversion of objects to structs
             meshInfo = obj.mesh.toStruct();
             thermalInfoStruct = obj.thermalInfo.toStruct();
-            settings = struct('finalTime',simDuration,'dt', obj.dt, 'alpha', obj.alpha,...
+            settings = struct('time',timePoints,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
                 'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
-
+            laserStruct = struct('fluenceRate',obj.laser.fluenceRate);
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % running MEX file
             if (obj.buildMatrices)
-                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,meshInfo);
+                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct,meshInfo);
             else
-                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings);
+                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct);
             end
 
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Storing outputs
             obj.thermalInfo.temperature = T;
 
+            if isscalar(timePoints)
+                timePoints = [0;timePoints]; % just to make sure plotting is nice
+            end
             if (obj.resetIntegration || obj.buildMatrices)
-                obj.time = 0:obj.dt:simDuration;
+                obj.time = timePoints;
                 obj.sensorTemps = sensorData;
             else
                 obj.sensorTemps = [obj.sensorTemps(1:end-1,:); sensorData];
-                obj.time = [obj.time(1:end-1); (obj.time(end):obj.dt:(obj.time(end) + simDuration))'];
+                obj.time = [obj.time(1:end-1); (timePoints+obj.time(end))];
             end
+
         end
 
         function createSensorTempsFigure(obj,figureNum)
