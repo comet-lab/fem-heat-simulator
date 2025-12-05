@@ -36,8 +36,9 @@ public:
 	}
 	Eigen::VectorXf singleStepWithUpdate(float alpha, float dt)
 	{
-		singleStep(alpha, dt);
-		return dVec_;
+		setAlpha(alpha);
+		setDt(dt);
+		return singleStepWithUpdate();
 	}
 	float alpha() const { return alpha_; }
 	float dt() const { return dt_; }
