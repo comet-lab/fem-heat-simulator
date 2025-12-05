@@ -91,6 +91,7 @@ classdef HeatSimulator < handle
                 dt double {mustBeGreaterThan(dt,0)} = []
                 alpha double {mustBeInRange(alpha,0,1)} = []
             end
+            % Input Checking
             if isempty(alpha)
                 alpha = obj.alpha;
             end
@@ -103,16 +104,21 @@ classdef HeatSimulator < handle
                 error('Final time must be greater than the time step.');
             end
             
+            % Conversion of objects to structs
             meshInfo = obj.mesh.toStruct();
             thermalInfoStruct = obj.thermalInfo.toStruct();
             settings = struct('finalTime',simDuration,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
                 'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
+
+            % running MEX file
             if (obj.buildMatrices)
                 [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,meshInfo);
             else
                 [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings);
             end
+
+            % Storing outputs
             obj.thermalInfo.temperature = T;
 
             if (obj.resetIntegration || obj.buildMatrices)
@@ -120,7 +126,7 @@ classdef HeatSimulator < handle
                 obj.sensorTemps = sensorData;
             else
                 obj.sensorTemps = [obj.sensorTemps(1:end-1,:); sensorData];
-                obj.time = [obj.time(1:end-1); [obj.time(end):obj.dt:(obj.time(end) + simDuration)]'];
+                obj.time = [obj.time(1:end-1); (obj.time(end):obj.dt:(obj.time(end) + simDuration))'];
             end
         end
 
