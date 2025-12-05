@@ -1,11 +1,11 @@
 clear; close all; clc
 %%
-sensorPositions = [0,0,0.1; 0 0 0.05; 0 0 0.5; 0,0,0.95; 0 0 0.98];
-z = 0:0.02:1;
-y = -1:0.025:1;
-x = -1:0.025:1;
+sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1; 0,0,0.2; 0 0 0.3;0 0 0.4;0 0 0.5];
+z = [0:0.0015:0.05 0.1:0.05:1];
+x = linspace(-2.5,2.5,101);
+y = linspace(-2.5,2.5,101);
 nodesPerAxis = [length(x),length(y),length(z)];
-boundaryConditions = [0,0,0,0,0,0]';
+boundaryConditions = [1,2,1,1,1,1]';
 
 mesh = Mesh(x,y,z,boundaryConditions);
 % Initialization of parameters
@@ -20,15 +20,15 @@ simulator.sensorLocations = sensorPositions;
 
 
 thermalInfo = ThermalModel();
-thermalInfo.MUA = 200;
+thermalInfo.MUA = 400;
 thermalInfo.TC = 0.0062;
 thermalInfo.VHC = 4.3;
-thermalInfo.HTC = 0.01;
+thermalInfo.HTC = 0.008;
 thermalInfo.ambientTemp = 24;
 thermalInfo.flux = 0;
 thermalInfo.temperature = 20*ones(prod(nodesPerAxis),1);
 
-w0 = 0.0168; % beam Waist [cm]
+w0 = 0.0167; % beam Waist [cm]
 focalPoint = 35; % distance from waist to target [cm]
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
@@ -42,10 +42,9 @@ thermalInfo.fluenceRate = fluenceRate;
 simulator.thermalInfo = thermalInfo;
 
 
-%% Running MEX File
-
+%% Heating Phase
 tic
-simDuration = 1.0;
+simDuration = 15.0;
 deltaT = simulator.dt;
 
 if ~simulator.silentMode
@@ -53,11 +52,16 @@ if ~simulator.silentMode
 end
 simulator.buildMatrices = true;
 simulator.resetIntegration = true;
-[Tpred,sensorTemps] = simulator.solve(simDuration);
+simulator.solve(simDuration);
+%% Cooling phase
+simulator.thermalInfo.fluenceRate = zeros(size(simulator.thermalInfo.fluenceRate));
+simulator.buildMatrices = false;
+simulator.resetIntegration = false;
+[Tpred, ~] = simulator.solve(simDuration);
 
 toc
 %% Plot Sensor Temps over time
-simulator.plotSensorTemps(sensorTemps);
+simulator.createSensorTempsFigure();
 
 %% Plot volume temperature information
 simulator.createVolumetricFigure();

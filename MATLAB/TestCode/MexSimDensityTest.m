@@ -21,16 +21,16 @@ simulator.silentMode = false;
 simulator.sensorLocations = sensorPositions;
 
 thermalInfo = ThermalModel();
-thermalInfo.MUA = 200;
+thermalInfo.MUA = 400;
 thermalInfo.TC = 0.0062;
 thermalInfo.VHC = 4.3;
-thermalInfo.HTC = 0.01;
+thermalInfo.HTC = 0.008;
 thermalInfo.ambientTemp = 24;
 thermalInfo.flux = 0;
 
 simDuration = 15.0;
 %% Set default laser settings
-w0 = 0.0168; % beam Waist [cm]
+w0 = 0.0167; % beam Waist [cm]
 focalPoint = 35; % distance from waist to target [cm]
 w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
 I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);

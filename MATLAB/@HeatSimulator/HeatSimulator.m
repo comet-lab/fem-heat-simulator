@@ -52,7 +52,7 @@ classdef HeatSimulator < handle
         % Storage for time steping
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
-        time (:,1) double
+        time (:,1) double = [0]
         % storage for sensor data
         sensorLocations (:,3) double
         sensorTemps (:,:) double
@@ -84,10 +84,10 @@ classdef HeatSimulator < handle
             newObj.buildMatrices = obj.buildMatrices;
         end
 
-        function [T,sensorData] = solve(obj, finalTime, dt, alpha)
+        function [T,sensorData] = solve(obj, simDuration, dt, alpha)
             arguments
                 obj (1,1) HeatSimulator
-                finalTime (1,1) {mustBeGreaterThan(finalTime,0)}
+                simDuration (1,1) {mustBeGreaterThan(simDuration,0)}
                 dt double {mustBeGreaterThan(dt,0)} = []
                 alpha double {mustBeInRange(alpha,0,1)} = []
             end
@@ -99,14 +99,13 @@ classdef HeatSimulator < handle
             end
             obj.dt = dt;
             obj.alpha = alpha;
-            if (finalTime < obj.dt)
+            if (simDuration < obj.dt)
                 error('Final time must be greater than the time step.');
             end
-            obj.time = 0:obj.dt:finalTime;
-
+            
             meshInfo = obj.mesh.toStruct();
             thermalInfoStruct = obj.thermalInfo.toStruct();
-            settings = struct('finalTime',finalTime,'dt', obj.dt, 'alpha', obj.alpha,...
+            settings = struct('finalTime',simDuration,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
                 'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
             if (obj.buildMatrices)
@@ -115,7 +114,14 @@ classdef HeatSimulator < handle
                 [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings);
             end
             obj.thermalInfo.temperature = T;
-            obj.sensorTemps = sensorData;
+
+            if (obj.resetIntegration || obj.buildMatrices)
+                obj.time = 0:obj.dt:simDuration;
+                obj.sensorTemps = sensorData;
+            else
+                obj.sensorTemps = [obj.sensorTemps(1:end-1,:); sensorData];
+                obj.time = [obj.time(1:end-1); [obj.time(end):obj.dt:(obj.time(end) + simDuration)]'];
+            end
         end
 
         function createSensorTempsFigure(obj,figureNum)
