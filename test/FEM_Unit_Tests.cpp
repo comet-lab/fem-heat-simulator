@@ -81,8 +81,9 @@ TEST_F(BaseSim, testSetFluenceRate) {
 
 	std::array<float, 6> laserPose = { 0,0,-20,0,0,0 };
 	float beamWaist = 0.0168;
+	float wavelength = 10.6e-4;
 	float laserPower = 1;
-	femSim->setFluenceRate(laserPose, laserPower, beamWaist);
+	femSim->setFluenceRate(laserPose, laserPower, beamWaist, wavelength);
 	Eigen::VectorXf fluenceTrue(27); // matrices are transformed into vectors using column major
 	fluenceTrue << 0.000000, 0.000017, 0.000000, 0.000017, 3.938834,
 		0.000017, 0.000000, 0.000017, 0.000000, 0.000000, 0.000017,

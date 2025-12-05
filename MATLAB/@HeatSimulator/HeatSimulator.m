@@ -126,7 +126,7 @@ classdef HeatSimulator < handle
                 laserStruct = struct('fluenceRate',obj.laser.fluenceRate);
             else
                 laserStruct = struct('laserPose',laserPose,'laserPower',laserPower,...
-                    'beamWaist',obj.laser.waist);
+                    'beamWaist',obj.laser.waist,'wavelength',obj.laser.wavelength);
             end
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

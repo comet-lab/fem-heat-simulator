@@ -59,7 +59,7 @@ int main()
 
     auto start = std::chrono::high_resolution_clock::now();
     std::array<float, 6> laserPose = { 0.0f,0,-35,0,0,0 };
-    simulator.setFluenceRate(laserPose, 0, 0.0168);
+    simulator.setFluenceRate(laserPose, 0, 0.0168,10.6e-4);
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start);
     start = std::chrono::high_resolution_clock::now();
     std::cout << "Time to calculate Fluence Rate: " << duration.count()/1000000.0 << std::endl;

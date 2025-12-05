@@ -49,8 +49,8 @@ public:
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
 	void setFluenceRate(Eigen::VectorXf& fluenceRate);
-	void setFluenceRate(std::array<float,6> laserPose, float laserPower, float beamWaist);
-	void setFluenceRate(Eigen::Vector<float,6> laserPose, float laserPower, float beamWaist);
+	void setFluenceRate(std::array<float,6> laserPose, const float laserPower, const float beamWaist, const float lambda);
+	void setFluenceRate(Eigen::Vector<float,6> laserPose, const float laserPower, const float beamWaist, const float lambda);
 	Eigen::VectorXf fluenceRate() const  { return thermalModel_->fluenceRate; }
 	Eigen::VectorXf fluenceRateElem() const { return thermalModel_->fluenceRateElem; }
 

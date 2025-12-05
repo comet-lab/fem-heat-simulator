@@ -18,7 +18,7 @@ private:
     const std::vector<std::string> thermalFields = { "temperature","MUA","VHC","TC","HTC","flux","ambientTemp" };
     const std::vector<std::string> settingsFields = { "dt","time","alpha" }; // optional fields {"silentMode","useGPU","useAllCPUs","resetIntegration"}
     const std::vector<std::string> laserFields1 = { "fluenceRate" };
-    const std::vector<std::string> laserFields3 = { "laserPose","laserPower","beamWaist" };
+    const std::vector<std::string> laserFields3 = { "laserPose","laserPower","beamWaist","wavelength"};
     const std::vector<std::string> meshFields4 = { "nodes","elements","boundaryFaces","sensorLocations" };
     const std::vector<std::string> meshFields5 = { "xpos","ypos","zpos","boundaryConditions","sensorLocations" };
 
@@ -35,7 +35,7 @@ private:
     bool multiStep = false;
 
     /* Required parameters extracted from inputs */
-    float MUA, TC, HTC, VHC, flux, ambientTemp, alpha, dt, beamWaist;
+    float MUA, TC, HTC, VHC, flux, ambientTemp, alpha, dt, beamWaist, wavelength;
     Eigen::VectorXf Temp, fluenceRate;
     std::vector<float> simTime, laserPower;
     Eigen::MatrixXf laserPose;
@@ -79,7 +79,7 @@ public:
             if (!multiStep)
                 simulator.setFluenceRate(fluenceRate);
             else
-                simulator.setFluenceRate(laserPose.row(0), laserPower[0], beamWaist);
+                simulator.setFluenceRate(laserPose.row(0), laserPower[0], beamWaist, wavelength);
             
             printDuration("MEX: Applied ThermalModel to Simulator ");
 
@@ -172,7 +172,7 @@ public:
         {             
             for (int i = 1; i < numTimePoints; i++) {
                 if (multiStep)
-                    simulator.setFluenceRate(laserPose.row(i), laserPower[i], beamWaist);
+                    simulator.setFluenceRate(laserPose.row(i), laserPower[i], beamWaist, wavelength);
                 simulator.multiStep(simTime[i] - simTime[i - 1]);
                 sensorTemps[i] = simulator.sensorTemps();
 
@@ -526,12 +526,12 @@ public:
 
             multiStep = false;
         }
-        else if (nfields == 3)
+        else if (nfields == 4)
         {
             if (!checkFieldNames(laserFields3, fieldNames))
             {
                 std::ostringstream oss;
-                oss << "LaserInfo must have fields: laserPose, laserPower, beamWaist if using three fields";
+                oss << "LaserInfo must have fields: laserPose, laserPower, beamWaist, and wavelength if using three fields";
                 displayError(matlabPtr, oss.str());
             }
             
@@ -552,6 +552,12 @@ public:
             if ((waistArr.getDimensions()[0] != 1) || (waistArr.getDimensions()[1] != 1))
                 displayError(matlabPtr, "beamWaist must be a scalar.");
             beamWaist = static_cast<float>(waistArr[0]);
+
+            // wavelength
+            matlab::data::TypedArray<double> wavelengthArr = laserInfo[0]["wavelength"];
+            if ((wavelengthArr.getDimensions()[0] != 1) || (wavelengthArr.getDimensions()[1] != 1))
+                displayError(matlabPtr, "wavelength must be a scalar.");
+            wavelength = static_cast<float>(wavelengthArr[0]);
 
             multiStep = true;
         }

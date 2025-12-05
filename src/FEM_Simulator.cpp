@@ -241,13 +241,12 @@ void FEM_Simulator::setFluenceRate(std::vector<std::vector<std::vector<float>>> 
 	this->setFluenceRate(FR);
 }
 
-void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose, float laserPower, float beamWaist)
+void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose,const float laserPower,const float beamWaist, const float lambda)
 {
 	Eigen::VectorXf FR = Eigen::VectorXf::Zero(mesh_->nodes().size());
 	
 	// Precompute constants
 	const float pi = 3.14159265358979323846f;
-	const float lambda = 10.6e-4f;  // wavelength in cm
 	// ASSUMING THERE IS NO ORIENTATION SHIFT ON THE LASER
 	//TODO: account for orientation shift on the laser
 	// I(x,y,z) = 2*P/(pi*w^2) * exp(-2*(x^2 + y^2)/w^2 - mua*z)
@@ -274,13 +273,13 @@ void FEM_Simulator::setFluenceRate(std::array<float,6> laserPose, float laserPow
 	setFluenceRate(FR);
 }
 
-void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, float laserPower, float beamWaist)
+void FEM_Simulator::setFluenceRate(Eigen::Vector<float, 6> laserPose, const float laserPower, const float beamWaist, const float lambda)
 {
 	std::array<float,6> laserPoseVec;
 	for (int i = 0; i < 6; i++) {
 		laserPoseVec[i] = laserPose(i);
 	}
-	setFluenceRate(laserPoseVec, laserPower, beamWaist);
+	setFluenceRate(laserPoseVec, laserPower, beamWaist, lambda);
 }
 
 void FEM_Simulator::setDt(float dt)
