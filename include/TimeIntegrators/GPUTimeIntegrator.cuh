@@ -31,16 +31,18 @@ public:
 
     GPUTimeIntegrator(const ThermalModel& thermalModel, const GlobalMatrices& globalMatrices, float alpha, float deltat);
     ~GPUTimeIntegrator();
+
+    /* Base class overrides */
     void initialize() override;
     void applyParameters() override;
     void singleStep() override;
+    Eigen::VectorXf singleStepWithUpdate() override;
     void updateLHS() override;
+    Eigen::VectorXf dVec() override { downloaddVec_d(); return dVec_; }
+    Eigen::VectorXf vVec() override { downloadvVec_d(); return vVec_; }
     
+    //Time Stepping helper
     void calculateRHS(float* &b_d, int nRows);
-
-    void getMatricesFromModel();
-
-    void uploadAllMatrices(); 
     
     // Clear Structs 
     void freeCSR(DeviceCSR& dA);
@@ -48,17 +50,18 @@ public:
     void freeDeviceVec(DeviceVec &vec);
 
     // Commands to upload vectors/matrices to gpu
+    void uploadAllMatrices(); 
+    void uploaddVec_d();
+    void uploadFluenceRate();
     void uploadSparseMatrix(const Eigen::SparseMatrix<float,Eigen::RowMajor>& inMat, DeviceCSR& outMat);
     void uploadSparseMatrix(int numRows, int numCols, int nnz, const int* csrOffsets, const int* columns, const float* values, DeviceCSR& dA);
     void uploadVector(const Eigen::VectorXf& v, DeviceVec& dV);
     void uploadVector(const float* data, int n, DeviceVec& dV);
-    void uploaddVec_d();
-    void uploadFluenceRate();
-
+    
     // commands to download vectors/matrices from gpu
-    void downloadVector(Eigen::VectorXf& v,const float* dv);
     void downloaddVec_d();
     void downloadvVec_d();
+    void downloadVector(Eigen::VectorXf& v,const float* dv);
     void downloadSparseMatrix(Eigen::SparseMatrix<float,Eigen::RowMajor>& outMat, const DeviceCSR& source);
 
      // Sparse-sparse addition
@@ -67,10 +70,6 @@ public:
     // Sparse-dense multiplication (csr*vec)
     void multiplySparseVector(const DeviceCSR& A, DeviceVec& vec, float* out);
     bool solveSparseLinearSystem();
-
-    // Setters
-    void setAlpha(float alpha);
-    void setDeltaT(float deltaT);
 
     // Kernels
     void scaleCSR(DeviceCSR& dA, float alpha);

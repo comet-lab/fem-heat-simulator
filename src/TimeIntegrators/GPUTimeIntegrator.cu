@@ -184,8 +184,7 @@ void GPUTimeIntegrator::initialize(){
 
     // -- Step 4a: Assign attribute to solution and return to eigen
     // Copy to host
-    CHECK_CUDA(cudaMemcpy(vVec_.data(), vVec_d_, nRows*sizeof(float), cudaMemcpyDeviceToHost));
-
+    downloadvVec_d();
 
     // -- Step 4b: initialize the LHS of the actual Euler equation for the first time step
     updateLHS();
@@ -252,10 +251,16 @@ void GPUTimeIntegrator::singleStep(){
     // -- Step 2b: Add implicit step to dVec --> dVec = dVec + alpha*dt*vVec
     addVectors(dVec_d_.data, vVec_d_ ,dVec_d_.data,nRows,(alpha_)*dt_);
 
-    downloaddVec_d();
     // -- Cleanup
     CHECK_CUDA( cudaFree(b_d) ); // free memory of RHS which was temporary
     b_d = nullptr;
+}
+
+Eigen::VectorXf GPUTimeIntegrator::singleStepWithUpdate()
+{
+    singleStep();
+    downloaddVec_d();
+    return dVec_;
 }
 
 void GPUTimeIntegrator::calculateRHS(float* &b_d, int nRows){

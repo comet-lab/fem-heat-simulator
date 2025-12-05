@@ -29,7 +29,7 @@ public:
 		setDt(dt);
 		singleStep();
 	}
-	Eigen::VectorXf singleStepWithUpdate() 
+	virtual Eigen::VectorXf singleStepWithUpdate() 
 	{
 		singleStep();
 		return dVec_;
@@ -42,8 +42,8 @@ public:
 	}
 	float alpha() const { return alpha_; }
 	float dt() const { return dt_; }
-	Eigen::VectorXf dVec() const { return dVec_; }
-	Eigen::VectorXf vVec() const { return vVec_; }
+	virtual Eigen::VectorXf dVec() { return dVec_; }
+	virtual Eigen::VectorXf vVec() { return vVec_; }
 
 	void setAlpha(float alpha) {
 		if ((alpha > 1) || (alpha < 0))
