@@ -28,29 +28,30 @@ thermalInfo.flux = 0;
 thermalInfo.temperature = 20*ones(prod(nodesPerAxis),1);
 simulator.thermalInfo = thermalInfo;
 
+% set sim duration
+timePoints = (0:simulator.dt:10.0)';
+% set laser settings
+laserPower = ones(size(timePoints));
+laserPower(timePoints>5) = 0;
+laserPose = zeros(size(timePoints,1),6);
+laserPose(:,3) = -35;
 w0 = 0.0168;
+
 lambda = 10.6e-4;
 laser = Laser(w0,lambda,thermalInfo.MUA);
 laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
 laser = laser.calculateIrradiance(mesh);
 simulator.laser = laser;
-
 %% Heating Phase
 tic
-timePoints = 0:simulator.dt:5.0;
+
 
 if ~simulator.silentMode
     fprintf("\n");
 end
 simulator.buildMatrices = true;
 simulator.resetIntegration = true;
-simulator.solve(timePoints);
-%% Cooling phase
-simulator.laser.fluenceRate = zeros(size(simulator.laser.fluenceRate));
-simulator.buildMatrices = false;
-simulator.resetIntegration = false;
-[Tpred, ~] = simulator.solve(timePoints);
-
+[Tpred,sensorData] = simulator.solve(timePoints,laserPose,laserPower);
 toc
 %% Plot Sensor Temps over time
 simulator.createSensorTempsFigure();

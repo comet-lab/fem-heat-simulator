@@ -79,7 +79,7 @@ public:
             if (!multiStep)
                 simulator.setFluenceRate(fluenceRate);
             else
-                simulator.setFluenceRate(laserPose.col(0), laserPower[0], beamWaist);
+                simulator.setFluenceRate(laserPose.row(0), laserPower[0], beamWaist);
             
             printDuration("MEX: Applied ThermalModel to Simulator ");
 
@@ -172,7 +172,7 @@ public:
         {             
             for (int i = 1; i < numTimePoints; i++) {
                 if (multiStep)
-                    simulator.setFluenceRate(laserPose.col(i), laserPower[i], beamWaist);
+                    simulator.setFluenceRate(laserPose.row(i), laserPower[i], beamWaist);
                 simulator.multiStep(simTime[i] - simTime[i - 1]);
                 sensorTemps[i] = simulator.sensorTemps();
 

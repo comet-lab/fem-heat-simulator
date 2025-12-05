@@ -85,7 +85,7 @@ classdef HeatSimulator < handle
             newObj.buildMatrices = obj.buildMatrices;
         end
 
-        function [T,sensorData] = solve(obj, timePoints, dt, alpha)
+        function [T,sensorData] = solve(obj, timePoints, laserPose, laserPower)
             %SOLVE - solves the heat equation and returns temperature at
             %specific spatio-temporal coordiantes and the final temperature
             %at each node
@@ -110,18 +110,9 @@ classdef HeatSimulator < handle
             arguments
                 obj (1,1) HeatSimulator
                 timePoints (:,1) {mustBeGreaterThanOrEqual(timePoints,0)}
-                dt double {mustBeGreaterThan(dt,0)} = []
-                alpha double {mustBeInRange(alpha,0,1)} = []
+                laserPose (:,6) = []
+                laserPower (:,1) = []
             end
-            % Input Checking
-            if isempty(alpha)
-                alpha = obj.alpha;
-            end
-            if isempty(dt)
-                dt = obj.dt;
-            end
-            obj.dt = dt;
-            obj.alpha = alpha;
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Conversion of objects to structs
@@ -130,7 +121,13 @@ classdef HeatSimulator < handle
             settings = struct('time',timePoints,'dt', obj.dt, 'alpha', obj.alpha,...
                 'silentMode', obj.silentMode, 'useAllCPUs', obj.useAllCPUs, 'useGPU', obj.useGPU,...
                 'resetIntegration',obj.resetIntegration,'sensorLocations',obj.sensorLocations);
-            laserStruct = struct('fluenceRate',obj.laser.fluenceRate);
+
+            if isempty(laserPose)
+                laserStruct = struct('fluenceRate',obj.laser.fluenceRate);
+            else
+                laserStruct = struct('laserPose',laserPose,'laserPower',laserPower,...
+                    'beamWaist',obj.laser.waist);
+            end
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % running MEX file
