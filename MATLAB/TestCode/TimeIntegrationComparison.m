@@ -2,6 +2,8 @@ clc; clear; close all;
 
 clear MEX_Heat_Simulation
 %% Initialization of parameters
+tFinal = 1;
+
 sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1; 0,0,0.2];
 z = [0:0.0015:0.05 0.1:0.05:1];
 x = linspace(-2.5,2.5,101);
@@ -40,7 +42,7 @@ laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
 laser = laser.calculateIrradiance(mesh);
 simulator.laser = laser;
 %% Running MEX File
-tFinal = 1;
+
 deltaTOpts = [0.05, 0.2, 0.5, 1.0]; % Time Step for integration % [s]
 alphaOpts = [1/2, 1]; % implicit percentage of time integration (0 - forward, 1/2 - crank-nicolson, 1 - backward)
 tic
