@@ -1,153 +1,188 @@
 clc; clear; close all;
-%% Initialization of parameters
-tissueSize = [2.0,2.0,1.0];
-nodesPerAxis = [41,41,50];
-ambientTemp = 24;
-T0 = single(20*ones(nodesPerAxis));
-deltaT = 0.05;
-alpha = 1/2;
-tFinal = single(0.05);
+% Initialization of parameters
+sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1; 0,0,0.2; 0 0 0.3;0 0 0.4;0 0 0.5];
+z = [0:0.0015:0.05 0.1:0.05:1];
+x = linspace(-1,1,41);
+y = linspace(-1,1,41);
+nodesPerAxis = [length(x),length(y),length(z)];
+boundaryConditions = [1,2,1,1,1,1]';
+
+mesh = Mesh(x,y,z,boundaryConditions);
+% Initialization of parameters
+simulator = HeatSimulator();
+simulator.dt = 0.05;
+simulator.alpha = 0.5;
+simulator.useAllCPUs = false;
+simulator.useGPU = false;
+simulator.silentMode = true;
+simulator.mesh = mesh;
+simulator.sensorLocations = sensorPositions;
+
+thermalInfo = ThermalModel();
+thermalInfo.MUA = 400;
+thermalInfo.TC = 0.0062;
+thermalInfo.VHC = 4.3;
+thermalInfo.HTC = 0.008;
+thermalInfo.ambientTemp = 24;
+thermalInfo.flux = 0;
+T0 = 20*ones(prod(nodesPerAxis),1);
+thermalInfo.temperature = T0;
+simulator.thermalInfo = thermalInfo;
+
+
+% set laser settings
 w0 = 0.0168;
-focalPoint = 35;
-MUA = 200;
-TC = 0.0062;
-VHC = 4.3;
-HTC = 0.05;
-useAllCPUs = false;
-useGPU = false;
-silentMode = true;
-Nn1d = 2;
-layerInfo = [0.05,30];
-sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1];
+lambda = 10.6e-4;
+laser = Laser(w0,lambda,thermalInfo.MUA);
+laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
+laser = laser.calculateIrradiance(mesh);
+simulator.laser = laser;
 
-w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
-I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
-
-xLayer = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
-yLayer = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
-zLayer = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
-[Y,X,Z] = meshgrid(yLayer,xLayer,zLayer); % left handed
-fluenceRate = single(I(X,Y,Z,MUA));
-tissueProperties = [MUA,TC,VHC,HTC]';
-
-BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
-flux = 0;
-rng(1);
-
-numTimeSteps = 20;
+tFinal = 1;
+timePoints = (0:simulator.dt:tFinal)';
+numTimeSteps = length(timePoints)-1;
 nRuns = 10;
-% Each loop will run with its own version of muA;
+% Each loop will run with its own version of muA cv and T
 muAOpts = linspace(2,200,nRuns);
 cvOpts = linspace(3.0,4.5,nRuns);
 Tstart = cell(nRuns,1);
 for i = 1:nRuns
-    Tstart{i} = T0 + randn(size(T0));
+    Tstart{i} = T0;
 end
 
-%% Parallel loop with createMatrices On;
-% useGPU = true;
+%% Parallel loop with matrix rebuild On;
+myCluster = parcluster('Processes');
+
 bigTic = tic;
 parDurationVec = zeros(nRuns,numTimeSteps);
 parSensorTemps = ones(nRuns,size(sensorPositions,1),numTimeSteps+1)*20;
 Tprediction = Tstart;
-createMatrices = true;
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
 for t = 1:numTimeSteps
     stepSensorTemps = zeros(nRuns,size(sensorPositions,1));
     parfor i = 1:nRuns
-        tissuePropTemp = tissueProperties;
-        tissuePropTemp(1) = muAOpts(i);
-        tissuePropTemp(3) = cvOpts(i);
-        Tpred = Tprediction{i};
+        simCopy = simulator.deepCopy();
+        simCopy.thermalInfo.MUA = muAOpts(i);
+        simCopy.thermalInfo.VHC = cvOpts(i);
+        simCopy.thermalInfo.temperature = Tprediction{i};
         tic
-        [Tpred,sensorTemps] = MEX_Heat_Simulation(Tpred,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissuePropTemp,BC,flux,ambientTemp,sensorPositions,layerInfo,...
-            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
-        stepSensorTemps(i,:) = sensorTemps(:,end)';
+        [Tpred,sensorTemps] = simCopy.solve([0;simCopy.dt]);
+        stepSensorTemps(i,:) = sensorTemps(end,:);
         parDurationVec(i,t) = toc;
         Tprediction{i} = Tpred;
     end
     parSensorTemps(:,:,t+1) = stepSensorTemps;
 end
 toc(bigTic)
-%% Parallel loop with createMatrices OFF;
+%% Parallel loop with buildMatrices OFF but resetIntegration true;
 clear MEX_Heat_Simulation;
 
 bigTic = tic;
 parOffDurationVec = zeros(nRuns,numTimeSteps);
 parOffSensorTemps = ones(nRuns,size(sensorPositions,1),numTimeSteps+1)*20;
 Tprediction = Tstart;
-createMatrices = true;
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
 for t = 1:numTimeSteps
     stepSensorTemps = zeros(nRuns,size(sensorPositions,1));
     parfor i = 1:nRuns
-        tissuePropTemp = tissueProperties;
-        tissuePropTemp(1) = muAOpts(i);
-        tissuePropTemp(3) = cvOpts(i);
-        Tpred = Tprediction{i};
+        simCopy = simulator.deepCopy();
+        simCopy.thermalInfo.MUA = muAOpts(i);
+        simCopy.thermalInfo.VHC = cvOpts(i);
+        simCopy.thermalInfo.temperature = Tprediction{i};
         tic
-        [Tpred,sensorTemps] = MEX_Heat_Simulation(Tpred,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissuePropTemp,BC,flux,ambientTemp,sensorPositions,layerInfo,...
-            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
-        stepSensorTemps(i,:) = sensorTemps(:,end)';
+        [Tpred,sensorTemps] = simCopy.solve([0;simCopy.dt]);
+        stepSensorTemps(i,:) = sensorTemps(end,:);
         parOffDurationVec(i,t) = toc;
         Tprediction{i} = Tpred;
     end
     parOffSensorTemps(:,:,t+1) = stepSensorTemps;
-    createMatrices = false;
+    simulator.buildMatrices = false;
+    simulator.resetIntegration = true;
 end
 toc(bigTic)
-%% Single CPU Loop
+
+%% Parallel loop with buildMatrices OFF and resetIntegration OFF;
+clear MEX_Heat_Simulation;
+
+bigTic = tic;
+parOffOffDurVec = zeros(nRuns,numTimeSteps);
+parOffOffSensTemps = ones(nRuns,size(sensorPositions,1),numTimeSteps+1)*20;
+Tprediction = Tstart;
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
+for t = 1:numTimeSteps
+    stepSensorTemps = zeros(nRuns,size(sensorPositions,1));
+    parfor i = 1:nRuns
+        simCopy = simulator.deepCopy();
+        simCopy.thermalInfo.MUA = muAOpts(i);
+        simCopy.thermalInfo.VHC = cvOpts(i);
+        simCopy.thermalInfo.temperature = Tprediction{i};
+        tic
+        [Tpred,sensorTemps] = simCopy.solve([0;simCopy.dt]);
+        stepSensorTemps(i,:) = sensorTemps(end,:);
+        parOffOffDurVec(i,t) = toc;
+        Tprediction{i} = Tpred;
+    end
+    parOffOffSensTemps(:,:,t+1) = stepSensorTemps;
+    simulator.buildMatrices = false;
+    simulator.resetIntegration = false;
+end
+toc(bigTic)
+%% Single CPU Loop with rebuild off 
 clear MEX_Heat_Simulation;
 
 bigTic = tic;
 singOnDurationVec = zeros(nRuns,numTimeSteps);
 singOnSensorTemps = ones(nRuns,size(sensorPositions,1),numTimeSteps+1)*20;
 Tprediction = Tstart;
-createMatrices = true;
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
 for t = 1:numTimeSteps
     stepSensorTemps = zeros(nRuns,size(sensorPositions,1));
     for i = 1:nRuns
-        tissuePropTemp = tissueProperties;
-        tissuePropTemp(1) = muAOpts(i);
-        tissuePropTemp(3) = cvOpts(i);
-        Tpred = Tprediction{i};
+        simulator.thermalInfo.MUA = muAOpts(i);
+        simulator.thermalInfo.VHC = cvOpts(i);
+        simulator.thermalInfo.temperature = Tprediction{i};
         tic
-        [Tpred,sensorTemps] = MEX_Heat_Simulation(Tpred,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissuePropTemp,BC,flux,ambientTemp,sensorPositions,layerInfo,...
-            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
-        stepSensorTemps(i,:) = sensorTemps(:,end)';
-        singOnDurationVec(i,t) = toc;
+        [Tpred,sensorTemps] = simulator.solve([0;simulator.dt]);
         Tprediction{i} = Tpred;
+
+        stepSensorTemps(i,:) = sensorTemps(end,:);
+        singOnDurationVec(i,t) = toc;
+        simulator.buildMatrices = false;
+        simulator.resetIntegration = true;
     end
     singOnSensorTemps(:,:,t+1) = stepSensorTemps;
 end
 toc(bigTic)
 
 
-%% Single GPU Loop
+%% Ground Truth
 clear MEX_Heat_Simulation;
 
-useGPU = true;
 bigTic = tic;
 singDurationVec = zeros(nRuns,numTimeSteps);
 singSensorTemps = ones(nRuns,size(sensorPositions,1),numTimeSteps+1)*20;
 Tprediction = Tstart;
-
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
 for i = 1:nRuns
-    createMatrices = true;
-    stepSensorTemps = zeros(1,size(sensorPositions,1),numTimeSteps);
-    tissuePropTemp = tissueProperties;
-    tissuePropTemp(1) = muAOpts(i);
-    tissuePropTemp(3) = cvOpts(i);
-    Tpred = Tprediction{i};
+    stepSensorTemps = zeros(size(sensorPositions,1),numTimeSteps);
+    simulator.buildMatrices = true;
+    simulator.resetIntegration = true;
+    simulator.thermalInfo.MUA = muAOpts(i);
+    simulator.thermalInfo.VHC = cvOpts(i);
+    simulator.thermalInfo.temperature = Tprediction{i};
     for t = 1:numTimeSteps
+
         tic
-        [Tpred,sensorTemps] = MEX_Heat_Simulation(Tpred,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissuePropTemp,BC,flux,ambientTemp,sensorPositions,layerInfo,...
-            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
-        stepSensorTemps(1,:,t) = sensorTemps(:,end)';
+        [Tpred,sensorTemps] = simulator.solve([0;simulator.dt]);
+        stepSensorTemps(:,t) = sensorTemps(end,:)';
         singDurationVec(i,t) = toc;
-%         createMatrices = false;
+        simulator.buildMatrices = false;
+        simulator.resetIntegration = false;
     end
     Tprediction{i} = Tpred;
     singSensorTemps(i,:,2:end) = stepSensorTemps;
@@ -159,21 +194,23 @@ figure(1);
 clf;
 tl = tiledlayout('flow');
 
-time = 0:deltaT:numTimeSteps*deltaT;
+time = (0:simulator.dt:tFinal)';
 for i = 1:nRuns
 nexttile()
 hold on;
-plot(time,reshape(singOnSensorTemps(i,1,:),size(time)),'Linewidth',2,'DisplayName',"Single-On")
-plot(time,reshape(singSensorTemps(i,1,:),size(time)),'Linewidth',2,'DisplayName',"Single-On GPU")
-plot(time,reshape(parSensorTemps(i,1,:),size(time)),'--','Linewidth',2,'DisplayName',"Parallel-On")
-plot(time,reshape(parOffSensorTemps(i,1,:),size(time)),':','Linewidth',2,'DisplayName',"Parallel-Off")
+plot(time,reshape(singOnSensorTemps(i,1,:),size(time)),'Linewidth',2,'DisplayName',"Single-Off-On")
+plot(time,reshape(singSensorTemps(i,1,:),size(time)),'Linewidth',2,'DisplayName',"Ground Truth")
+plot(time,reshape(parSensorTemps(i,1,:),size(time)),'--','Linewidth',2,'DisplayName',"Parallel-On-On")
+plot(time,reshape(parOffSensorTemps(i,1,:),size(time)),'-.','Linewidth',2,'DisplayName',"Parallel-Off-On")
+plot(time,reshape(parOffOffSensTemps(i,1,:),size(time)),':','Linewidth',2,'DisplayName',"Parallel-Off-Off")
 hold off
 grid on;
 xlabel("Time (s)");
 ylabel("Temperature (deg C)");
 title(sprintf("Run %d", i));
-legend();
-end
 
+end
+leg = legend('orientation','horizontal');
+leg.Layout.Tile = 'south';
 clear mex;
 
