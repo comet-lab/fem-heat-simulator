@@ -294,9 +294,10 @@ public:
             //displayOnMATLAB(matlabPtr, stream, false);
             for (int e = 0; e < numElems; e++)
             {
+                elements[e].nodes.resize(nodesPerElem);
                 for (int n = 0; n < nodesPerElem; n++)
                 {
-                    elements[e].nodes.push_back(elemArr[n][e] - 1); // convert 1-based indexing to 0-based indexing.
+                    elements[e].nodes[n] = (elemArr[n][e] - 1); // convert 1-based indexing to 0-based indexing.
                 }
             }
             /* Extract boundary faces from input */
