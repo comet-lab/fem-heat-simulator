@@ -135,25 +135,25 @@ classdef Mesh < handle
             % --- 3) Back face (y = min), local face 3 ---
             [i,k] = ndgrid(1:Nx-1, 1:Nz-1);
             j = ones(size(i));
-            BF = Mesh.makeSquareFaces(i,j,k, 3, bc(3), [1 2 6 5], Nx, Nz);
+            BF = Mesh.makeSquareFaces(i,j,k, 3, bc(3), [1 2 6 5], Nx, Ny);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
             % --- 4) Front face (y = max), local face 4 ---
             [i,k] = ndgrid(1:Nx-1, 1:Nz-1);
             j = (Ny-1)*ones(size(i));
-            BF = Mesh.makeSquareFaces(i,j,k, 4, bc(4), [4 8 7 3], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 4, bc(4), [4 8 7 3], Nx, Ny);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
             % --- 5) Left face (x = min), local face 5 ---
             [j,k] = ndgrid(1:Ny-1, 1:Nz-1);
             i = ones(size(j));
-            BF = Mesh.makeSquareFaces(i,j,k, 5, bc(5), [1 5 8 4], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 5, bc(5), [1 5 8 4], Nx, Ny);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
             % --- 6) Right face (x = max), local face 6 ---
             [j,k] = ndgrid(1:Ny-1, 1:Nz-1);
             i = (Nx-1)*ones(size(j));
-            BF = Mesh.makeSquareFaces(i,j,k, 6, bc(6), [2 3 7 6], Nz, Nx);
+            BF = Mesh.makeSquareFaces(i,j,k, 6, bc(6), [2 3 7 6], Nx, Ny);
             obj.boundaryFaces = [obj.boundaryFaces;BF];
 
         end
