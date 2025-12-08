@@ -7,6 +7,8 @@
 #include "ShapeFunctions/HexLinear.hpp"
 #include "ShapeFunctions/TetLinear.hpp"
 #include "ShapeFunctions/TetQuadratic.hpp"
+#include <iostream>
+#include <string>
 
 enum BoundaryType {
 	FLUX,
@@ -96,25 +98,27 @@ private:
 		for (int iter = 0; iter < 20; iter++) {
 			// Compute shape functions Ni and their derivatives
 			Eigen::Vector<float, ShapeFunc::nNodes> N;
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi;
+			Eigen::Matrix<float, ShapeFunc::nNodes, 3> dNdxi;
 			for (int A = 0; A < ShapeFunc::nNodes; A++)
 			{
 				N(A) = ShapeFunc::N(xi,A);
-				dNdxi.col(A) = ShapeFunc::dNdxi(xi, A);
+				dNdxi.row(A) = ShapeFunc::dNdxi(xi, A);
 			}
 
 			// Compute residual r = X(xi) - p
-			Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePos;
+			Eigen::Matrix<float, 3, ShapeFunc::nNodes> nodePos;
 			for (int A = 0; A < ShapeFunc::nNodes; A++) {
-				nodePos.row(A) << nodes_[nodeList[A]].x, nodes_[nodeList[A]].y, nodes_[nodeList[A]].z;
+				nodePos.col(A) << nodes_[nodeList[A]].x, nodes_[nodeList[A]].y, nodes_[nodeList[A]].z;
 			}
-			Eigen::Vector3f r = (nodePos.transpose() * N) - p;
+			Eigen::Vector3f r = (nodePos * N) - p;
 
 			// Build Jacobian matrix J
-			Eigen::Matrix3f J = dNdxi * nodePos;
+			Eigen::Matrix3f J = nodePos * dNdxi;
+			std::cout << "computeXiCoordinatesT: Jacobian " << J << std::endl;
 
 			// Solve J * delta = -r
 			Eigen::Vector3f delta = J.colPivHouseholderQr().solve(-r);
+			std::cout << "computeXiCoordinatesT: delta: " << delta << std::endl;
 
 			xi[0] += delta(0);
 			xi[1] += delta(1);

@@ -52,14 +52,14 @@ namespace ShapeFunctions {
         }
 
         // Derivative of N wrt
-        static inline Eigen::Vector3f dNdxi(const std::array<float, 3>&, int A) {
+        static inline Eigen::RowVector3f dNdxi(const std::array<float, 3>&, int A) {
             // derivitives of shape functions are constant
             switch (A) {
-            case 0: return Eigen::Vector3f(-1.0f, -1.0f, -1.0f);
-            case 1: return Eigen::Vector3f(1.0f, 0.0f, 0.0f);
-            case 2: return Eigen::Vector3f(0.0f, 1.0f, 0.0f);
-            case 3: return Eigen::Vector3f(0.0f, 0.0f, 1.0f);
-            default: return Eigen::Vector3f::Zero();
+            case 0: return Eigen::RowVector3f(-1.0f, -1.0f, -1.0f);
+            case 1: return Eigen::RowVector3f(1.0f, 0.0f, 0.0f);
+            case 2: return Eigen::RowVector3f(0.0f, 1.0f, 0.0f);
+            case 3: return Eigen::RowVector3f(0.0f, 0.0f, 1.0f);
+            default: return Eigen::RowVector3f::Zero();
             }
         }
 
@@ -74,12 +74,12 @@ namespace ShapeFunctions {
             }
         }
 
-        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& xi, int A) {
+        static inline Eigen::RowVector2f dNdxi_face(const std::array<float, 2>& xi, int A) {
             switch (A) {
-            case 0: return Eigen::Vector2f(-1.0f, -1.0f);
-            case 1: return Eigen::Vector2f(1.0f, 0.0f);
-            case 2: return Eigen::Vector2f(0.0f, 1.0f);
-            default: return Eigen::Vector2f::Zero();
+            case 0: return Eigen::RowVector2f(-1.0f, -1.0f);
+            case 1: return Eigen::RowVector2f(1.0f, 0.0f);
+            case 2: return Eigen::RowVector2f(0.0f, 1.0f);
+            default: return Eigen::RowVector2f::Zero();
             }
         }
 

@@ -41,41 +41,41 @@ TEST(TetQuadratic, testdNdxi)
 	std::array<std::array<float, 3>, 10> xi = { {{0,0,0},{1,0,0},{0,1,0},{0,0,1},{0.5,0,0},{0.5,0.5,0},{0,0.5,0},
 		{0,0,0.5},{0.5,0,0.5},{0,0.5,0.5}} };
 	// true dNdxi for the location {1/4,1/4,1/4} for each node. 
-	std::array<Eigen::Vector3f, Nne> output1True = {
-	Eigen::Vector3f{0, 0, 0}, // node 0
-	Eigen::Vector3f{ 0,  0,  0}, // node 1
-	Eigen::Vector3f{ 0,  0,  0}, // node 2
-	Eigen::Vector3f{ 0,  0,  0}, // node 3
-	Eigen::Vector3f{ 0, -1, -1}, // node 4
-	Eigen::Vector3f{ 1,  1,  0}, // node 5
-	Eigen::Vector3f{-1,  0, -1}, // node 6
-	Eigen::Vector3f{-1,  -1, 0}, // node 7
-	Eigen::Vector3f{ 1,  0,  1}, // node 8
-	Eigen::Vector3f{ 0,  1,  1} // node 9
+	std::array<Eigen::RowVector3f, Nne> output1True = {
+	Eigen::RowVector3f{0, 0, 0}, // node 0
+	Eigen::RowVector3f{ 0,  0,  0}, // node 1
+	Eigen::RowVector3f{ 0,  0,  0}, // node 2
+	Eigen::RowVector3f{ 0,  0,  0}, // node 3
+	Eigen::RowVector3f{ 0, -1, -1}, // node 4
+	Eigen::RowVector3f{ 1,  1,  0}, // node 5
+	Eigen::RowVector3f{-1,  0, -1}, // node 6
+	Eigen::RowVector3f{-1,  -1, 0}, // node 7
+	Eigen::RowVector3f{ 1,  0,  1}, // node 8
+	Eigen::RowVector3f{ 0,  1,  1} // node 9
 	};
 	// true dNdxi when we are at the node the shape function belongs to 
-	std::array<Eigen::Vector3f, Nne> output2True = {
-	Eigen::Vector3f{-3, -3, -3}, // node 0
-	Eigen::Vector3f{ 3,  0,  0}, // node 1
-	Eigen::Vector3f{ 0,  3,  0}, // node 2
-	Eigen::Vector3f{ 0,  0,  3}, // node 3
-	Eigen::Vector3f{ 0, -2, -2}, // node 4
-	Eigen::Vector3f{ 2,  2,  0}, // node 5
-	Eigen::Vector3f{-2,  0, -2}, // node 6
-	Eigen::Vector3f{-2,  -2, 0}, // node 7
-	Eigen::Vector3f{ 2,  0,  2}, // node 8
-	Eigen::Vector3f{ 0,  2,  2} // node 9
+	std::array<Eigen::RowVector3f, Nne> output2True = {
+	Eigen::RowVector3f{-3, -3, -3}, // node 0
+	Eigen::RowVector3f{ 3,  0,  0}, // node 1
+	Eigen::RowVector3f{ 0,  3,  0}, // node 2
+	Eigen::RowVector3f{ 0,  0,  3}, // node 3
+	Eigen::RowVector3f{ 0, -2, -2}, // node 4
+	Eigen::RowVector3f{ 2,  2,  0}, // node 5
+	Eigen::RowVector3f{-2,  0, -2}, // node 6
+	Eigen::RowVector3f{-2,  -2, 0}, // node 7
+	Eigen::RowVector3f{ 2,  0,  2}, // node 8
+	Eigen::RowVector3f{ 0,  2,  2} // node 9
 	};
 
 	for (int Ai = 0; Ai < Nne; Ai++)
 	{
-		Eigen::Vector3f output1 = testFunctions.dNdxi({ 1 / 4.0f, 1 / 4.0f, 1 / 4.0f }, Ai);
+		Eigen::RowVector3f output1 = testFunctions.dNdxi({ 1 / 4.0f, 1 / 4.0f, 1 / 4.0f }, Ai);
 
 		EXPECT_FLOAT_EQ(output1True[Ai](0), output1(0));
 		EXPECT_FLOAT_EQ(output1True[Ai](1), output1(1));
 		EXPECT_FLOAT_EQ(output1True[Ai](2), output1(2));
 
-		Eigen::Vector3f output2 = testFunctions.dNdxi(xi[Ai], Ai);
+		Eigen::RowVector3f output2 = testFunctions.dNdxi(xi[Ai], Ai);
 		EXPECT_FLOAT_EQ(output2True[Ai](0), output2(0));
 		EXPECT_FLOAT_EQ(output2True[Ai](1), output2(1));
 		EXPECT_FLOAT_EQ(output2True[Ai](2), output2(2));
@@ -153,32 +153,32 @@ TEST(TetQuadratic, testdN_face)
 	std::array<std::array<float, 2>, 6> xi = { {{0,0},{1,0},{0,1},{0.5,0},{0.5,0.5},{0,0.5}} };
 
 	// true dNdxi for the location {1/3,1/3} for each node. 
-	std::array<Eigen::Vector2f, 6> output1True = {
-	Eigen::Vector2f{-1/3.0f, -1 / 3.0f}, // node 0
-	Eigen::Vector2f{ 1 / 3.0f,  0.0f}, // node 1
-	Eigen::Vector2f{ 0.0f,  1 / 3.0f}, // node 2
-	Eigen::Vector2f{ 0.0f, -4/3.0f}, // node 3
-	Eigen::Vector2f{ 4/3.0f,  4/3.0f}, // node 4
-	Eigen::Vector2f{-4/3.0f,  0.0f}, // node 5
+	std::array<Eigen::RowVector2f, 6> output1True = {
+	Eigen::RowVector2f{-1/3.0f, -1 / 3.0f}, // node 0
+	Eigen::RowVector2f{ 1 / 3.0f,  0.0f}, // node 1
+	Eigen::RowVector2f{ 0.0f,  1 / 3.0f}, // node 2
+	Eigen::RowVector2f{ 0.0f, -4/3.0f}, // node 3
+	Eigen::RowVector2f{ 4/3.0f,  4/3.0f}, // node 4
+	Eigen::RowVector2f{-4/3.0f,  0.0f}, // node 5
 	};
 
 	// true dNdxi when we are at the node the shape function belongs to 
-	std::array<Eigen::Vector2f, 6> output2True = {
-	Eigen::Vector2f{-3, -3}, // node 0
-	Eigen::Vector2f{ 3,  0}, // node 1
-	Eigen::Vector2f{ 0,  3}, // node 2
-	Eigen::Vector2f{ 0, -2}, // node 3
-	Eigen::Vector2f{ 2,  2}, // node 4
-	Eigen::Vector2f{-2,  0} // node 5
+	std::array<Eigen::RowVector2f, 6> output2True = {
+	Eigen::RowVector2f{-3, -3}, // node 0
+	Eigen::RowVector2f{ 3,  0}, // node 1
+	Eigen::RowVector2f{ 0,  3}, // node 2
+	Eigen::RowVector2f{ 0, -2}, // node 3
+	Eigen::RowVector2f{ 2,  2}, // node 4
+	Eigen::RowVector2f{-2,  0} // node 5
 	};
 
 	for (int A = 0; A < testFunctions.nFaceNodes; A++)
 	{
-		Eigen::Vector2f output1 = testFunctions.dNdxi_face({ 1 / 3.0f, 1 / 3.0f }, A);
+		Eigen::RowVector2f output1 = testFunctions.dNdxi_face({ 1 / 3.0f, 1 / 3.0f }, A);
 		EXPECT_NEAR(output1True[A](0), output1(0),0.000001);
 		EXPECT_NEAR(output1True[A](1), output1(1),0.000001);
 
-		Eigen::Vector2f output2 = testFunctions.dNdxi_face(xi[A], A);
+		Eigen::RowVector2f output2 = testFunctions.dNdxi_face(xi[A], A);
 		EXPECT_FLOAT_EQ(output2True[A](0), output2(0));
 		EXPECT_FLOAT_EQ(output2True[A](1), output2(1));
 	}

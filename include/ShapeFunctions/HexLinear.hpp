@@ -61,10 +61,10 @@ namespace ShapeFunctions {
             }
         }
 
-        static inline Eigen::Vector3f dNdxi(const std::array<float, 3>& xi, int A)
+        static inline Eigen::RowVector3f dNdxi(const std::array<float, 3>& xi, int A)
         {
             const float x = xi[0], y = xi[1], z = xi[2];
-            Eigen::Vector3f dN;
+            Eigen::RowVector3f dN;
             switch (A) {
             case 0: dN << -0.125f * (1 - y) * (1 - z), -0.125f * (1 - x) * (1 - z), -0.125f * (1 - x) * (1 - y); break;
             case 1: dN << 0.125f * (1 - y) * (1 - z), -0.125f * (1 + x) * (1 - z), -0.125f * (1 + x) * (1 - y); break;
@@ -79,10 +79,10 @@ namespace ShapeFunctions {
             return dN;
         }
 
-        static inline Eigen::Vector2f dNdxi_face(const std::array<float, 2>& xi, int A)
+        static inline Eigen::RowVector2f dNdxi_face(const std::array<float, 2>& xi, int A)
         {
             const float x = xi[0], y = xi[1];
-            Eigen::Vector2f dN_face;
+            Eigen::RowVector2f dN_face;
             switch (A) {
             case 0: dN_face << -0.25f * (1 - y), -0.25 * (1 - x); break;
             case 1: dN_face << 0.25f * (1 - y), -0.25f * (1 + x); break;

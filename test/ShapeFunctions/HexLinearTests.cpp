@@ -53,8 +53,8 @@ TEST(HexLinear, testdNdxi)
 
 	for (int Ai = 0; Ai < Nne; Ai++)
 	{
-		Eigen::Vector3f output1 = testFunctions.dNdxi(xi1[Ai], Ai);
-		Eigen::Vector3f output2 = testFunctions.dNdxi({ 0.0f,0.0f,0.0f }, Ai);
+		Eigen::RowVector3f output1 = testFunctions.dNdxi(xi1[Ai], Ai);
+		Eigen::RowVector3f output2 = testFunctions.dNdxi({ 0.0f,0.0f,0.0f }, Ai);
 
 		for (int i = 0; i < 3; i++)
 		{
@@ -154,10 +154,10 @@ TEST(HexLinear, testdN_face)
 		for (int A = 0; A < testFunctions.nFaceNodes; A++)
 		{
 			std::cout << "Face: " << faceIdx << " A: " << A << std::endl;
-			Eigen::Vector2f output1 = testFunctions.dNdxi_face(gp1, A);
-			Eigen::Vector2f output2 = testFunctions.dNdxi_face(gp2, A);
-			Eigen::Vector2f output3 = testFunctions.dNdxi_face(gp3, A);
-			Eigen::Vector2f output4 = testFunctions.dNdxi_face(gp4, A);
+			Eigen::RowVector2f output1 = testFunctions.dNdxi_face(gp1, A);
+			Eigen::RowVector2f output2 = testFunctions.dNdxi_face(gp2, A);
+			Eigen::RowVector2f output3 = testFunctions.dNdxi_face(gp3, A);
+			Eigen::RowVector2f output4 = testFunctions.dNdxi_face(gp4, A);
 			for (int idx = 0; idx < 2; idx++)
 			{
 				EXPECT_FLOAT_EQ(point1True[A][idx], output1[idx]);

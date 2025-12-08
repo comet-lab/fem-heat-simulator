@@ -288,14 +288,15 @@ public:
 
 		for (int i = 0; i < ShapeFunc::nGP; ++i)
 		{
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
+			Eigen::Matrix<float, ShapeFunc::nNodes, 3> dNdxi = dNdxiCache_[i];
 			float detJ = detJCache_[i];
-			// Derivatives in physical coordinates: 3 × nNodes
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdx = invJCache_[i] * dNdxi;
+			// Derivatives in physical coordinates: nNodes x 3
+			// normally its J^-T * dNdxi, however we stored our dNdxi has a row vector not a column vector
+			Eigen::Matrix<float, ShapeFunc::nNodes, 3> dNdx = dNdxi * invJCache_[i];
 			// Weight
 			float weight = w[i][0] * w[i][1] * w[i][2] * detJ;
 			// Ke contribution: (nNodes × 3)(3 × nNodes) = nNodes × nNodes
-			Ke += dNdx.transpose() * dNdx * weight;
+			Ke += dNdx * dNdx.transpose() * weight;
 		}
 
 		return Ke;
@@ -320,13 +321,13 @@ public:
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
 			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[i];
-			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[i];
+			Eigen::Matrix<float, ShapeFunc::nFaceNodes, 2> dN_dxi_eta = dNdxiFaceCache_[i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
+			Eigen::Matrix<float, 3, 2> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
-			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
+			float detJ = (JFace.col(0).cross(JFace.col(1))).norm();
 
 			float weight = w[i][0] * w[i][1] * detJ;
 
@@ -359,13 +360,13 @@ public:
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
 			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face = NFaceCache_[i];
-			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta = dNdxiFaceCache_[i];
+			Eigen::Matrix<float, ShapeFunc::nFaceNodes, 2> dN_dxi_eta = dNdxiFaceCache_[i];
 
 			// Compute 2x3 surface Jacobian
-			Eigen::Matrix<float, 2, 3> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
+			Eigen::Matrix<float, 3, 2> JFace = calculateJFace<ShapeFunc>(elem, faceIndex, dN_dxi_eta);
 
 			// Surface determinant: norm of cross product of rows
-			float detJ = (JFace.row(0).cross(JFace.row(1))).norm();
+			float detJ = (JFace.col(0).cross(JFace.col(1))).norm();
 
 			float weight = w[i][0] * w[i][1] * detJ;
 
@@ -397,7 +398,7 @@ public:
 		invJCache_.clear();
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi = dNdxiCache_[i];
+			Eigen::Matrix<float, ShapeFunc::nNodes, 3> dNdxi = dNdxiCache_[i];
 			Eigen::Matrix3f J = calculateJ<ShapeFunc>(elem, dNdxi);
 			Eigen::Matrix3f Jinv = J.inverse();
 			float detJ = J.determinant();
@@ -412,15 +413,15 @@ public:
 	* @param dNdxi is the shape function derivative over the volume evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float, 3, Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix3f calculateJ(const Element& elem, const Eigen::Matrix<float, Eigen::Dynamic, 3>& dNdxi)
 	{
-		Eigen::Matrix<float, ShapeFunc::nNodes, 3> nodePoses;
+		Eigen::Matrix<float, 3, ShapeFunc::nNodes> nodePoses;
 		for (int a = 0; a < ShapeFunc::nNodes; ++a)
 		{
 			const Node& n = mesh_->nodes()[elem.nodes[a]];
-			nodePoses.row(a) << n.x, n.y, n.z;
+			nodePoses.col(a) << n.x, n.y, n.z;
 		}
-		Eigen::Matrix3f J = dNdxi * nodePoses;
+		Eigen::Matrix3f J = nodePoses * dNdxi;
 		return J;
 	}
 
@@ -431,15 +432,15 @@ public:
 	* @param dNdxi is the shape function derivative over the surface evaluated at the current gaussian integration point
 	*/
 	template <typename ShapeFunc>
-	Eigen::Matrix<float, 2, 3> calculateJFace(const Element& elem, int faceIndex, const Eigen::Matrix<float, 2, Eigen::Dynamic>& dNdxi)
+	Eigen::Matrix<float, 3, 2> calculateJFace(const Element& elem, int faceIndex, const Eigen::Matrix<float, Eigen::Dynamic, 2>& dNdxi)
 	{
-		Eigen::Matrix<float, ShapeFunc::nFaceNodes, 3> nodePoses;
+		Eigen::Matrix<float, 3, ShapeFunc::nFaceNodes> nodePoses;
 		for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 		{
 			const Node& n = mesh_->nodes()[elem.nodes[ShapeFunc::faceConnectivity[faceIndex][a]]];
-			nodePoses.row(a) << n.x, n.y, n.z;
+			nodePoses.col(a) << n.x, n.y, n.z;
 		}
-		Eigen::Matrix<float, 2, 3> JFace = dNdxi * nodePoses;
+		Eigen::Matrix<float, 3, 2> JFace = nodePoses * dNdxi ;
 		return JFace;
 	}
 
@@ -468,12 +469,12 @@ public:
 		for (int i = 0; i < ShapeFunc::nGP; i++)
 		{
 			const auto& xi = gp[i];
-			Eigen::Matrix<float, 3, ShapeFunc::nNodes> dNdxi;
+			Eigen::Matrix<float, ShapeFunc::nNodes, 3> dNdxi;
 			Eigen::VectorXf Nvals(ShapeFunc::nNodes);
 			for (int a = 0; a < ShapeFunc::nNodes; a++)
 			{
 				Nvals(a) = ShapeFunc::N(xi, a);
-				dNdxi.col(a) = ShapeFunc::dNdxi(xi, a);
+				dNdxi.row(a) = ShapeFunc::dNdxi(xi, a);
 			}
 			NaNbCache_.push_back(Nvals * Nvals.transpose());
 			NCache_.push_back(Nvals);
@@ -485,17 +486,17 @@ public:
 		const auto& gpFace = ShapeFunc::faceGaussPoints();
 		std::vector<Eigen::VectorXf> temporaryNFace(ShapeFunc::nFaceGP);
 		//std::vector<Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes>> temporarydNdxi(ShapeFunc::nFaceGP);
-		std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> temporarydNdxi(ShapeFunc::nFaceGP);
+		std::vector<Eigen::Matrix<float, Eigen::Dynamic, 2>> temporarydNdxi(ShapeFunc::nFaceGP);
 		std::vector<Eigen::Matrix<float, ShapeFunc::nFaceNodes, ShapeFunc::nFaceNodes>> temporaryNaNbFace(ShapeFunc::nFaceGP);
 		for (int i = 0; i < ShapeFunc::nFaceGP; ++i)
 		{
 			Eigen::Vector<float, ShapeFunc::nFaceNodes> N_face;
-			Eigen::Matrix<float, 2, ShapeFunc::nFaceNodes> dN_dxi_eta;
+			Eigen::Matrix<float, ShapeFunc::nFaceNodes, 2> dN_dxi_eta;
 
 			for (int a = 0; a < ShapeFunc::nFaceNodes; ++a)
 			{
 				N_face(a) = ShapeFunc::N_face(gpFace[i], a);
-				dN_dxi_eta.col(a) = ShapeFunc::dNdxi_face(gpFace[i], a);
+				dN_dxi_eta.row(a) = ShapeFunc::dNdxi_face(gpFace[i], a);
 			}
 			temporaryNFace[i] = N_face;
 			temporaryNaNbFace[i] = N_face * N_face.transpose();
@@ -515,7 +516,7 @@ private:
 	// volume shape functions
 	std::vector<Eigen::VectorXf> NCache_; // Stores the shape functions for each node at each gauss point
 	std::vector<Eigen::MatrixXf> NaNbCache_; // Stores the multiplication of N*N' for element shape functions at each gauss point
-	std::vector<Eigen::Matrix<float, 3, Eigen::Dynamic>> dNdxiCache_; // Stores the shape function derivaties for each node at each gauss point
+	std::vector<Eigen::Matrix<float, Eigen::Dynamic, 3>> dNdxiCache_; // Stores the shape function derivaties for each node at each gauss point
 	// surface shape functions
 	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Vector is face shape functions at gauss point on face
 	// size is nFace x nGP x nFaceNodes
@@ -524,7 +525,7 @@ private:
 	std::vector<Eigen::MatrixXf> NaNbFaceCache_;
 	// outer std::vector is faceIdx, inner std::vector is gauss point, Eigen::Matrix is face derivative shape functions at gauss point on face
 	// size is nFace x nGp x (2 x nFaceNodes)
-	std::vector<Eigen::Matrix<float, 2, Eigen::Dynamic>> dNdxiFaceCache_;
+	std::vector<Eigen::Matrix<float, Eigen::Dynamic, 2>> dNdxiFaceCache_;
 
 	/* Caching jacobians per element*/
 	std::vector<float> detJCache_; //Caching the determinant of the jacobian for each Gauss point

@@ -118,10 +118,10 @@ protected:
 */
 TEST_F(HexBuilder, testCalculateJacobian)
 {
-	Eigen::Matrix<float,3,8> dNdxi;
+	Eigen::Matrix<float,8,3> dNdxi;
 	for (int a = 0; a < 8; a++)
 	{
-		dNdxi.col(a) = ShapeFunctions::HexLinear::dNdxi({1.0f,-1.0f,0.0f}, a);
+		dNdxi.row(a) = ShapeFunctions::HexLinear::dNdxi({1.0f,-1.0f,0.0f}, a);
 	}
 	
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::HexLinear>(mesh.elements()[0], dNdxi); // position (xi) doesn't matter in this test case
@@ -328,10 +328,10 @@ TEST_F(HexBuilder, testBuildMatrices)
 TEST_F(TetLinBuilder, testCalculateJ)
 {
 	const int Nne = ShapeFunctions::TetLinear::nNodes;
-	Eigen::Matrix<float,3,Nne> dNdxi;
+	Eigen::Matrix<float,Nne,3> dNdxi;
 	for (int a = 0; a < Nne; a++)
 	{
-		dNdxi.col(a) = ShapeFunctions::TetLinear::dNdxi({1.0f,0.0f,0.0f}, a);
+		dNdxi.row(a) = ShapeFunctions::TetLinear::dNdxi({1.0f,0.0f,0.0f}, a);
 	}
 
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetLinear>(elem, dNdxi); // position (xi) doesn't matter in this test case
@@ -498,11 +498,11 @@ TEST_F(TetLinBuilder, testBuildMatrices)
 TEST_F(TetQuadBuilder, testCalculateJ)
 {
 	const int Nne = ShapeFunctions::TetQuadratic::nNodes;
-	Eigen::Matrix<float, 3, Nne> dNdxi;
+	Eigen::Matrix<float, Nne, 3> dNdxi;
 	for (int a = 0; a < Nne; a++)
 	{
 		// xi position doesn't matter since Jacobian should be constant throughout mesh
-		dNdxi.col(a) = ShapeFunctions::TetQuadratic::dNdxi({ 0.0f,0,0.0f }, a); 
+		dNdxi.row(a) = ShapeFunctions::TetQuadratic::dNdxi({ 0.0f,0,0.0f }, a); 
 	}
 
 	Eigen::Matrix3f J = matrixBuilder.calculateJ<ShapeFunctions::TetQuadratic>(elem, dNdxi);
