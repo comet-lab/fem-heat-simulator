@@ -42,15 +42,15 @@ laser = Laser(w0,lambda,thermalInfo.MUA);
 laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
 laser = laser.calculateIrradiance(mesh);
 simulator.laser = laser;
-%% Heating Phase
+%% Simulating 
 tic
-
-
 if ~simulator.silentMode
     fprintf("\n");
 end
 simulator.buildMatrices = true;
 simulator.resetIntegration = true;
+% solve can be called with laserPose and laserPower, or without as long as
+% calculateIrradiance has been called on the laser
 [Tpred,sensorData] = simulator.solve(timePoints,laserPose,laserPower);
 toc
 %% Plot Sensor Temps over time

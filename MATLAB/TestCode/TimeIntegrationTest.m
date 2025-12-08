@@ -2,39 +2,45 @@ clc; clear; close all;
 
 clear MEX_Heat_Simulation
 %% Initialization of parameters
-tissueSize = [5.0,5.0,1.0]; % [cm, cm, cm]
-nodesPerAxis = [81,81,50];
-ambientTemp = 24; % ambient temp
-T0 = single(20*ones(nodesPerAxis)); % initial temp [deg C]
-tFinal = single(15.0); % final duration of simulation [s]
-w0 = 0.0168; % beam Waist [cm]
-focalPoint = 35; % distance from waist to target [cm]
-MUA = 200; % absorption coefficient [cm^-1]
-TC = 0.0062; % thermal conductivity [W/K cm]
-VHC = 4.3; % volumetric heat capacity [J/K cm^3]
-HTC = 0.05; % heat transfer coefficient [W/K cm^2]
-useAllCPUs = true; % multithreading enabled
-useGPU = true;
-silentMode = false; % print statements off
-Nn1d = 2; % nodes per axis in a single element
-layerInfo = [0.05,30]; % layer height, layer elements
-sensorPositions = [0,0,0; 0 0.5 0; 0 0 0.5];
-BC = int32([2,0,0,0,0,0]'); %0: HeatSink, 1: Flux, 2: Convection
-flux = 0;
+sensorPositions = [0,0,0; 0 0 0.05; 0 0 0.1; 0,0,0.2];
+z = [0:0.0015:0.05 0.1:0.05:1];
+x = linspace(-2.5,2.5,101);
+y = linspace(-2.5,2.5,101);
+nodesPerAxis = [length(x),length(y),length(z)];
+boundaryConditions = [1,2,1,1,1,1]';
 
+mesh = Mesh(x,y,z,boundaryConditions);
+% Initialization of parameters
+simulator = HeatSimulator();
+simulator.dt = 0.05;
+simulator.alpha = 0.5;
+simulator.useAllCPUs = true;
+simulator.useGPU = false;
+simulator.silentMode = true;
+simulator.buildMatrices = true;
+simulator.resetIntegration = true;
+simulator.mesh = mesh;
+simulator.sensorLocations = sensorPositions;
 
-w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
-I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
+thermalInfo = ThermalModel();
+thermalInfo.MUA = 400;
+thermalInfo.TC = 0.0062;
+thermalInfo.VHC = 4.3;
+thermalInfo.HTC = 0.008;
+thermalInfo.ambientTemp = 24;
+thermalInfo.flux = 0;
+T0 = 20*ones(prod(nodesPerAxis),1);
+thermalInfo.temperature = T0;
+simulator.thermalInfo = thermalInfo;
 
-x = linspace(-tissueSize(1)/2,tissueSize(1)/2,nodesPerAxis(1));
-y = linspace(-tissueSize(2)/2,tissueSize(2)/2,nodesPerAxis(2));
-z = [linspace(0,layerInfo(1)-layerInfo(1)/layerInfo(2),layerInfo(2)) linspace(layerInfo(1),tissueSize(3),nodesPerAxis(3)-layerInfo(2))];
-[X,Y,Z] = meshgrid(x,y,z);
-fluenceRate = single(I(X,Y,Z,MUA));
-tissueProperties = [MUA,TC,VHC,HTC]';
-
-createMatrices = true; % whether to always recreate all the matrices.
+w0 = 0.0168;
+lambda = 10.6e-4;
+laser = Laser(w0,lambda,thermalInfo.MUA);
+laser.focalPose = struct('x',0,'y',0,'z',-35,'theta',0,'phi',0,'psi',0);
+laser = laser.calculateIrradiance(mesh);
+simulator.laser = laser;
 %% Running MEX File
+tFinal = 1;
 deltaTOpts = [0.05, 0.2, 0.5, 1.0]; % Time Step for integration % [s]
 alphaOpts = [1/2, 1]; % implicit percentage of time integration (0 - forward, 1/2 - crank-nicolson, 1 - backward)
 tic
@@ -44,13 +50,15 @@ for dd = 1:length(deltaTOpts)
     deltaT = deltaTOpts(dd);
     for aa = 1:length(alphaOpts)
         alpha = alphaOpts(aa);
-        if ~silentMode
+        if ~simulator.silentMode
             fprintf("\n");
         end
         tic
-        [Tpred,sensorTemps] = MEX_Heat_Simulation(T0,fluenceRate,tissueSize',tFinal,...
-            deltaT,tissueProperties,BC,flux,ambientTemp,sensorPositions,layerInfo,...
-            useAllCPUs,useGPU,alpha,silentMode,Nn1d,createMatrices);
+        timePoints = (0:deltaT:tFinal)';
+        simulator.dt = deltaT;
+        simulator.alpha = alpha;
+        simulator.thermalInfo.temperature = T0;
+        [Tpred,sensorTemps] = simulator.solve(timePoints);
         durationCell{dd,aa} = toc;
 
         sensorTempsCell{dd,aa} = sensorTemps;
@@ -75,7 +83,7 @@ for ss = 1:size(sensorPositions,1)
             deltaT = deltaTOpts(dd);
 
 
-            plot(0:deltaT:tFinal,sensorTempsCell{dd,aa}(ss,:),'LineStyle',lineOpts{dd},...
+            plot(0:deltaT:tFinal,sensorTempsCell{dd,aa}(:,ss),'LineStyle',lineOpts{dd},...
                 'LineWidth',1.5,'Color',c(aa,:),'DisplayName',...
                 sprintf("\\alpha: %g, \\Deltat: %g",alpha,deltaT));
 
