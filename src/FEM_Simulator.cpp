@@ -162,6 +162,8 @@ void FEM_Simulator::updateTemperatureSensors() {
 			calculateSensorTemp<ShapeFunctions::HexLinear>(sensors_[s]);
 		else if ((mesh_->order() == LINEAR) && (mesh_->elementShape() == TETRAHEDRAL))
 			calculateSensorTemp<ShapeFunctions::TetLinear>(sensors_[s]);
+		else if ((mesh_->order() == QUADRATIC) && (mesh_->elementShape() == TETRAHEDRAL))
+			calculateSensorTemp<ShapeFunctions::TetQuadratic>(sensors_[s]);
 		else
 			throw std::runtime_error("Can't calculate sensor temperature for element type");
 		sensorTemps_[s] = (sensors_[s].temp);
