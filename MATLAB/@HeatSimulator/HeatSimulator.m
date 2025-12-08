@@ -73,11 +73,13 @@ classdef HeatSimulator < handle
 
         function newObj = deepCopy(obj)
             newObj = HeatSimulator();
-            newObj.mesh = Mesh;
+            newObj.mesh = obj.mesh;
             newObj.thermalInfo = obj.thermalInfo;
             newObj.laser = obj.laser;
             newObj.dt = obj.dt;
             newObj.alpha = obj.alpha;
+            newObj.sensorTemps = obj.sensorTemps;
+            newObj.time = obj.time;
             newObj.sensorLocations = obj.sensorLocations;
             newObj.silentMode = obj.silentMode;
             newObj.useAllCPUs = obj.useAllCPUs;
