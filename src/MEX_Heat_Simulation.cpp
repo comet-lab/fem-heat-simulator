@@ -478,6 +478,7 @@ public:
         {
             matlab::data::Array smArr = settings[0]["silentMode"];
             silentMode = static_cast<bool>(smArr[0]);
+            simulator.silentMode = silentMode;
         }
         if (hasField(fieldNames, "useGPU"))
         {
