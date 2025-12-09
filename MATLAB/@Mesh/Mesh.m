@@ -42,7 +42,7 @@ classdef Mesh < handle
                     geom = varargin{1}.Geometry;
                     femesh = geom.Mesh;
                 end
-                obj.nodes = femesh.Nodes;
+                obj.nodes = femesh.Nodes; % convert m to cm
                 obj.elements = femesh.Elements;
                 obj.boundaryFaces = Mesh.makeBoundaryFaces(femesh);
 
@@ -285,10 +285,14 @@ classdef Mesh < handle
                 nNf = 6;
                 % --- Quadratic tet face-node patterns ---
                 faceNodePattern = {
-                    [1, 2, 3, 5, 9, 8]+1;   % face 1: Opposite node 1
-                    [0, 3, 2, 7, 9, 6]+1;   % face 2: Opposite node 2
-                    [0, 1, 3, 4, 8, 7]+1;   % face 3: Opposite node 3
-                    [0, 2, 1, 6, 5, 4]+1    % face 4: Opposite node 4
+                    % [1, 2, 3, 5, 9, 8]+1;   % face 1: Opposite node 1
+                    % [0, 3, 2, 7, 9, 6]+1;   % face 2: Opposite node 2
+                    % [0, 1, 3, 4, 8, 7]+1;   % face 3: Opposite node 3
+                    % [0, 2, 1, 6, 5, 4]+1    % face 4: Opposite node 4
+                    [1, 5, 2, 9, 3, 8]+1;   % face 1: Opposite node 1
+                    [0, 7, 3, 9, 2, 6,]+1;   % face 2: Opposite node 2
+                    [0, 4, 1, 8, 3, 7]+1;   % face 3: Opposite node 3
+                    [0, 6, 2, 5, 1, 4]+1    % face 4: Opposite node 4
                     };
             elseif nNe == 8
                 % --- Linear Hex face-node patterns ---
@@ -389,14 +393,14 @@ classdef Mesh < handle
             % ----------------------------------------------------
             geomFaceNodes = cell(geometry.NumFaces,1);
             for gf = 1:geometry.NumFaces
-                geomFaceNodes{gf} = boundaryNode(mesh, 'region', gf);
+                geomFaceNodes{gf} = findNodes(geometry.Mesh, 'region',"Face", gf);
             end
             %% ----------------------------------------------------------
             % 2. Assign geometry-face ID + boundary type to each face
             % ----------------------------------------------------------
             for k = 1:numel(boundaryFaces)
                 % Use vertex nodes (first 3 nodes) for classification
-                vtx = boundaryFaces(k).nodeIDs(1:3);
+                vtx = boundaryFaces(k).nodes;
 
                 found = false;
                 for gf = 1:geometry.NumFaces
