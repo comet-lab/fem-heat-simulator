@@ -1,5 +1,7 @@
 clear; close all; clc
 
+simDuration = 15.0;
+tissueSize = [5,5,1];
 sensorPositions = [ 0,   0,  0;
                     0.1, 0   0;
                     0.2, 0   0;
@@ -27,55 +29,67 @@ thermalInfo.VHC = 4.3;
 thermalInfo.HTC = 0.008;
 thermalInfo.ambientTemp = 24;
 thermalInfo.flux = 0;
+simulator.thermalInfo = thermalInfo;
 
-simDuration = 15.0;
 %% Set default laser settings
-w0 = 0.0167; % beam Waist [cm]
-focalPoint = 35; % distance from waist to target [cm]
-w = @(z) w0 * sqrt(1 + (z.*10.6e-4./(pi*w0.^2)).^2);
-I = @(x,y,z,MUA) 2./(w(focalPoint + z).^2.*pi) .* exp(-2.*(x.^2 + y.^2)./(w(focalPoint + z).^2) - MUA.*z);
+% set laser settings
+% laserPower = ones(size(timePoints));
+% laserPower(timePoints>5) = 0;
+% laserPose = zeros(size(timePoints,1),6);
+% laserPose(:,3) = -35;
+
+w0 = 0.0168;
+lambda = 10.6e-4;
+focalDist = 35;
+laser = Laser(w0,lambda,thermalInfo.MUA);
+laser.focalPose = struct('x',0,'y',0,'z',-focalDist,'theta',0,'phi',0,'psi',0);
+simulator.laser = laser;
+
+%%
+timePoints = (0:simulator.dt:simDuration)';
 
 %% Create two different meshes
 % MESH 1
-z1 = [0:0.0015:0.05 0.1:0.05:1];
-y1 = -1:0.025:1;
-x1 = -1:0.025:1;
+z1 = [0:0.0010:0.05 0.1:0.05:tissueSize(3)];
+y1 = linspace(-tissueSize(2)/2,tissueSize(2)/2,201);
+x1 = linspace(-tissueSize(1)/2,tissueSize(1)/2,201);
 [X1,Y1,Z1] = meshgrid(x1,y1,z1);
-nodesPerAxis = [length(x1),length(y1),length(z1)];
+nodesPerAxis1 = [length(x1),length(y1),length(z1)];
 boundaryConditions = [1,1,1,1,1,1]';
 mesh1 = Mesh(x1,y1,z1,boundaryConditions);
 
-fluenceRate1 = single(I(X1(:),Y1(:),Z1(:),thermalInfo.MUA));
-thermalInfo.temperature = 20*ones(prod(nodesPerAxis),1);
+simulator.thermalInfo.temperature = 20*ones(prod(nodesPerAxis1),1);
+simulator.laser = simulator.laser.calculateIrradiance(mesh1);
 simulator.mesh = mesh1;
-thermalInfo.fluenceRate = fluenceRate1;
-simulator.thermalInfo = thermalInfo;
-[Tpred1,sensorTemps1] = simulator.solve(simDuration);
+
+[Tpred1,sensorTemps1] = simulator.solve(timePoints);
 
 
 %% Second Simulator
 simulator2 = simulator.deepCopy();
-z2 = [0:0.0015:0.05 0.1:0.05:1];
-y2 = [Mesh.geometricSpacing(-1,-0.3,15,0.075) (-0.275:0.025:0.275) Mesh.geometricSpacing(0.3,1,15,0.075,true)];
-x2 = [Mesh.geometricSpacing(-1,-0.3,15,0.075) (-0.275:0.025:0.275) Mesh.geometricSpacing(0.3,1,15,0.075,true)];
+z2 = Mesh.geometricSpacing(0,1,35,0.15,true);
+maxStep = 0.2;
+numSteps = 20;
+y2 = [Mesh.geometricSpacing(-tissueSize(2)/2,-0.3,numSteps,maxStep) (-0.25:0.05:0.25) Mesh.geometricSpacing(0.3,tissueSize(2)/2,numSteps,maxStep,true)];
+x2 = [Mesh.geometricSpacing(-tissueSize(1)/2,-0.3,numSteps,maxStep) (-0.25:0.05:0.25) Mesh.geometricSpacing(0.3,tissueSize(1)/2,numSteps,maxStep,true)];
 [X2,Y2,Z2] = meshgrid(x2,y2,z2);
-nodesPerAxis = [length(x2),length(y2),length(z2)];
+nodesPerAxis2 = [length(x2),length(y2),length(z2)];
 boundaryConditions = [1,1,1,1,1,1]';
 mesh2 = Mesh(x2,y2,z2,boundaryConditions);
 
 simulator2.mesh = mesh2;
-%%
-fluenceRate2 = single(I(X2(:),Y2(:),Z2(:),thermalInfo.MUA));
-simulator2.thermalInfo.temperature = 20*ones(prod(nodesPerAxis),1);
-simulator2.thermalInfo.fluenceRate = fluenceRate2;
-[Tpred2,sensorTemps2] = simulator2.solve(simDuration);
+simulator2.thermalInfo.temperature = 20*ones(prod(nodesPerAxis2),1);
+simulator2.laser = simulator2.laser.calculateIrradiance(mesh2);
+
+[Tpred2,sensorTemps2] = simulator2.solve(timePoints);
 
 
 %% Fluence Comparison
-
+w = @(z) w0.*sqrt( 1 + (lambda.*(z+focalDist)./(pi*w0.^2)).^2);
+I = @(x,y,z,MUA) 2./(pi*w(z).^2).*exp( -2 .* (x.^2 + y.^2)./w(z).^2 - MUA.*z);
 figure(1)
 clf;
-tiledlayout
+tiledlayout(1,2)
 nexttile()
 hold on
 plot(-1:0.001:1,I(-1:0.001:1,0,0,thermalInfo.MUA),'DisplayName','Ground Truth',...
@@ -89,6 +103,20 @@ xlabel("X Axis (cm)")
 ylabel("Irradiance (W/cm^2)")
 grid on
 legend()
+
+nexttile()
+hold on;
+plot(0:0.0001:1,I(0,0,0:0.0001:1,thermalInfo.MUA),'DisplayName','Ground Truth',...
+    'LineWidth',2,'LineStyle','-')
+plot(z1,I(0,0,z1,thermalInfo.MUA),'DisplayName',"Sim 1 Fluence Rate",...
+    'LineWidth',2,'LineStyle','--')
+plot(z2,I(0,0,z2,thermalInfo.MUA),'DisplayName',"Sim 2 Fluence Rate",...
+    'LineWidth',2,'LineStyle',':')
+xlabel("Z Axis (cm)")
+ylabel("Irradiance (W/cm^2)")
+% set(gca,'XScale','log');
+grid on;
+
 %% Volumetric plots
 simulator.createVolumetricFigure(3);
 simulator2.createVolumetricFigure(4);

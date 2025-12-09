@@ -445,7 +445,7 @@ classdef Mesh < handle
             else
                 % Solve geometric series equation for r
                 fun = @(r) sStart*(1 - r^m)/(1 - r) - L;
-                r = fzero(fun, [0, 0.99]);  % r in (0,1)
+                r = fzero(fun, [0, 0.999]);  % r in (0,1)
             end
 
             % Build spacings
