@@ -16,9 +16,9 @@ depthSensorIdx = 4; % index where we switch from radial to depth sensor
 simulator = HeatSimulator();
 simulator.dt = 0.05;
 simulator.alpha = 0.5;
-simulator.useAllCPUs = false;
+simulator.useAllCPUs = true;
 simulator.useGPU = false;
-simulator.silentMode = false;
+simulator.silentMode = true;
 
 simulator.sensorLocations = sensorPositions;
 
@@ -51,8 +51,8 @@ timePoints = (0:simulator.dt:simDuration)';
 %% Create two different meshes
 % MESH 1
 z1 = [0:0.0010:0.05 0.1:0.05:tissueSize(3)];
-y1 = linspace(-tissueSize(2)/2,tissueSize(2)/2,201);
-x1 = linspace(-tissueSize(1)/2,tissueSize(1)/2,201);
+y1 = linspace(-tissueSize(2)/2,tissueSize(2)/2,101);
+x1 = linspace(-tissueSize(1)/2,tissueSize(1)/2,101);
 [X1,Y1,Z1] = meshgrid(x1,y1,z1);
 nodesPerAxis1 = [length(x1),length(y1),length(z1)];
 boundaryConditions = [1,1,1,1,1,1]';
@@ -62,8 +62,9 @@ simulator.thermalInfo.temperature = 20*ones(prod(nodesPerAxis1),1);
 simulator.laser = simulator.laser.calculateIrradiance(mesh1);
 simulator.mesh = mesh1;
 
+tic
 [Tpred1,sensorTemps1] = simulator.solve(timePoints);
-
+fprintf("Mesh 1 duration: %0.2f sec", toc);
 
 %% Second Simulator
 simulator2 = simulator.deepCopy();
@@ -81,8 +82,9 @@ simulator2.mesh = mesh2;
 simulator2.thermalInfo.temperature = 20*ones(prod(nodesPerAxis2),1);
 simulator2.laser = simulator2.laser.calculateIrradiance(mesh2);
 
+tic
 [Tpred2,sensorTemps2] = simulator2.solve(timePoints);
-
+fprintf("Mesh 2 duration: %0.2f sec", toc);
 
 %% Fluence Comparison
 w = @(z) w0.*sqrt( 1 + (lambda.*(z+focalDist)./(pi*w0.^2)).^2);
