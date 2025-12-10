@@ -9,7 +9,6 @@ GPUTimeIntegrator::GPUTimeIntegrator(const ThermalModel& thermalModel, const Glo
 {
     CHECK_CUSPARSE(cusparseCreate(&handle_));
     uploadAllMatrices();
-    std::cout << "Matrices Uploaded" << std::endl;
 }
 
 GPUTimeIntegrator::~GPUTimeIntegrator() {
