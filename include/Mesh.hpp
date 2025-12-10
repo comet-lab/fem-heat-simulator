@@ -114,11 +114,9 @@ private:
 
 			// Build Jacobian matrix J
 			Eigen::Matrix3f J = nodePos * dNdxi;
-			std::cout << "computeXiCoordinatesT: Jacobian " << J << std::endl;
 
 			// Solve J * delta = -r
 			Eigen::Vector3f delta = J.colPivHouseholderQr().solve(-r);
-			std::cout << "computeXiCoordinatesT: delta: " << delta << std::endl;
 
 			xi[0] += delta(0);
 			xi[1] += delta(1);
