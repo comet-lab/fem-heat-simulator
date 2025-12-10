@@ -266,6 +266,8 @@ public:
         }
         if (outputs.size() == 3)
             saveSurfaceData = true;
+        if (outputs.size() == 2)
+            saveSurfaceData = false;
         // Check input 1 which is required
         if (inputs[VarPlacement::THERMAL_INFO].getType() != matlab::data::ArrayType::STRUCT) {
             displayError(matlabPtr, "Input #1 must be a struct (thermalInfo).");
