@@ -45,7 +45,7 @@ public:
 	void setTemp(Eigen::VectorXf& Temp);
 	int enableGPU();
 	void disableGPU();
-	Eigen::VectorXf Temp() const { return thermalModel_->Temp; }
+	const Eigen::VectorXf& Temp() const { return thermalModel_->Temp; }
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
 	void setFluenceRate(Eigen::VectorXf& fluenceRate);

@@ -1,4 +1,5 @@
 #include "MEX_Utility.hpp"
+#include <set>
 
 class MexFunction : public matlab::mex::Function {
 
@@ -33,6 +34,7 @@ private:
     bool buildMatrices = true; // build matrices will build global matrices and reset time integration
     bool resetIntegration = false; // uses current global matrices but resets time integration
     bool multiStep = false;
+    bool saveSurfaceData = false;
 
     /* Required parameters extracted from inputs */
     float MUA, TC, HTC, VHC, flux, ambientTemp, alpha, dt, beamWaist, wavelength;
@@ -99,6 +101,20 @@ public:
             return;
         }
         printDuration("MEX: Set all simulation parameters -- ");
+
+        std::set<long> surfaceNodesSet;
+        std::vector<long> surfaceNodes;
+        if (saveSurfaceData)
+        {
+            for (BoundaryFace bf : mesh.boundaryFaces())
+            {
+                for (long n : bf.nodes)
+                {
+                    surfaceNodesSet.insert(n);
+                }
+            }
+            surfaceNodes = std::vector<long>(surfaceNodesSet.begin(), surfaceNodesSet.end()); 
+        }
         
         // Set parallelization
         Eigen::setNbThreads(1);
@@ -168,6 +184,12 @@ public:
         std::vector<std::vector<float>> sensorTemps(numTimePoints); // save the sensor data at each discrete time point provided
         simulator.updateTemperatureSensors();
         sensorTemps[0] = simulator.sensorTemps(); // initialize the time = 0 sensor
+        Eigen::MatrixXf surfaceTemps(surfaceNodes.size(),numTimePoints);
+        if (saveSurfaceData)
+        {
+            auto& fullTemp = simulator.Temp();
+            surfaceTemps.col(0) = fullTemp(surfaceNodes);
+        }
         try 
         {             
             for (int i = 1; i < numTimePoints; i++) {
@@ -175,7 +197,11 @@ public:
                     simulator.setFluenceRate(laserPose.row(i), laserPower[i], beamWaist, wavelength);
                 simulator.multiStep(simTime[i] - simTime[i - 1]);
                 sensorTemps[i] = simulator.sensorTemps();
-
+                if (saveSurfaceData)
+                {
+                    auto& fullTemp = simulator.Temp();
+                    surfaceTemps.col(i) = fullTemp(surfaceNodes);
+                }
             }
         }
         catch (const std::exception& e) {
@@ -199,6 +225,11 @@ public:
             }
         }
         outputs[1] = sensorTempsOutput;
+        if (saveSurfaceData)
+        {
+            matlab::data::TypedArray<float> surfaceTempsOutput = convertEigenMatrixToMatlabArray(surfaceTemps);
+            outputs[2] = surfaceTempsOutput;
+        }
 
         printDuration("MEX: End of Mex Function. Total Time was ");
     }
@@ -230,9 +261,11 @@ public:
                 std::cerr << "Error checking mesh input: " << e.what() << "\n";
             }
         }
-        if (outputs.size() != 2) {
-            displayError(matlabPtr, "Exactly 2 outputs must be specified.");
+        if ((outputs.size() > 3) || (outputs.size() < 2)) {
+            displayError(matlabPtr, "Must specify 2 or 3 outputs.");
         }
+        if (outputs.size() == 3)
+            saveSurfaceData = true;
         // Check input 1 which is required
         if (inputs[VarPlacement::THERMAL_INFO].getType() != matlab::data::ArrayType::STRUCT) {
             displayError(matlabPtr, "Input #1 must be a struct (thermalInfo).");

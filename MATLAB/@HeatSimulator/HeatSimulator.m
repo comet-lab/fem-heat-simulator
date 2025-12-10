@@ -88,7 +88,7 @@ classdef HeatSimulator < handle
             newObj.buildMatrices = obj.buildMatrices;
         end
 
-        function [T,sensorData] = solve(obj, timePoints, laserPose, laserPower)
+        function [T,sensorData,surfaceData] = solve(obj, timePoints, laserPose, laserPower)
             %SOLVE - solves the heat equation and returns temperature at
             %specific spatio-temporal coordiantes and the final temperature
             %at each node
@@ -135,9 +135,17 @@ classdef HeatSimulator < handle
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % running MEX file
             if (obj.buildMatrices)
-                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct,meshInfo);
+                if nargout == 3
+                    [T,sensorData,surfaceData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct,meshInfo);
+                else
+                    [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct,meshInfo);
+                end
             else
-                [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct);
+                if nargout == 3
+                    [T,sensorData,surfaceData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct);
+                else
+                    [T,sensorData] = MEX_Heat_Simulation(thermalInfoStruct,settings,laserStruct);
+                end
             end
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

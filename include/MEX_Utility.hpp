@@ -70,6 +70,25 @@ inline matlab::data::TypedArray<float> convertEigenVectorToMatlabArray(const Eig
     return matlabArray;
 }
 
+inline matlab::data::TypedArray<float> convertEigenMatrixToMatlabArray(const Eigen::MatrixXf& mat) {
+    // Get dimensions of the input vector
+    size_t dim1 = mat.rows();
+    size_t dim2 = mat.cols();
+
+    matlab::data::ArrayFactory factory;
+    // Create MATLAB array with appropriate dimensions
+    matlab::data::TypedArray<float> matlabArray = factory.createArray<float>({ dim1, dim2 });
+
+    // Fill MATLAB array with vector data
+    for (size_t i = 0; i < dim1; ++i) {
+        for (size_t j = 0; j < dim2; ++j) {
+            matlabArray[i][j] = mat(i,j);
+        }
+    }
+
+    return matlabArray;
+}
+
 /* Helper function to convert a matlab array to a std::vector<float>*/
 inline std::vector<float> convertMatlabArrayToFloatVector(const matlab::data::Array& matlabArray) {
     // Get dimensions of the Matlab array
