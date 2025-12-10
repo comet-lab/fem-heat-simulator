@@ -295,7 +295,6 @@ void GPUTimeIntegrator::uploadFluenceRate()
     uploadVector(thermalModel_.fluenceRate, FluenceRate_d_);
     uploadVector(thermalModel_.fluenceRateElem, FluenceRateElem_d_);
     uploadVector(thermalModel_.Temp, Temp_d_);
-    std::cout << "Fluence Rate Parameters Uploaded" << std::endl;
 }
 
 void GPUTimeIntegrator::downloaddVec_d()
