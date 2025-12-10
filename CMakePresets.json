@@ -21,10 +21,10 @@
       "displayName": "x64 Release",
       "description": "Release build using Ninja generator",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/x64-Release",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/x64-Release"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}"
       }
     }
   ],

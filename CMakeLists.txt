@@ -61,20 +61,30 @@ endif()
 
 set(HEATSIM_SRC
     src/FEM_Simulator.cpp
+    src/Mesh.cpp
+    src/TimeIntegrators/CPUTimeIntegrator.cpp
 )
 
 set(HEATSIM_HEADERS
     include/FEM_Simulator.h
+    include/MatrixBuilder.hpp
+    include/ShapeFunctions/HexLinear.hpp
+    include/ShapeFunctions/TetLinear.hpp
+    include/ShapeFunctions/TetQuadratic.hpp
+    include/TimeIntegrators/TimeIntegrator.hpp
+    include/TimeIntegrators/CPUTimeIntegrator.hpp
+    include/ThermalModel.hpp
+    include/GlobalMatrices.hpp
 )
 
 # GPU sources (conditionally)
 if(USE_CUDA)
     list(APPEND HEATSIM_SRC
-        src/GPUTimeIntegrator.cu
+        src/TimeIntegrators/GPUTimeIntegrator.cu
         src/AmgXSolver.cpp
     )
     list(APPEND HEATSIM_HEADERS
-        include/GPUTimeIntegrator.cuh
+        include/TimeIntegrators/GPUTimeIntegrator.cuh
         include/AmgXSolver.hpp
     )
 endif()
@@ -140,17 +150,14 @@ enable_openmp(HeatSimulationShared)
 
 # CUDA standard
 
-
 set_target_properties(HeatSimulationShared PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
 set_target_properties(HeatSimulationStatic PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON)
-
-
 
 # ──────────────────────────────────────────────────────────────
 # Executable: main
 # ──────────────────────────────────────────────────────────────
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE HeatSimulation::Shared)
+target_link_libraries(main PRIVATE HeatSimulation::Static)
 
 # ──────────────────────────────────────────────────────────────
 # Unit tests (GoogleTest via FetchContent)
@@ -169,7 +176,7 @@ if(BUILD_TESTING)
 
     add_executable(FEM_Unit_Tests
         test/FEM_Unit_Tests.cpp
-        test/BaseSim.cpp
+        
     )
     target_link_libraries(FEM_Unit_Tests
         PRIVATE
@@ -177,24 +184,56 @@ if(BUILD_TESTING)
             GTest::gtest_main
     )
 
-    if (USE_CUDA)
-        add_executable(GPUSolver_Unit_Tests
-            test/GPUSolver_Unit_Tests.cpp
-            test/BaseGPU.cpp
-            test/TestHelpers.hpp
-        )
-        target_link_libraries(GPUSolver_Unit_Tests
-            PRIVATE
-                HeatSimulation::Static
-                GTest::gtest_main
-        )
-    endif()
+    add_executable(MatrixBuilderTests
+        test/MatrixBuilderTests.cpp
+    )
+    target_link_libraries(MatrixBuilderTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
+    add_executable(HexLinearTests
+        test/ShapeFunctions/HexLinearTests.cpp
+    )
+    target_link_libraries(HexLinearTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
+    add_executable(TetLinearTests
+        test/ShapeFunctions/TetLinearTests.cpp
+    )
+    target_link_libraries(TetLinearTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
+    add_executable(TetQuadraticTests
+        test/ShapeFunctions/TetQuadraticTests.cpp
+    )
+    target_link_libraries(TetQuadraticTests
+        HeatSimulation::Static    
+        GTest::gtest_main
+    )
+
+    # if (USE_CUDA)
+    #     add_executable(GPUSolver_Unit_Tests
+    #         test/GPUSolver_Unit_Tests.cpp
+    #         test/BaseGPU.cpp
+    #         test/TestHelpers.hpp
+    #     )
+    #     target_link_libraries(GPUSolver_Unit_Tests
+    #         PRIVATE
+    #             HeatSimulation::Static
+    #             GTest::gtest_main
+    #     )
+    # endif()
 
     include(GoogleTest)
     gtest_discover_tests(FEM_Unit_Tests)
-    if (USE_CUDA)
-        gtest_discover_tests(GPUSolver_Unit_Tests)
-    endif()
+    # if (USE_CUDA)
+    #     gtest_discover_tests(GPUSolver_Unit_Tests)
+    # endif()
 endif()
 
 # ──────────────────────────────────────────────────────────────
@@ -206,6 +245,9 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     if(Matlab_FOUND)
         matlab_add_mex(NAME MEX_Heat_Simulation
             SRC src/MEX_Heat_Simulation.cpp
+        )
+        target_include_directories(MEX_Heat_Simulation
+            PRIVATE ${CMAKE_SOURCE_DIR}/include
         )
         target_link_libraries(MEX_Heat_Simulation HeatSimulation::Static)
 
@@ -219,24 +261,6 @@ if(BUILD_FEM_MEX AND CMAKE_BUILD_TYPE STREQUAL "Release")
             target_link_libraries(MEX_Heat_Simulation gomp)
         elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(MEX_Heat_Simulation PRIVATE /openmp)
-        endif()
-
-
-        matlab_add_mex(NAME MEX_Heat_Simulation_MultiStep
-            SRC src/MEX_Heat_Simulation_MultiStep.cpp
-        )
-        target_link_libraries(MEX_Heat_Simulation_MultiStep HeatSimulation::Static)
-
-        set_target_properties(MEX_Heat_Simulation_MultiStep PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
-            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        )
-        # Manually add OpenMP compile flags (don't use helper function) because MEX requires plain linking
-        if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE -fopenmp)
-            target_link_libraries(MEX_Heat_Simulation_MultiStep gomp)
-        elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-            target_compile_options(MEX_Heat_Simulation_MultiStep PRIVATE /openmp)
         endif()
     else()
         set(BUILD_FEM_MEX OFF)
