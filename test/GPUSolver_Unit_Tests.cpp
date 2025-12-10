@@ -6,7 +6,58 @@
 #include <string>
 #include "TestHelpers.hpp"
 
+#include <gtest/gtest.h>
+#include "TimeIntegrators/GPUTimeIntegrator.cuh"
 
+class BaseGPU : public testing::Test {
+protected:
+    GPUTimeIntegrator *gpu = nullptr;
+    FEM_Simulator* femSim = nullptr;     
+
+    void SetUp() override {
+        
+        //Example FEM_Simulator initialization
+        int nodesPerAxis[3] = { 20, 20, 20 };
+        std::vector<std::vector<std::vector<float>>> TempAsVec(
+            nodesPerAxis[0], std::vector<std::vector<float>>(
+                nodesPerAxis[1], std::vector<float>(nodesPerAxis[2], 20.0f)));
+
+        float tissueSize[3] = { 1, 1, 1 };
+        femSim = new FEM_Simulator(TempAsVec, tissueSize, 1.0f, 1.0f, 1.0f, 1.0f, 2);
+        femSim->alpha_ = 0.5f;
+        femSim->silentMode = true;
+
+        float laserPose[6] = { 0, 0, -25, 0, 0, 0 };
+        femSim->dt_ = 0.05f;
+        femSim->setFluenceRate(laserPose, 1.0f, 0.0168f);
+
+        femSim->buildMatrices();
+        
+        gpu = new GPUTimeIntegrator(femSim->alpha_, femSim->dt_);
+
+        gpu->setModel(femSim);
+    }
+
+
+    void TearDown() override {
+        // std::cout << "Entered Tear Down" << std::endl;
+        delete gpu;
+        gpu = nullptr;
+        // std::cout << "Cleared gpu" << std::endl;       
+        delete femSim;
+        femSim = nullptr;
+        // std::cout << "Cleared femSim" << std::endl; 
+    }
+
+    static void SetUpTestSuite() {
+        
+        // AMGX_initialize_plugins();
+    }
+
+    static void TearDownTestSuite() {
+        // AMGX_finalize();
+    }
+};
 
 /*
 These test cases overall aren't great because BaseGPU creates an instance of FEM_Simulator to actually test 
@@ -108,7 +159,7 @@ TEST_F(BaseGPU, Test_UploadAll)
     std::cout << "Checking FluenceRate" << std::endl;
     Eigen::VectorXf FluenceRateOutput(femSim->FirrMat.cols()); 
     gpu->downloadVector(FluenceRateOutput,gpu->FluenceRate_d_.data);
-    compareTwoVectors(femSim->FluenceRate,FluenceRateOutput);
+    compareTwoVectors(femSim->fluenceRate_,FluenceRateOutput);
 
     // Checking Fq
     std::cout << "Checking Fq" << std::endl;
@@ -226,10 +277,10 @@ TEST_F(BaseGPU, Test_addVector2)
 
 TEST_F(BaseGPU, Test_AddSparse1)
 {
-    float TC = 2;
+    float TC_ = 2;
     float HTC = 3;
-    gpu->addSparse(gpu->Kint_d_, TC, gpu->Kconv_d_, HTC, gpu->globK_d_);
-    Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC + femSim->Kconv*HTC;
+    gpu->addSparse(gpu->Kint_d_, TC_, gpu->Kconv_d_, HTC, gpu->globK_d_);
+    Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC_ + femSim->Kconv*HTC;
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputMat = truthMat;
 
     //make sure output vec is set to 0 though.
@@ -251,10 +302,10 @@ TEST_F(BaseGPU, Test_AddSparse1)
 
 TEST_F(BaseGPU, Test_AddSparse2)
 {
-    float TC = 0;
+    float TC_ = 0;
     float HTC = -1;
-    gpu->addSparse(gpu->Kint_d_, TC, gpu->Kconv_d_, HTC, gpu->globK_d_);
-    Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC + femSim->Kconv*HTC;
+    gpu->addSparse(gpu->Kint_d_, TC_, gpu->Kconv_d_, HTC, gpu->globK_d_);
+    Eigen::SparseMatrix<float, Eigen::RowMajor> truthMat = femSim->Kint*TC_ + femSim->Kconv*HTC;
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputMat = truthMat; // copy for size
 
     //make sure output vec is set to 0 though.
@@ -282,7 +333,7 @@ TEST_F(BaseGPU, Test_multiplySparseVector)
     int nRows = femSim->Kconv.rows();
     cudaMalloc(&outputVec_d,nRows*sizeof(float));
     gpu->multiplySparseVector(gpu->FirrMat_d_, gpu->FluenceRate_d_, outputVec_d);
-    Eigen::VectorXf truthVec = femSim->FirrMat*femSim->FluenceRate;
+    Eigen::VectorXf truthVec = femSim->FirrMat*femSim->fluenceRate_;
     Eigen::VectorXf outputVec(nRows);
 
     gpu->downloadVector(outputVec, outputVec_d);
@@ -308,7 +359,7 @@ TEST_F(BaseGPU, Test_applyParameters)
     // std::cout << "FEM Apply Parameters: " << std::endl;
     femSim->applyParametersCPU();
     // std::cout << "GPU Apply Parameters: " << std::endl;
-    gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
+    gpu->applyParameters(femSim->TC, femSim->HTC_, femSim->VHC_, femSim->MUA_, femSim->elemNFR_);
     
 
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputM, outputK;
@@ -321,16 +372,16 @@ TEST_F(BaseGPU, Test_applyParameters)
 
     // CHECK GLOB K
     std::cout << "Checking K" << std::endl;
-    compareTwoMats(femSim->globK,outputK);
+    compareTwoMats(femSim->globK_,outputK);
 
     // CHECK GLOB M
     std::cout << "Checking M" << std::endl;
-    compareTwoMats(femSim->globM,outputM);
+    compareTwoMats(femSim->globM_,outputM);
 
     // CHECK GLOB F
     std::cout << "Checking F: nrows = " << nRows << std::endl;
     for (int i = 0; i < nRows; i++){
-        ASSERT_TRUE(abs(femSim->globF(i) - outputF(i)) < 0.0001);
+        ASSERT_TRUE(abs(femSim->globF_(i) - outputF(i)) < 0.0001);
     }
 }
 
@@ -344,32 +395,32 @@ TEST_F(BaseGPU, Test_calculateRHS)
     int nCols = femSim->Kconv.cols();
 
     // Perform Ground truth
-    femSim->initializeTimeIntegrationCPU(); // performs applyParametersCPU() internally
+    femSim->initializeTimeIntegration(); // performs applyParametersCPU() internally
     // Calculate RHS using stored matrices
-    Eigen::VectorXf bTrue = (femSim->globF - femSim->globK*femSim->dVec);
-    // Eigen::VectorXf bPartial = femSim->globK*femSim->dVec;
+    Eigen::VectorXf bTrue = (femSim->globF_ - femSim->globK_*femSim->dVec_);
+    // Eigen::VectorXf bPartial = femSim->globK_*femSim->dVec;
 
     // -- Run on GPU 
     Eigen::VectorXf outputB_d(nRows);
     // Make sure parameter have been applied
-    gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
+    gpu->applyParameters(femSim->TC, femSim->HTC_, femSim->VHC_, femSim->MUA_, femSim->elemNFR_);
     Eigen::SparseMatrix<float, Eigen::RowMajor> outputK;
     Eigen::VectorXf outputF(nRows);
     gpu->downloadVector(outputF, gpu->globF_d_);
     gpu->downloadSparseMatrix(outputK, gpu->globK_d_);
     // CHECK GLOB K
     std::cout << "Checking K...." << std::endl;
-    compareTwoMats(femSim->globK,outputK);
+    compareTwoMats(femSim->globK_,outputK);
     // CHECK GLOB F
     std::cout << "Checking F...." << std::endl;
-    compareTwoVectors(femSim->globF, outputF);
+    compareTwoVectors(femSim->globF_, outputF);
 
     std::cout << "Uploading dVec to gpu->..." << std::endl;
     // Make sure dVec has been uploaded
-    gpu->uploadVector(femSim->dVec,gpu->dVec_d_); // make sure 
+    gpu->uploadVector(femSim->dVec_,gpu->dVec_d_); // make sure 
     Eigen::VectorXf dVecCopy(nRows);
     gpu->downloadVector(dVecCopy,gpu->dVec_d_.data);
-    compareTwoVectors(femSim->dVec,dVecCopy);
+    compareTwoVectors(femSim->dVec_,dVecCopy);
 
     // Calculate
     std::cout << "Calculating RHS" << std::endl;
@@ -394,12 +445,12 @@ TEST_F(BaseGPU, Test_initializeDV)
     int nCols = femSim->Kconv.cols();
 
     // Perform Ground truth
-    femSim->initializeTimeIntegrationCPU();
-    Eigen::VectorXf trueD = femSim->dVec;
-    Eigen::VectorXf trueV = femSim->vVec;
+    femSim->initializeTimeIntegration();
+    Eigen::VectorXf trueD = femSim->dVec_;
+    Eigen::VectorXf trueV = femSim->vVec_;
     // Apply GPU 
     Eigen::VectorXf outputD(nRows), outputV(nRows);
-    gpu->applyParameters(femSim->TC, femSim->HTC, femSim->VHC, femSim->MUA, femSim->elemNFR);
+    gpu->applyParameters(femSim->TC, femSim->HTC_, femSim->VHC_, femSim->MUA_, femSim->elemNFR_);
 
     gpu->initialize(trueD, outputV); // automatically assigns v to input
     
