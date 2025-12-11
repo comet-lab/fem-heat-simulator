@@ -129,3 +129,31 @@ TEST_F(SingleElem, testSetSensorLocation) {
 		{0.0,0.0,0.98}} };
 	femSim->setSensorLocations(sensorLocations);
 }
+
+
+TEST_F(SingleElem, copyConstructorTest) {
+
+	FEM_Simulator* simCopy = new FEM_Simulator(*femSim);
+	Eigen::VectorXf temp2 = Eigen::VectorXf::Constant(8, 1.0f);;
+	simCopy->setTemp(temp2);
+	simCopy->setMUA(0);
+	simCopy->setTC(0);
+	simCopy->setVHC(0);
+	simCopy->setDt(10);
+	simCopy->setAlpha(0);
+
+	auto sim1Temp = femSim->Temp();
+	auto sim2Temp = simCopy->Temp();
+	for (int i = 0; i < 8; i++)
+	{
+		ASSERT_NE(sim1Temp(i), sim2Temp(i));
+	}
+
+	ASSERT_NE(simCopy->MUA(), femSim->MUA());
+	ASSERT_NE(simCopy->TC(), femSim->TC());
+	ASSERT_NE(simCopy->VHC(), femSim->VHC());
+	ASSERT_FLOAT_EQ(simCopy->HTC(), femSim->HTC());
+	ASSERT_NE(simCopy->dt(), femSim->dt());
+	ASSERT_NE(simCopy->alpha(), femSim->alpha());
+
+}

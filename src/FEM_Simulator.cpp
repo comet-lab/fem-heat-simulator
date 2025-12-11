@@ -33,7 +33,7 @@ FEM_Simulator::FEM_Simulator(const FEM_Simulator& other)
 	else
 		thermalModel_ = nullptr;
 
-	// copy mesh (assuming Mesh has a safe copy constructor)
+	// copy mesh so both objects point to the same mesh
 	mesh_ = other.mesh_;
 }
 

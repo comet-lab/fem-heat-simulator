@@ -40,11 +40,13 @@ public:
 	void updateTemperatureSensors(); // update sensor temp vec and sensors variable
 	void initializeContainers();
 
+	// GPU Control
+	int enableGPU();
+	void disableGPU();
+
 	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
-	int enableGPU();
-	void disableGPU();
 	const Eigen::VectorXf& Temp() const { return thermalModel_->Temp; }
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
@@ -69,15 +71,15 @@ public:
 	//std::shared_ptr<const Mesh> mesh() const { return mesh_; }
 	
 	void setTC(float TC);
-	//float TC() const { return TC_; }
+	float TC() const { return thermalModel_->TC; }
 	void setVHC(float VHC);
-	//float VHC() const { return VHC_; }
+	float VHC() const { return thermalModel_->VHC; }
 	void setMUA(float MUA);
-	//float MUA() const { return MUA_; }
+	float MUA() const { return thermalModel_->MUA; }
 	void setHTC(float HTC);
-	//float HTC() const { return HTC_; }
+	float HTC() const { return thermalModel_->HTC; }
 	void setAmbientTemp(float ambientTemp);
-	//float ambientTemp() const { return ambientTemp_; }
+	float ambientTemp() const { return thermalModel_->ambientTemp; }
 
 	void setAlpha(float alpha) {
 		if ((alpha > 1) || (alpha < 0))
