@@ -47,7 +47,7 @@ public:
 	// -- Setters and Getters -- 
 	void setTemp(std::vector<std::vector<std::vector<float>>> Temp);
 	void setTemp(Eigen::VectorXf& Temp);
-	const Eigen::VectorXf& Temp() const { return thermalModel_->Temp; }
+	Eigen::VectorXf Temp() const { return thermalModel_->Temp; }
 
 	void setFluenceRate(std::vector<std::vector<std::vector<float>>> fluenceRate);
 	void setFluenceRate(Eigen::VectorXf& fluenceRate);

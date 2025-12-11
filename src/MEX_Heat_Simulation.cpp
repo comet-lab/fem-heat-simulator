@@ -187,8 +187,7 @@ public:
         Eigen::MatrixXf surfaceTemps(surfaceNodes.size(),numTimePoints);
         if (saveSurfaceData)
         {
-            auto& fullTemp = simulator.Temp();
-            surfaceTemps.col(0) = fullTemp(surfaceNodes);
+            surfaceTemps.col(0) = simulator.Temp()(surfaceNodes);
         }
         try 
         {             
@@ -199,8 +198,7 @@ public:
                 sensorTemps[i] = simulator.sensorTemps();
                 if (saveSurfaceData)
                 {
-                    auto& fullTemp = simulator.Temp();
-                    surfaceTemps.col(i) = fullTemp(surfaceNodes);
+                    surfaceTemps.col(i) = simulator.Temp()(surfaceNodes);
                 }
             }
         }
