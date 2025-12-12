@@ -1,4 +1,5 @@
 #include "MEX_Utility.hpp"
+#include "FEM_Simulator.h"
 #include <set>
 
 class MexFunction : public matlab::mex::Function {
@@ -69,10 +70,12 @@ public:
         resetTimer();
         checkArguments(outputs, inputs); // check arguments will check for valid inputs and set the necessary class variables
         if (!streamBuf)
+        {
             streamBuf = new MexStreamBuf(matlabPtr,silentMode);
-        std::cout.rdbuf(streamBuf);
-        std::cerr.rdbuf(streamBuf);
-
+            std::cout.rdbuf(streamBuf);
+            std::cerr.rdbuf(streamBuf);
+        }
+            
         stream.str("");
         stream << "MEX: Inputs Validated -- Setting Up Model" << std::endl;
         displayOnMATLAB(matlabPtr,stream,silentMode);
