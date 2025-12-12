@@ -1,3 +1,4 @@
+#include <cstdint> // had to include this because MINGW GCC 15 does not automatically include it
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 #include "FEM_Simulator.h"
