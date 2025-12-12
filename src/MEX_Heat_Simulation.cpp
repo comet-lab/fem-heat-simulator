@@ -1,4 +1,5 @@
 #include "MEX_Utility.hpp"
+#include "FEM_Simulator.h"
 #include <set>
 
 class MexFunction : public matlab::mex::Function {
@@ -27,6 +28,7 @@ private:
     FEM_Simulator simulator;
     Mesh mesh;
     std::ostringstream stream;
+    MexStreamBuf* streamBuf = nullptr;
     /* Optional Parameters that are stored as class variables for repeat calls */
     bool silentMode = true;
     bool useAllCPUs = false;
@@ -55,6 +57,11 @@ public:
 
     ~MexFunction()
     {
+        if (streamBuf)
+        {
+            delete streamBuf;
+            streamBuf = nullptr;
+        }
         return;
     }
 
@@ -62,6 +69,13 @@ public:
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         resetTimer();
         checkArguments(outputs, inputs); // check arguments will check for valid inputs and set the necessary class variables
+        if (!streamBuf)
+        {
+            streamBuf = new MexStreamBuf(matlabPtr,silentMode);
+            std::cout.rdbuf(streamBuf);
+            std::cerr.rdbuf(streamBuf);
+        }
+            
         stream.str("");
         stream << "MEX: Inputs Validated -- Setting Up Model" << std::endl;
         displayOnMATLAB(matlabPtr,stream,silentMode);
@@ -187,8 +201,7 @@ public:
         Eigen::MatrixXf surfaceTemps(surfaceNodes.size(),numTimePoints);
         if (saveSurfaceData)
         {
-            auto& fullTemp = simulator.Temp();
-            surfaceTemps.col(0) = fullTemp(surfaceNodes);
+            surfaceTemps.col(0) = simulator.Temp()(surfaceNodes);
         }
         try 
         {             
@@ -199,8 +212,7 @@ public:
                 sensorTemps[i] = simulator.sensorTemps();
                 if (saveSurfaceData)
                 {
-                    auto& fullTemp = simulator.Temp();
-                    surfaceTemps.col(i) = fullTemp(surfaceNodes);
+                    surfaceTemps.col(i) = simulator.Temp()(surfaceNodes);
                 }
             }
         }

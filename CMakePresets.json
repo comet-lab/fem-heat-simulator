@@ -10,10 +10,10 @@
       "displayName": "x64 Debug",
       "description": "Debug build using Ninja generator",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/out/build/x64-Debug",
+      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/x64-Debug"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}"
       }
     },
     {
