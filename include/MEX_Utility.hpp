@@ -187,6 +187,37 @@ bool checkFieldNames(const std::vector<std::string>& requiredNames, const std::v
     return allMatching;
 }
 
+class MexStreamBuf : public std::streambuf {
+private:
+    std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr;
+    std::ostringstream buffer;   // internal buffer
+    bool silentMode;
+
+public:
+    MexStreamBuf(std::shared_ptr<matlab::engine::MATLABEngine> eng,
+                 bool silent)
+        : matlabPtr(eng), silentMode(silent) {}
+
+protected:
+    // Called for each inserted character
+    virtual int overflow(int c = EOF) override {
+        if (c != EOF) {
+            buffer.put(static_cast<char>(c));
+
+            // flush to MATLAB on newline
+            if (c == '\n') {
+                displayOnMATLAB(matlabPtr, buffer, silentMode);
+            }
+        }
+        return c;
+    }
+
+    // Called on std::flush or std::endl
+    virtual int sync() override {
+        displayOnMATLAB(matlabPtr, buffer, silentMode);
+        return 0;
+    }
+};
 
 //inline void display3DVector(const std::vector<std::vector<std::vector<float>>>& vec, std::string title) {
 //    // Get dimensions of the input vector

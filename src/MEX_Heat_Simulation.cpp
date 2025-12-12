@@ -27,6 +27,7 @@ private:
     FEM_Simulator simulator;
     Mesh mesh;
     std::ostringstream stream;
+    MexStreamBuf* streamBuf = nullptr;
     /* Optional Parameters that are stored as class variables for repeat calls */
     bool silentMode = true;
     bool useAllCPUs = false;
@@ -55,15 +56,23 @@ public:
 
     ~MexFunction()
     {
+        if (streamBuf)
+        {
+            delete streamBuf;
+            streamBuf = nullptr;
+        }
         return;
     }
 
     /* This is the gateway routine for the MEX-file. */
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        std::cout.rdbuf(stream.rdbuf());
-        std::cerr.rdbuf(stream.rdbuf());
         resetTimer();
         checkArguments(outputs, inputs); // check arguments will check for valid inputs and set the necessary class variables
+        if (!streamBuf)
+            streamBuf = new MexStreamBuf(matlabPtr,silentMode);
+        std::cout.rdbuf(streamBuf);
+        std::cerr.rdbuf(streamBuf);
+
         stream.str("");
         stream << "MEX: Inputs Validated -- Setting Up Model" << std::endl;
         displayOnMATLAB(matlabPtr,stream,silentMode);
