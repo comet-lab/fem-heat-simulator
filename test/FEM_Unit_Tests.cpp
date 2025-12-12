@@ -77,6 +77,63 @@ public:
 	static void TearDownTestSuite() {}
 };
 
+class FullSim : public testing::Test {
+public:
+
+	FEM_Simulator* sim = nullptr;
+	std::vector<Node> nodes;
+	Element elem;
+	std::vector<BoundaryFace> boundaryFaces;
+
+	Mesh mesh;
+
+	void SetUp() override {
+		std::array<float, 3> tissueSize = { 2.0f,2.0f,1.0f };
+		std::array<long, 3> nodesPerAxis = { 81,81,51 };
+		long nNodes = nodesPerAxis[0] * nodesPerAxis[1] * nodesPerAxis[2];
+		long nElems = (nodesPerAxis[0] - 1) * (nodesPerAxis[1] - 1) * (nodesPerAxis[2] - 1);
+		//std::array<BoundaryType,6> BC = { CONVECTION,CONVECTION,CONVECTION ,CONVECTION ,CONVECTION ,CONVECTION };
+		std::array<BoundaryType, 6> BC = { HEATSINK,HEATSINK, HEATSINK, HEATSINK, HEATSINK, HEATSINK};
+		mesh = Mesh::buildCubeMesh(tissueSize, nodesPerAxis, BC);
+
+		float initialTemp = 20.0f;
+		Eigen::VectorXf Temp = Eigen::VectorXf::Constant(nNodes, initialTemp);
+		Eigen::VectorXf FluenceRate = Eigen::VectorXf::Constant(nNodes, 0);
+
+		srand(1);
+
+		float mua = 200;
+		float tc = 0.0062;
+		float vhc = 4.3;
+		float htc = 0.01;
+		sim = new FEM_Simulator(mua, vhc, tc, htc);
+		sim->setMesh(mesh);
+		sim->setTemp(Temp);
+		sim->setAlpha(1);
+		sim->setDt(0.05f);
+		sim->setHeatFlux(0.0);
+		sim->setAmbientTemp(24.0f);
+		sim->silentMode = false;
+		sim->enableGPU();
+		std::array<float, 6> laserPose = { 0.0f,0,-35,0,0,0 };
+		sim->setFluenceRate(laserPose, 0, 0.0168, 10.6e-4);
+		sim->buildMatrices();
+		sim->silentMode = true;
+	}
+
+	// ~QueueTest() override = default;
+	void TearDown() override {
+		std::cout << "Teardown" << std::endl;
+		delete sim;
+		sim = nullptr;
+	}
+
+	static void SetUpTestSuite() {}
+
+	static void TearDownTestSuite() {}
+};
+
+
 TEST_F(BaseSim, testSetFluenceRate) {
 
 	std::array<float, 6> laserPose = { 0,0,-20,0,0,0 };
@@ -156,4 +213,41 @@ TEST_F(SingleElem, copyConstructorTest) {
 	ASSERT_NE(simCopy->dt(), femSim->dt());
 	ASSERT_NE(simCopy->alpha(), femSim->alpha());
 
+}
+
+
+TEST_F(FullSim, parLoopTest) {
+
+	const int numThreads = 5;
+	omp_set_num_threads(numThreads);
+	int totalSims = 10;
+	int numRuns = 5;
+	std::vector<FEM_Simulator*> simObjs(numThreads);;
+	for (int i = 0; i < numThreads; ++i)
+	{
+		simObjs[i] = new FEM_Simulator(*sim);
+		simObjs[i]->initializeTimeIntegration(); // only initialize time integration here
+	}
+	Eigen::MatrixXf TempStorage(mesh.nodes().size(), totalSims);
+
+	for (int r = 0; r < numRuns; r++)
+	{
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+		for (int i = 0; i < totalSims; i++)
+		{
+			int tid = omp_get_thread_num();
+			FEM_Simulator* currSim = simObjs[tid];
+			Eigen::VectorXf newT = Eigen::VectorXf::Constant(mesh.nodes().size(), i);
+			currSim->setTemp(newT);
+			currSim->singleStep();
+			TempStorage.col(i) = currSim->Temp();
+		}
+	}
+	
+	// Dirichlet boundaries and no laser input means that each column should have values equal to the column number
+	for (int i = 0; i < totalSims; i++)
+		ASSERT_FLOAT_EQ(TempStorage(0, i), i);
 }
