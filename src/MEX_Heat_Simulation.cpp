@@ -60,6 +60,8 @@ public:
 
     /* This is the gateway routine for the MEX-file. */
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
+        std::cout.rdbuf(stream.rdbuf());
+        std::cerr.rdbuf(stream.rdbuf());
         resetTimer();
         checkArguments(outputs, inputs); // check arguments will check for valid inputs and set the necessary class variables
         stream.str("");
