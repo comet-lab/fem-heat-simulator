@@ -82,6 +82,21 @@ classdef Mesh < handle
             S.boundaryFaces = obj.boundaryFaces;
         end
 
+        function [idx,dist] = findClosestNode(obj,pos)
+            arguments
+                obj
+                pos (3,:) double
+            end
+            numPos = size(pos,2);
+            idx = zeros(1,numPos);
+            dist = zeros(1,numPos);
+            for i = 1:numPos
+                d2 = sum((obj.nodes - pos(:,i)).^2,1);
+                [~,idx(i)] = min(d2);
+                dist(i) = sqrt(d2(idx(i)));
+            end
+        end
+
         function obj = buildCubeMesh(obj, xPos, yPos, zPos, bc)
 
             Nx = numel(xPos);
@@ -445,7 +460,15 @@ classdef Mesh < handle
             else
                 % Solve geometric series equation for r
                 fun = @(r) sStart*(1 - r^m)/(1 - r) - L;
-                r = fzero(fun, [0, 0.999]);  % r in (0,1)
+                try
+                    [r,~,exitflag,~] = fzero(fun, [0, 0.999]);  % r in (0,1)
+                    if exitflag <= 0
+                        error('GeometricSpacing:NoConverge','fzero failed: %s', output.message);
+                    end
+                catch ME
+                    msg = sprintf("Most likely due to sStart*(n-1) < (b-a)");
+                    error('fzero failed: %s\n%s', ME.message,msg);
+                end
             end
 
             % Build spacings
@@ -464,5 +487,85 @@ classdef Mesh < handle
                 x = fliplr(x);  % optional to ensure ascending order
             end
         end
+
+        function x = createGeometricSpacing(objLength,numNodes,hMax,hMin)
+            % CREATEGEOMETRICSPACING determines the geometric node spacing 
+            % for a specified length given the number of nodes and largest 
+            % and smallest spacing
+            %
+            % This function will keep appending chunks the size of hMin
+            % until the spacing difference between each node are all >=
+            % hMin and we have the correct number of nodes along the
+            % length. This function will use geometricSpacing to determine
+            % the intermediate spots
+            %
+            %
+            arguments
+                objLength (1,1) double {mustBeGreaterThan(objLength,0)}
+                numNodes (1,1) double {mustBeGreaterThan(numNodes,1)}
+                hMax (1,1) double {mustBeGreaterThan(hMax,0)}
+                hMin (1,1) double {mustBeGreaterThanOrEqual(hMin,0)}
+            end
+            if hMax < hMin
+                error("hMax must be greater than or equal to hMin")
+            end
+            valid = false;
+            endNodes = objLength;
+            tol = 1e-5;
+            while ~valid
+                remNodes = numNodes - length(endNodes) + 1;
+                spacing = Mesh.geometricSpacing(0,endNodes(1),remNodes,hMax);
+                if isscalar(endNodes)
+                    x = spacing;
+                else
+                    x = [spacing endNodes(2:end)];
+                end
+                edgeLengths = diff(x);
+                if any(abs(edgeLengths) < (hMin - tol))
+                    newLeft = endNodes(1) - hMin;
+                    endNodes = [newLeft endNodes];
+                else
+                    return
+                end
+            end
+        end
+
+        function [x,y,z] = getNodesGeometric(tissueSize,nodesPerAxis,hMax,hMin)
+            % GETNODESGEOMETRIC will use geometric spacing to place nodes
+            % within the specified tissue size using the given
+            % nodesPerAxis. The edge lengths will be within the bounds
+            % defined by hMax and hMin
+            arguments
+                tissueSize (1,3) double
+                nodesPerAxis (1,3) double
+                hMax (1,3) double % max edge length for geometric scaling
+                hMin (1,3) double % min edge length for geometric scaling
+            end
+
+            if mod(nodesPerAxis(1),2) % odd number of  nodes
+                x = Mesh.createGeometricSpacing(tissueSize(1)/2,ceil(nodesPerAxis(1)/2),hMax(1),hMin(1));
+                x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
+                x = [-x, flip(x(1:end-1))];
+            else
+                x = Mesh.createGeometricSpacing(tissueSize(1)/2 - hMin/2,round(nodesPerAxis(1)/2),hMax(1),hMin(1));
+                x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
+                x = [-x, flip(x)];
+            end
+
+            if mod(nodesPerAxis(2),2) % odd number of  nodes
+                y = Mesh.createGeometricSpacing(tissueSize(2)/2,ceil(nodesPerAxis(2)/2),hMax(2),hMin(2));
+                y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
+                y = [-y, flip(y(1:end-1))];
+            else
+                y = Mesh.createGeometricSpacing(tissueSize(2)/2 - hMin/2,round(nodesPerAxis(2)/2),hMax(2),hMin(2));
+                y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
+                y = [-y, flip(y)];
+            end
+
+            z = Mesh.createGeometricSpacing(tissueSize(3),nodesPerAxis(3),hMax(3),hMin(3));
+            z = flip(tissueSize(3) - z); % puts small spacings starting at 0
+
+        end
+
     end
 end

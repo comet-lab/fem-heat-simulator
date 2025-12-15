@@ -4,7 +4,7 @@ classdef ThermalModel
     %   Detailed explanation goes here
 
     properties
-        MUA (1,1) double {mustBeGreaterThan(MUA,0)} = 200 % absorption coefficient [cm^-1]
+        MUA (1,1) double {mustBeGreaterThanOrEqual(MUA,0)} = 200 % absorption coefficient [cm^-1]
         TC (1,1) double {mustBeGreaterThan(TC,0)} = 0.006 % thermal conductivity [W/K cm]
         VHC (1,1) double {mustBeGreaterThan(VHC,0)} = 4.2 % volumetric heat capacity [J/K cm^3]
         HTC (1,1) double {mustBeGreaterThan(HTC,0)} = 0.01 % heat transfer coefficient [W/K cm^2]
