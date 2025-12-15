@@ -436,7 +436,7 @@ classdef HeatSimulator < handle
             if isfield(params,'layerInfo')
                 warning("LayerInfo for setting mesh is deprecated");
                 if all(params.layerInfo ~= 0)
-                    zTop = linspace(0,params.layerInfo(1),params.layerInfo(2));
+                    zTop = linspace(0,params.layerInfo(1),params.layerInfo(2)+1);
                     zBottom = linspace(params.layerInfo(1),params.tissueSize(3),nodesPerAxis(3)-params.layerInfo(2));
                     z = [zTop(1:end-1) zBottom];
                 else
