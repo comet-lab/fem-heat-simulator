@@ -489,7 +489,7 @@ classdef Mesh < handle
                 objLength (1,1) double {mustBeGreaterThan(objLength,0)}
                 numNodes (1,1) double {mustBeGreaterThan(numNodes,1)}
                 hMax (1,1) double {mustBeGreaterThan(hMax,0)}
-                hMin (1,1) double {mustBeGreaterThan(hMin,0)}
+                hMin (1,1) double {mustBeGreaterThanOrEqual(hMin,0)}
             end
             if hMax < hMin
                 error("hMax must be greater than hMin")
