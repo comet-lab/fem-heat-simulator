@@ -112,11 +112,16 @@ classdef HeatSimulator < handle
             %       this will return sensorData with 2 rows.
             arguments
                 obj (1,1) HeatSimulator
-                timePoints (:,1) {mustBeGreaterThanOrEqual(timePoints,0)}
+                timePoints (:,1) {mustBeGreaterThanOrEqual(timePoints,0)} = []
                 laserPose (:,6) = []
                 laserPower (:,1) = []
             end
-
+            
+            if isempty(timePoints)
+                timePoints = [0,obj.dt];
+                obj.time = [];
+                obj.sensorTemps = [];
+            end
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % Conversion of objects to structs
             meshInfo = obj.mesh.toStruct();
