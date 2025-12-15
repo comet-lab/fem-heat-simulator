@@ -544,21 +544,21 @@ classdef Mesh < handle
             if mod(nodesPerAxis(1),2) % odd number of  nodes
                 x = Mesh.createGeometricSpacing(tissueSize(1)/2,ceil(nodesPerAxis(1)/2),hMax(1),hMin(1));
                 x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
-                x = [x, flip(x(1:end-1))];
+                x = [-x, flip(x(1:end-1))];
             else
                 x = Mesh.createGeometricSpacing(tissueSize(1)/2 - hMin/2,round(nodesPerAxis(1)/2),hMax(1),hMin(1));
                 x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
-                x = [x, flip(x)];
+                x = [-x, flip(x)];
             end
 
             if mod(nodesPerAxis(2),2) % odd number of  nodes
                 y = Mesh.createGeometricSpacing(tissueSize(2)/2,ceil(nodesPerAxis(2)/2),hMax(2),hMin(2));
                 y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
-                y = [y, flip(y(1:end-1))];
+                y = [-y, flip(y(1:end-1))];
             else
                 y = Mesh.createGeometricSpacing(tissueSize(2)/2 - hMin/2,round(nodesPerAxis(2)/2),hMax(2),hMin(2));
                 y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
-                y = [y, flip(y)];
+                y = [-y, flip(y)];
             end
 
             z = Mesh.createGeometricSpacing(tissueSize(3),nodesPerAxis(3),hMax(3),hMin(3));
