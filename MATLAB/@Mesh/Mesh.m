@@ -542,21 +542,21 @@ classdef Mesh < handle
             end
 
             if mod(nodesPerAxis(1),2) % odd number of  nodes
-                x = Mesh.createGeoemtricSpacing(tissueSize(1)/2,ceil(nodesPerAxis(1)/2),hMax(1),hMin(1));
+                x = Mesh.createGeometricSpacing(tissueSize(1)/2,ceil(nodesPerAxis(1)/2),hMax(1),hMin(1));
                 x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
                 x = [x, flip(x(1:end-1))];
             else
-                x = Mesh.createGeoemtricSpacing(tissueSize(1)/2 - hMin/2,round(nodesPerAxis(1)/2),hMax(1),hMin(1));
+                x = Mesh.createGeometricSpacing(tissueSize(1)/2 - hMin/2,round(nodesPerAxis(1)/2),hMax(1),hMin(1));
                 x = (tissueSize(1)/2 - x); % -tissueSize/2 - 0;
                 x = [x, flip(x)];
             end
 
             if mod(nodesPerAxis(2),2) % odd number of  nodes
-                y = Mesh.createGeoemtricSpacing(tissueSize(2)/2,ceil(nodesPerAxis(2)/2),hMax(2),hMin(2));
+                y = Mesh.createGeometricSpacing(tissueSize(2)/2,ceil(nodesPerAxis(2)/2),hMax(2),hMin(2));
                 y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
                 y = [y, flip(y(1:end-1))];
             else
-                y = Mesh.createGeoemtricSpacing(tissueSize(2)/2 - hMin/2,round(nodesPerAxis(2)/2),hMax(2),hMin(2));
+                y = Mesh.createGeometricSpacing(tissueSize(2)/2 - hMin/2,round(nodesPerAxis(2)/2),hMax(2),hMin(2));
                 y = (tissueSize(2)/2 - y); % -tissueSize/2 - 0;
                 y = [y, flip(y)];
             end
