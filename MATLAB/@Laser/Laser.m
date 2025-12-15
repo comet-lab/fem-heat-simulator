@@ -14,6 +14,11 @@ classdef Laser
 
     methods
         function obj = Laser(waist, wavelength, MUA)
+            arguments
+                waist (1,1) double = 1;
+                wavelength (1,1) double = 10.6e-4;
+                MUA (1,1) double = 1;
+            end
             obj.waist = waist;
             obj.MUA = MUA;
             obj.wavelength = wavelength;

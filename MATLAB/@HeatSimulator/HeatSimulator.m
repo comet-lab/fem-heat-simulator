@@ -48,8 +48,8 @@ classdef HeatSimulator < handle
 
     properties
         mesh Mesh
-        thermalInfo ThermalModel
-        laser Laser
+        thermalInfo ThermalModel = ThermalModel()
+        laser Laser = Laser()
         % Storage for time steping
         dt (1,1) double {mustBeGreaterThan(dt,0)} = 0.05 % Time Step for integration
         alpha (1,1) double {mustBeInRange(alpha,0,1)} = 0.5 % implicit vs explicit lever
