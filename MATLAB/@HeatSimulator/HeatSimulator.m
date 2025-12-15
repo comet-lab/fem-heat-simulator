@@ -70,7 +70,7 @@ classdef HeatSimulator < handle
             %HEATSIMULATOR Construct an instance of this class
             %   Detailed explanation goes here
             arguments
-                simParams struct
+                simParams struct = [];
             end
             if ~isempty(simParams)
                 obj = HeatSimulator.objFromStruct(simParams);
@@ -433,7 +433,7 @@ classdef HeatSimulator < handle
                 params (1,1) struct = []
             end
             nodesPerAxis = size(params.currentTemp);
-            if isField(params,'layerInfo')
+            if isfield(params,'layerInfo')
                 warning("LayerInfo for setting mesh is deprecated");
                 if all(params.layerInfo ~= 0)
                     zTop = linspace(0,params.layerInfo(1),params.layerInfo(2));
