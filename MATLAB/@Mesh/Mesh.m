@@ -445,7 +445,15 @@ classdef Mesh < handle
             else
                 % Solve geometric series equation for r
                 fun = @(r) sStart*(1 - r^m)/(1 - r) - L;
-                r = fzero(fun, [0, 0.999]);  % r in (0,1)
+                try
+                    [r,~,exitflag,~] = fzero(fun, [0, 0.999]);  % r in (0,1)
+                    if exitflag <= 0
+                        error('GeometricSpacing:NoConverge','fzero failed: %s', output.message);
+                    end
+                catch ME
+                    msg = sprintf("Most likely due to sStart*(n-1) < (b-a)");
+                    error('fzero failed: %s\n%s', ME.message,msg);
+                end
             end
 
             % Build spacings
@@ -462,6 +470,48 @@ classdef Mesh < handle
             if flip
                 x = b - (x - a);
                 x = fliplr(x);  % optional to ensure ascending order
+            end
+        end
+
+        function x = createGeometricSpacing(objLength,numNodes,hMax,hMin)
+            % GETNODESPACING determines the geometric node spacing for a
+            % specified length given the number of nodes and largest and
+            % smallest spacing
+            %
+            % This function will keep appending chunks the size of hMin
+            % until the spacing difference between each node are all >=
+            % hMin and we have the correct number of nodes along the
+            % length. This function will use geometricSpacing to determine
+            % the intermediate spots
+            %
+            %
+            arguments
+                objLength (1,1) double {mustBeGreaterThan(objLength,0)}
+                numNodes (1,1) double {mustBeGreaterThan(numNodes,1)}
+                hMax (1,1) double {mustBeGreaterThan(hMax,0)}
+                hMin (1,1) double {mustBeGreaterThan(hMin,0)}
+            end
+            if hMax < hMin
+                error("hMax must be greater than hMin")
+            end
+            valid = false;
+            endNodes = objLength;
+            tol = 1e-5;
+            while ~valid
+                remNodes = numNodes - length(endNodes) + 1;
+                spacing = Mesh.geometricSpacing(0,endNodes(1),remNodes,hMax);
+                if isscalar(endNodes)
+                    x = spacing;
+                else
+                    x = [spacing endNodes(2:end)];
+                end
+                edgeLengths = diff(x);
+                if any(abs(edgeLengths) < (hMin - tol))
+                    newLeft = endNodes(1) - hMin;
+                    endNodes = [newLeft endNodes];
+                else
+                    return
+                end
             end
         end
     end
