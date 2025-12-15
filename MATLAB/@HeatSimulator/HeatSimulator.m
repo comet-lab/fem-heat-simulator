@@ -430,7 +430,7 @@ classdef HeatSimulator < handle
             %
             %
             arguments
-                params (1,1) struct
+                params (1,1) struct = []
             end
             nodesPerAxis = size(params.currentTemp);
             if isField(params,'layerInfo')
