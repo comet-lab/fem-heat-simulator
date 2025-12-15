@@ -118,7 +118,7 @@ classdef HeatSimulator < handle
             end
             
             if isempty(timePoints)
-                timePoints = [0,obj.dt];
+                timePoints = [0;obj.dt];
                 obj.time = [];
                 obj.sensorTemps = [];
             end
