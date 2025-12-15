@@ -82,6 +82,19 @@ classdef Mesh < handle
             S.boundaryFaces = obj.boundaryFaces;
         end
 
+        function idx = findClosestNode(obj,pos)
+            arguments
+                obj
+                pos (3,:) double
+            end
+            numPos = size(pos,2);
+            idx = zeros(1,numPos);
+            for i = 1:numPos
+                d2 = sum((obj.nodes - pos).^2,1);
+                [~,idx(i)] = min(d2);
+            end
+        end
+
         function obj = buildCubeMesh(obj, xPos, yPos, zPos, bc)
 
             Nx = numel(xPos);
