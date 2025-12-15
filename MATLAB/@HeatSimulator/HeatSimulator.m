@@ -3,7 +3,7 @@ classdef HeatSimulator < handle
     %Simulator
     %   All information regarding running simulations should go through
     %   this class. For example, to set the fluence rate of the laser use
-    %   
+    %
     %       simulator.thermalInfo.fluenceRate = ...
     %
     %   HeatSimulator is a handle class (not a value class). This means if
@@ -66,9 +66,15 @@ classdef HeatSimulator < handle
     end
 
     methods
-        function obj = HeatSimulator()
+        function obj = HeatSimulator(simParams)
             %HEATSIMULATOR Construct an instance of this class
             %   Detailed explanation goes here
+            arguments
+                simParams struct
+            end
+            if ~isempty(simParams)
+                obj = HeatSimulator.objFromStruct(simParams);
+            end
         end
 
         function newObj = deepCopy(obj)
@@ -97,7 +103,7 @@ classdef HeatSimulator < handle
             %   temperature of the entire mesh after the specified duration
             %   as well as the temperature at each sensor location, at each
             %   time point specified in timePoints. The time step size of
-            %   the simulator is dependent on dt. 
+            %   the simulator is dependent on dt.
             %
             %   timePoints is expected to start at 0 and end at some
             %   nonzero time.
@@ -116,7 +122,7 @@ classdef HeatSimulator < handle
                 laserPose (:,6) = []
                 laserPower (:,1) = []
             end
-            
+
             if isempty(timePoints)
                 timePoints = [0;obj.dt];
                 obj.time = [];
@@ -136,7 +142,7 @@ classdef HeatSimulator < handle
                 laserStruct = struct('laserPose',laserPose,'laserPower',laserPower,...
                     'beamWaist',obj.laser.waist,'wavelength',obj.laser.wavelength);
             end
-            
+
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % running MEX file
             if (obj.buildMatrices)
@@ -212,7 +218,7 @@ classdef HeatSimulator < handle
                     'Color',plotOpts.ColorOrder(ss,:),'MarkerIndices',markerIndices);
             end
             hold off
-            
+
         end
 
         function createVolumetricFigure(obj,figureNum)
@@ -376,7 +382,7 @@ classdef HeatSimulator < handle
             % delete(data.hPatch); % patch is now updated directly in
             % function with set(hPatch, 'Faces', newFaces);
             data.hPatch = plotVolumetricChunk(data.obj, data.faces, ...
-               data.xrange, data.yrange, data.zrange, data.ax);
+                data.xrange, data.yrange, data.zrange, data.ax);
 
             guidata(fig,data);
         end
@@ -416,6 +422,68 @@ classdef HeatSimulator < handle
             leg = legend(legendText,'NumColumns',nSims);
             leg.Layout.Tile = 'east';
             set(gca,'FontSize',15)
+        end
+
+        function simulator = objFromStruct(params)
+            % OBJFROMSTRUCT takes in a params struct defined by the
+            % function ``createSimParams`` to make a simulator object.
+            %
+            %
+            arguments
+                params (1,1) struct
+            end
+            nodesPerAxis = size(params.currentTemp);
+            if isField(params,'layerInfo')
+                warning("LayerInfo for setting mesh is deprecated");
+                if all(params.layerInfo ~= 0)
+                    zTop = linspace(0,params.layerInfo(1),params.layerInfo(2));
+                    zBottom = linspace(params.layerInfo(1),params.tissueSize(3),nodesPerAxis(3)-params.layerInfo(2));
+                    z = [zTop(1:end-1) zBottom];
+                else
+                    z = linspace(0,params.tissueSize(3),nodesPerAxis(3));
+                end
+                x = linspace(-params.tissueSize(1)/2,params.tissueSize(2)/2,nodesPerAxis(1));
+                y = linspace(-params.tissueSize(2)/2,params.tissueSize(2)/2,nodesPerAxis(2));
+            elseif (isfield(params,'hMax') && isfield(params,'hMin'))
+                [x,y,z] = Mesh.getNodesGeometric(params.tissueSize,nodesPerAxis,params.hMax,params.hMin);
+            else
+                error ("Input struct either needs 'layerInfo' or 'hMax' and 'hMin' to set the mesh");
+            end
+            
+
+            mesh = Mesh(x,y,z,params.boundaryConditions);
+            
+            % Initialization of parameters
+            simulator = HeatSimulator();
+            simulator.mesh = mesh;
+            simulator.dt = min(0.05,double(params.timeStep));
+            simulator.alpha = params.alpha;
+            simulator.useAllCPUs = params.useAllCPUs;
+            simulator.useGPU = params.useGPU;
+            simulator.silentMode = params.silentMode;
+            simulator.buildMatrices = params.createMatrices;
+            simulator.resetIntegration = params.createMatrices;
+            simulator.sensorLocations = params.sensorPositions;
+
+            thermalInfo = ThermalModel();
+            thermalInfo.MUA = params.mediaProperties.mua;
+            thermalInfo.TC = params.mediaProperties.tc;
+            thermalInfo.VHC = params.mediaProperties.vhc;
+            thermalInfo.HTC = params.mediaProperties.htc;
+            thermalInfo.ambientTemp = params.ambientTemp;
+            thermalInfo.flux = 0;
+            thermalInfo.temperature = params.currentTemp(:);
+            simulator.thermalInfo = thermalInfo;
+
+            % set laser settings
+            w0 = 0.0168;
+            lambda = 10.6e-4;
+            laser = Laser(w0,lambda,thermalInfo.MUA);
+            laser.focalPose = struct('x',params.laserPose.x,'y',...
+                params.laserPose.y,'z',params.laserPose.z,...
+                'theta',params.laserPose.theta,'phi',params.laserPose.phi,...
+                'psi',params.laserPose.psi);
+            simulator.laser = laser;
         end
     end
 end
