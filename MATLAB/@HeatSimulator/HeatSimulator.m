@@ -160,7 +160,7 @@ classdef HeatSimulator < handle
             if isscalar(timePoints)
                 timePoints = [0;timePoints]; % just to make sure plotting is nice
             end
-            if (obj.resetIntegration || obj.buildMatrices)
+            if (obj.resetIntegration || obj.buildMatrices || isempty(obj.time))
                 obj.time = timePoints;
                 obj.sensorTemps = sensorData;
             else
