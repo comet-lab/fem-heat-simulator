@@ -91,7 +91,7 @@ classdef Mesh < handle
             idx = zeros(1,numPos);
             dist = zeros(1,numPos);
             for i = 1:numPos
-                d2 = sum((obj.nodes - pos).^2,1);
+                d2 = sum((obj.nodes - pos(:,i)).^2,1);
                 [dist(i),idx(i)] = min(d2);
             end
         end
