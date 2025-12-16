@@ -403,7 +403,7 @@ classdef HeatSimulator < handle
             end
             figure(figNum);
             clf;
-            tiledlayout;
+            tiledlayout('flow');
             nexttile();
             nSims = numel(simObjs);     % number of repeated simObj inputs
             legendText = {};
