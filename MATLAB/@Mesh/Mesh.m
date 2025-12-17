@@ -97,7 +97,7 @@ classdef Mesh < handle
             end
         end
 
-        function [eIdx,xi] = findPosInMesh(obj,pts)
+        function [eIdx,xiAll] = findPosInMesh(obj,pts)
             arguments
                 obj
                 pts (3,:)
