@@ -1,9 +1,12 @@
+clc; clear; close all;
 %% 1. Create FEM model for transient heat analysis
 fem = femodel('AnalysisType','thermalTransient');
 
 %% 2. Define 3D geometry
-gm = multicuboid(5, 5, 1); % [cm,cm,cm]
-fem.Geometry = gm; % 
+fem.Geometry = multicuboid(5, 5, 1); % [cm,cm,cm]
+fem.Geometry = addVertex(fem.Geometry,"Coordinates",[0,0,0]);
+% fem.Geometry = addVertex(fem.Geometry,"Coordinates",[0,0]);
+
 %% 3. Visualize faces to know IDs
 figure(1);
 clf
@@ -11,26 +14,11 @@ pdegplot(fem.Geometry,'FaceLabels','on','FaceAlpha',0.5);
 title('Cuboid Geometry - Face Labels');
 axis equal; view(30,30);
 
-%% 4. Define material properties
-% fem.MaterialProperties = materialProperties('ThermalConductivity',0.62, ... % W/m C : 0.0062 W/cm C -> 
-%     'MassDensity', 1000,... % kg/m^3 : 1 g/cm^3 -> 0.001 kg/cm^3 -> 1000 kg/m^3 
-%     'SpecificHeat',4000); % J/kg C : 4.0 J/g C -> 4000 J/kg C
-
-%% 5. Dirichlet Boundaries
-% Face 1: 100°C
-% fem.FaceBC(1) = faceBC("Temperature",20);
-
-%% Heat flux Boundary
-% fem.FaceLoad(2:6) = faceLoad("ConvectionCoefficient",100,... % W/m^2 C : 0.01 W/cm^2 C -> 100 W/m^2 C
-%     "AmbientTemperature",25);
-
-%% 6. Initial condition
-% fem.VertexIC = vertexIC("Temperature",25);
-% fem.CellIC = cellIC("Temperature",25);
-
 %% 7. Generate mesh
-fem = generateMesh(fem,'Hmax',0.2);
+fem = generateMesh(fem,'Hmax',0.3,'Hvertex',{9,0.0005},'Hgrad',1.01);
 mesh = Mesh(fem,[1,1,1,1,1,1]);
+figure(2)
+pdemesh(fem,'FaceAlpha',1.0);
 %%
 sensorPositions = [0,0,0.05];
 simulator = HeatSimulator();
@@ -44,7 +32,7 @@ simulator.mesh = mesh;
 simulator.sensorLocations = sensorPositions;
 
 thermalInfo = ThermalModel();
-thermalInfo.MUA = 2;
+thermalInfo.MUA = 200;
 thermalInfo.TC = 0.0062;
 thermalInfo.VHC = 4.3;
 thermalInfo.HTC = 0.008;

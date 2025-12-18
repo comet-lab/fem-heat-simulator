@@ -97,6 +97,42 @@ classdef Mesh < handle
             end
         end
 
+        function [eIdx,xiAll] = findPosInMesh(obj,pts)
+            arguments
+                obj
+                pts (3,:)
+            end
+            Ne = size(obj.elements,2);
+            Nne = size(obj.elements,1);
+            shape = ShapeFunctions.getShape(string(Nne));
+            % bounding boxes to cull elements quickly
+            mins = zeros(3,Ne); maxs = zeros(3,Ne);
+            for e = 1:Ne
+                coords = obj.nodes(:, obj.elements(:,e) );
+                mins(:,e) = min(coords,[],2);
+                maxs(:,e) = max(coords,[],2);
+            end
+            
+            numPts = size(pts,2);
+            eIdx = zeros(1,numPts);
+            xiAll = zeros(3,numPts);
+            for p = 1:numPts
+                x = pts(:,p);
+                % bounding box check
+                mask = all(x >= mins & x <= maxs, 1); 
+                cand = find(mask);
+                for e = cand
+                    nodeList = obj.nodes(:,obj.elements(:,e));
+                    xi = Mesh.computeXiCoords(x,nodeList,shape);
+                    if shape.insideRef(xi)
+                        eIdx(p) = e;
+                        xiAll(:,p) = xi;
+                        continue;
+                    end
+                end
+            end
+        end
+
         function obj = buildCubeMesh(obj, xPos, yPos, zPos, bc)
 
             Nx = numel(xPos);
@@ -567,5 +603,33 @@ classdef Mesh < handle
 
         end
 
+        function xi = computeXiCoords(pt, nodeList, S)
+            maxIters = 20;
+            
+            tol = 1e-10;
+            xi = [0;0;0]; % initial guess
+            for it = 1:maxIters
+                N = S.N(xi);        % Nn x 1
+                dN = S.dN(xi);       % Nn x 3 (d/dxi,d/deta,d/dzeta)
+                xhat = nodeList * N;                % 3x1 mapped point
+                res = xhat - pt;              % 3x1 residual
+                if norm(res) < tol
+                    return
+                end
+                J = nodeList * dN;                  % 3 x 3 Jacobian d x / d xi
+                % check invertibility
+                if rcond(J) < 1e-12
+                    xi = [];
+                    return
+                end
+                delta = J \ res;
+                xi = xi - delta;
+                % optionally clamp to reasonable range to avoid divergence
+                if any(isnan(xi)) || any(abs(xi) > 1e6)
+                    xi = [];
+                    return
+                end
+            end
+        end
     end
 end
