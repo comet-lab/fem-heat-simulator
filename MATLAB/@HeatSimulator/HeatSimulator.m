@@ -476,8 +476,8 @@ classdef HeatSimulator < handle
             simulator.thermalInfo = thermalInfo;
 
             % set laser settings
-            w0 = 0.0168;
-            lambda = 10.6e-4;
+            w0 = params.beamWaist;
+            lambda = params.wavelength;
             laser = Laser(w0,lambda,thermalInfo.MUA);
             laser.focalPose = struct('x',params.laserPose.x,'y',...
                 params.laserPose.y,'z',params.laserPose.z,...
