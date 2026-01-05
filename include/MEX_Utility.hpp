@@ -152,8 +152,14 @@ inline void displayOnMATLAB(std::shared_ptr<matlab::engine::MATLABEngine> matlab
     // Pass stream content to MATLAB fprintf function
     if (!silentMode) {
         matlab::data::ArrayFactory factory;
+        // We use "%s" as the format specifier so that symbols like '%' 
+        // in the actual message (stream.str()) are treated as plain text.
         matlabPtr->feval(u"fprintf", 0,
-            std::vector<matlab::data::Array>({ factory.createScalar(stream.str()) }));
+            std::vector<matlab::data::Array>({
+                factory.createScalar("%s"),
+                factory.createScalar(stream.str())
+                }));
+
         // Clear stream buffer
         stream.str("");
     }
